@@ -17,6 +17,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -45,6 +53,7 @@ import {
   Play,
   Ban,
   ExternalLink,
+  Trash2,
   Code2,
 } from "lucide-react";
 import {
@@ -53,6 +62,7 @@ import {
   usePauseTask,
   useResumeTask,
   useCancelTask,
+  useDeleteTask,
 } from "@/lib/hooks/use-tasks";
 import { useModels } from "@/lib/hooks/use-models";
 import { useDatasets } from "@/lib/hooks/use-datasets";
@@ -119,12 +129,18 @@ export default function TasksPage() {
   const pauseTask = usePauseTask();
   const resumeTask = useResumeTask();
   const cancelTask = useCancelTask();
+  const deleteTask = useDeleteTask();
 
   const { data: models = [] } = useModels();
   const { data: datasets = [] } = useDatasets();
   const { data: criteria = [] } = useCriteria();
 
   const [panel, setPanel] = useState<PanelMode>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [globalFilter, setGlobalFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("__all__");
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -992,22 +1008,79 @@ export default function TasksPage() {
                     )}
                   </div>
 
-                  {/* View detail link */}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => router.push(`/tasks/${selectedTask.id}`)}
-                  >
-                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                    查看详情
-                  </Button>
+                  {/* View detail + delete */}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => router.push(`/tasks/${selectedTask.id}`)}
+                    >
+                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                      查看详情
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/5"
+                      onClick={() =>
+                        setDeleteTarget({
+                          id: selectedTask.id,
+                          name: selectedTask.name,
+                        })
+                      }
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </CardContent>
               )}
             </Card>
           </div>
         )}
       </div>
+
+      {/* Delete confirmation */}
+      <Dialog open={!!deleteTarget} onOpenChange={() => { setDeleteTarget(null); setDeleteError(""); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>删除任务</DialogTitle>
+            <DialogDescription>
+              确定要删除 &quot;{deleteTarget?.name}&quot; 吗？相关的子任务和评测结果也将被删除，此操作不可撤销。
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive px-1">{deleteError}</p>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => { setDeleteTarget(null); setDeleteError(""); }}>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                setDeleteError("");
+                try {
+                  const id = deleteTarget!.id;
+                  if (selectedId === id) closePanel();
+                  await deleteTask.mutateAsync(id);
+                  setDeleteTarget(null);
+                } catch (err: unknown) {
+                  const detail =
+                    err && typeof err === "object" && "response" in err
+                      ? (err as { response?: { data?: { detail?: string } } }).response
+                          ?.data?.detail
+                      : undefined;
+                  setDeleteError(detail || "删除失败");
+                }
+              }}
+              disabled={deleteTask.isPending}
+            >
+              {deleteTask.isPending ? "删除中..." : "删除"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

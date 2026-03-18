@@ -6,6 +6,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import get_current_user, get_db
+from app.models.eval_result import EvalResult
 from app.models.eval_task import EvalSubtask, EvalTask, TaskStatus
 from app.models.user import User
 from app.schemas.task import SubtaskResponse, TaskCreate, TaskResponse
@@ -129,3 +130,29 @@ async def cancel_task(
     await session.commit()
     await session.refresh(task)
     return task
+
+
+@router.delete("/{task_id}", status_code=204)
+async def delete_task(
+    task_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    task = await session.get(EvalTask, task_id)
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+
+    # Delete results referencing this task
+    stmt = select(EvalResult).where(EvalResult.task_id == task_id)
+    results = (await session.exec(stmt)).all()
+    for r in results:
+        await session.delete(r)
+
+    # Delete subtasks
+    stmt = select(EvalSubtask).where(EvalSubtask.task_id == task_id)
+    subtasks = (await session.exec(stmt)).all()
+    for s in subtasks:
+        await session.delete(s)
+
+    await session.delete(task)
+    await session.commit()
