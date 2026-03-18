@@ -1,174 +1,138 @@
-"""Evaluation task endpoints."""
-from typing import List, Optional
+import uuid
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import SQLModel, Session, select
+from pydantic import BaseModel
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.database import get_db
-from app.db.models import Evaluation, TaskStatus
-from app.security import get_current_user
+from app.db.models import Dataset, Evaluation, EvaluationDatasetLink, MLModel, TaskStatus
+from app.db.session import get_session
+from app.scheduler.tasks import run_evaluation
 
-router = APIRouter()
-
-
-class GenerationConfig(SQLModel):
-    temperature: Optional[float] = 0.7
-    max_tokens: Optional[int] = 2048
-    top_p: Optional[float] = 0.9
-    top_k: Optional[int] = 50
+router = APIRouter(prefix="/evaluations", tags=["evaluations"])
 
 
-class DatasetArgs(SQLModel):
-    limit: Optional[int] = None
-    few_shot_num: Optional[int] = 0
-    few_shot_random: Optional[bool] = True
+# ---------- Schemas ----------
 
 
-class EvalConfig(SQLModel):
-    metrics: Optional[List[str]] = ["exact_match"]
-    eval_type: Optional[str] = "native"
-
-
-class EvaluationCreate(SQLModel):
+class EvaluationCreate(BaseModel):
     name: str
-    description: Optional[str] = None
-    model_id: int
-    dataset_id: int
-    generation_config: Optional[GenerationConfig] = None
-    dataset_args: Optional[DatasetArgs] = None
-    eval_config: Optional[EvalConfig] = None
+    model_id: uuid.UUID
+    dataset_ids: list[uuid.UUID]
+    temperature: float = 0.0
+    max_tokens: int = 2048
+    few_shot: int = 0
+    batch_size: int = 1
+    extra_params: dict | None = None
 
 
-class EvaluationUpdate(SQLModel):
-    status: Optional[str] = None
-    progress: Optional[float] = None
-    metrics: Optional[dict] = None
-
-
-class EvaluationResponse(SQLModel):
-    id: int
+class EvaluationRead(BaseModel):
+    id: uuid.UUID
     name: str
-    description: Optional[str] = None
-    model_id: int
-    dataset_id: int
-    status: str
+    model_id: uuid.UUID
+    status: TaskStatus
+    celery_task_id: str | None
+    temperature: float
+    max_tokens: int
+    few_shot: int
+    batch_size: int
+    extra_params: dict | None
     progress: float
-    metrics: Optional[dict] = None
-    created_at: str
-    updated_at: str
-    completed_at: Optional[str] = None
+    error_message: str | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    dataset_ids: list[uuid.UUID] = []
+
+    model_config = {"from_attributes": True}
 
 
-class EvaluationDetailResponse(EvaluationResponse):
-    generation_config: Optional[dict] = None
-    dataset_args: Optional[dict] = None
-    eval_config: Optional[dict] = None
+# ---------- Helpers ----------
 
 
-def _response(e: Evaluation) -> EvaluationResponse:
-    return EvaluationResponse(
-        id=e.id, name=e.name, description=e.description,
-        model_id=e.model_config_id, dataset_id=e.dataset_id,
-        status=e.status, progress=e.progress, metrics=e.metrics,
-        created_at=e.created_at.isoformat(), updated_at=e.updated_at.isoformat(),
-        completed_at=e.completed_at.isoformat() if e.completed_at else None
+def _eval_to_read(evaluation: Evaluation) -> EvaluationRead:
+    return EvaluationRead(
+        **evaluation.model_dump(),
+        dataset_ids=[d.id for d in evaluation.datasets],
     )
 
 
-@router.get("", response_model=List[EvaluationResponse])
-def list_evaluations(
-    skip: int = 0, limit: int = 50, status: Optional[str] = None,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """List all evaluations."""
-    query = select(Evaluation).where(Evaluation.user_id == current_user["id"])
-    if status:
-        query = query.where(Evaluation.status == TaskStatus(status))
-    query = query.order_by(Evaluation.created_at.desc()).offset(skip).limit(limit)
-    return [_response(e) for e in db.exec(query).all()]
+# ---------- Endpoints ----------
 
 
-@router.post("", response_model=EvaluationResponse, status_code=status.HTTP_201_CREATED)
-def create_evaluation(
-    evaluation: EvaluationCreate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+@router.post("", response_model=EvaluationRead, status_code=status.HTTP_201_CREATED)
+async def create_evaluation(
+    payload: EvaluationCreate,
+    session: AsyncSession = Depends(get_session),
 ):
-    """Create a new evaluation task."""
-    db_eval = Evaluation(
-        name=evaluation.name, description=evaluation.description,
-        model_config_id=evaluation.model_id, dataset_id=evaluation.dataset_id,
-        user_id=current_user["id"],
-        generation_config=evaluation.generation_config.model_dump() if evaluation.generation_config else None,
-        dataset_args=evaluation.dataset_args.model_dump() if evaluation.dataset_args else None,
-        eval_config=evaluation.eval_config.model_dump() if evaluation.eval_config else None,
-        status=TaskStatus.PENDING, progress=0.0,
+    # Validate model exists
+    model = await session.get(MLModel, payload.model_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    # Validate datasets exist
+    datasets: list[Dataset] = []
+    for ds_id in payload.dataset_ids:
+        ds = await session.get(Dataset, ds_id)
+        if not ds:
+            raise HTTPException(status_code=404, detail=f"Dataset {ds_id} not found")
+        datasets.append(ds)
+
+    evaluation = Evaluation(
+        name=payload.name,
+        model_id=payload.model_id,
+        temperature=payload.temperature,
+        max_tokens=payload.max_tokens,
+        few_shot=payload.few_shot,
+        batch_size=payload.batch_size,
+        extra_params=payload.extra_params,
     )
-    db.add(db_eval)
-    db.commit()
-    db.refresh(db_eval)
-    return _response(db_eval)
+    session.add(evaluation)
+    await session.flush()
+
+    # Create link records
+    for ds in datasets:
+        link = EvaluationDatasetLink(evaluation_id=evaluation.id, dataset_id=ds.id)
+        session.add(link)
+
+    await session.commit()
+    await session.refresh(evaluation)
+
+    # Dispatch Celery task
+    celery_result = run_evaluation.delay(str(evaluation.id))
+    evaluation.celery_task_id = celery_result.id
+    evaluation.status = TaskStatus.PENDING
+    session.add(evaluation)
+    await session.commit()
+    await session.refresh(evaluation)
+
+    return _eval_to_read(evaluation)
 
 
-@router.get("/{evaluation_id}", response_model=EvaluationDetailResponse)
-def get_evaluation(
-    evaluation_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+@router.get("", response_model=list[EvaluationRead])
+async def list_evaluations(
+    skip: int = 0,
+    limit: int = 50,
+    status_filter: TaskStatus | None = None,
+    session: AsyncSession = Depends(get_session),
 ):
-    """Get evaluation details."""
-    e = db.exec(
-        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.user_id == current_user["id"])
-    ).first()
-    if not e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
-    return EvaluationDetailResponse(
-        id=e.id, name=e.name, description=e.description,
-        model_id=e.model_config_id, dataset_id=e.dataset_id,
-        status=e.status, progress=e.progress, metrics=e.metrics,
-        generation_config=e.generation_config, dataset_args=e.dataset_args, eval_config=e.eval_config,
-        created_at=e.created_at.isoformat(), updated_at=e.updated_at.isoformat(),
-        completed_at=e.completed_at.isoformat() if e.completed_at else None
-    )
+    query = select(Evaluation).order_by(Evaluation.created_at.desc())  # type: ignore[attr-defined]
+    if status_filter:
+        query = query.where(Evaluation.status == status_filter)
+    query = query.offset(skip).limit(limit)
+    result = await session.exec(query)
+    evaluations = result.all()
+    return [_eval_to_read(e) for e in evaluations]
 
 
-@router.patch("/{evaluation_id}", response_model=EvaluationResponse)
-def update_evaluation(
-    evaluation_id: int, update: EvaluationUpdate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+@router.get("/{evaluation_id}", response_model=EvaluationRead)
+async def get_evaluation(
+    evaluation_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
 ):
-    """Update an evaluation."""
-    e = db.exec(
-        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.user_id == current_user["id"])
-    ).first()
-    if not e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
-
-    if update.status:
-        e.status = TaskStatus(update.status)
-    if update.progress is not None:
-        e.progress = update.progress
-    if update.metrics is not None:
-        e.metrics = update.metrics
-
-    db.add(e)
-    db.commit()
-    db.refresh(e)
-    return _response(e)
-
-
-@router.delete("/{evaluation_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_evaluation(
-    evaluation_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Delete an evaluation."""
-    e = db.exec(
-        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.user_id == current_user["id"])
-    ).first()
-    if not e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found")
-    db.delete(e)
-    db.commit()
+    evaluation = await session.get(Evaluation, evaluation_id)
+    if not evaluation:
+        raise HTTPException(status_code=404, detail="Evaluation not found")
+    return _eval_to_read(evaluation)

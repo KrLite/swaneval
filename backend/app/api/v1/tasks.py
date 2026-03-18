@@ -1,126 +1,110 @@
-"""Task management endpoints."""
-from typing import List, Optional
+import uuid
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
-from sqlmodel import SQLModel, Session, select
+from pydantic import BaseModel
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.database import get_db
 from app.db.models import Evaluation, TaskStatus
-from app.security import get_current_user
+from app.db.session import get_session
+from app.scheduler.celery_app import celery_app
 
-router = APIRouter()
+router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
-class TaskStatusResponse(SQLModel):
-    id: int
+# ---------- Schemas ----------
+
+
+class TaskRead(BaseModel):
+    id: uuid.UUID
     name: str
-    status: str
+    status: TaskStatus
+    celery_task_id: str | None
     progress: float
-    message: Optional[str] = None
-    created_at: str
-    updated_at: str
+    error_message: str | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
-class TaskCancelResponse(SQLModel):
-    success: bool
-    message: str
+# ---------- Endpoints ----------
 
 
-def _response(t: Evaluation) -> TaskStatusResponse:
-    return TaskStatusResponse(
-        id=t.id, name=t.name, status=t.status, progress=t.progress,
-        message=None, created_at=t.created_at.isoformat(), updated_at=t.updated_at.isoformat()
+@router.get("", response_model=list[TaskRead])
+async def list_tasks(
+    skip: int = 0,
+    limit: int = 50,
+    session: AsyncSession = Depends(get_session),
+):
+    result = await session.exec(
+        select(Evaluation).order_by(Evaluation.created_at.desc()).offset(skip).limit(limit)  # type: ignore[attr-defined]
     )
+    return result.all()
 
 
-def _get_task(db: Session, task_id: int, user_id: int) -> Evaluation:
-    task = db.exec(
-        select(Evaluation).where(Evaluation.id == task_id, Evaluation.user_id == user_id)
-    ).first()
-    if not task:
+@router.get("/{task_id}", response_model=TaskRead)
+async def get_task(task_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    evaluation = await session.get(Evaluation, task_id)
+    if not evaluation:
         raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    return evaluation
 
 
-@router.get("", response_model=List[TaskStatusResponse])
-def list_tasks(
-    skip: int = 0, limit: int = 50, status: Optional[str] = None,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """List all tasks."""
-    query = select(Evaluation).where(Evaluation.user_id == current_user["id"])
-    if status:
-        query = query.where(Evaluation.status == TaskStatus(status))
-    query = query.order_by(Evaluation.created_at.desc()).offset(skip).limit(limit)
-    return [_response(t) for t in db.exec(query).all()]
+@router.post("/{task_id}/cancel", response_model=TaskRead)
+async def cancel_task(task_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    evaluation = await session.get(Evaluation, task_id)
+    if not evaluation:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if evaluation.status not in (TaskStatus.PENDING, TaskStatus.RUNNING):
+        raise HTTPException(status_code=400, detail="Task cannot be cancelled in current state")
+
+    # Revoke Celery task
+    if evaluation.celery_task_id:
+        celery_app.control.revoke(evaluation.celery_task_id, terminate=True)
+
+    evaluation.status = TaskStatus.CANCELLED
+    evaluation.finished_at = datetime.now(timezone.utc)
+    session.add(evaluation)
+    await session.commit()
+    await session.refresh(evaluation)
+    return evaluation
 
 
-@router.get("/{task_id}", response_model=TaskStatusResponse)
-def get_task(
-    task_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Get task status."""
-    return _response(_get_task(db, task_id, current_user["id"]))
+# ---------- WebSocket ----------
 
 
-@router.post("/{task_id}/cancel", response_model=TaskCancelResponse)
-def cancel_task(
-    task_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Cancel a task."""
-    task = _get_task(db, task_id, current_user["id"])
-    if task.status not in [TaskStatus.PENDING, TaskStatus.RUNNING]:
-        return TaskCancelResponse(success=False, message=f"Cannot cancel task with status: {task.status}")
-    task.status = TaskStatus.CANCELLED
-    db.add(task)
-    db.commit()
-    return TaskCancelResponse(success=True, message="Task cancelled successfully")
-
-
-@router.post("/{task_id}/pause")
-def pause_task(
-    task_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Pause a running task."""
-    task = _get_task(db, task_id, current_user["id"])
-    if task.status != TaskStatus.RUNNING:
-        return {"success": False, "message": "Task is not running"}
-    task.status = TaskStatus.PAUSED
-    db.add(task)
-    db.commit()
-    return {"success": True, "message": "Task paused"}
-
-
-@router.post("/{task_id}/resume")
-def resume_task(
-    task_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Resume a paused task."""
-    task = _get_task(db, task_id, current_user["id"])
-    if task.status != TaskStatus.PAUSED:
-        return {"success": False, "message": "Task is not paused"}
-    task.status = TaskStatus.RUNNING
-    db.add(task)
-    db.commit()
-    return {"success": True, "message": "Task resumed"}
-
-
-@router.websocket("/ws/{task_id}")
-async def task_progress_websocket(websocket: WebSocket, task_id: int):
-    """WebSocket endpoint for real-time task progress."""
+@router.websocket("/ws/{task_id}/progress")
+async def task_progress_ws(websocket: WebSocket, task_id: uuid.UUID):
     await websocket.accept()
     try:
-        await websocket.send_json({"type": "status", "task_id": task_id, "status": "connected", "progress": 0})
         while True:
+            # Wait for a message from client (acts as a poll trigger)
             await websocket.receive_text()
-            await websocket.send_json({"type": "heartbeat", "task_id": task_id})
+
+            async with get_session().__anext__() as session:  # type: ignore[union-attr]
+                evaluation = await session.get(Evaluation, task_id)
+                if not evaluation:
+                    await websocket.send_json({"error": "Task not found"})
+                    break
+
+                await websocket.send_json(
+                    {
+                        "id": str(evaluation.id),
+                        "status": evaluation.status,
+                        "progress": evaluation.progress,
+                        "error_message": evaluation.error_message,
+                    }
+                )
+
+                if evaluation.status in (
+                    TaskStatus.COMPLETED,
+                    TaskStatus.FAILED,
+                    TaskStatus.CANCELLED,
+                ):
+                    break
     except WebSocketDisconnect:
         pass

@@ -1,187 +1,136 @@
-"""Results endpoints."""
-from typing import List, Optional
+import uuid
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import SQLModel, Session, select
+from pydantic import BaseModel
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.database import get_db
-from app.db.models import Evaluation, EvaluationResult, TaskStatus
-from app.security import get_current_user
+from app.db.models import Evaluation, EvaluationResult, MLModel, TaskStatus
+from app.db.session import get_session
 
-router = APIRouter()
-
-
-class MetricResult(SQLModel):
-    metric: str
-    value: float
+router = APIRouter(prefix="/results", tags=["results"])
 
 
-class EvaluationResultsResponse(SQLModel):
-    evaluation_id: int
-    total_samples: int
-    metrics: List[MetricResult]
-    results: List[dict]
+# ---------- Schemas ----------
 
 
-class LeaderboardEntry(SQLModel):
-    model_id: int
+class ResultRead(BaseModel):
+    id: uuid.UUID
+    evaluation_id: uuid.UUID
+    dataset_name: str
+    metric_name: str
+    metric_value: float
+    details: dict | None
+
+    model_config = {"from_attributes": True}
+
+
+class LeaderboardEntry(BaseModel):
     model_name: str
-    dataset: str
-    metric: str
-    value: float
-    rank: int
+    model_id: uuid.UUID
+    scores: dict[str, float]
+    average: float
 
 
-class ColumnChartData(SQLModel):
-    metrics: List[str]
-    series: List[dict]
+class ChartDataPoint(BaseModel):
+    label: str
+    values: dict[str, float]
 
 
-class RadarChartData(SQLModel):
-    metrics: List[str]
-    values: List[float]
+# ---------- Endpoints ----------
 
 
-class LineChartData(SQLModel):
-    x_axis: str
-    series: List[dict]
-
-
-@router.get("/{evaluation_id}/results", response_model=EvaluationResultsResponse)
-def get_evaluation_results(
-    evaluation_id: int, limit: int = Query(100, le=1000),
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+@router.get("/{evaluation_id}", response_model=list[ResultRead])
+async def get_results(
+    evaluation_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
 ):
-    """Get evaluation results."""
-    evaluation = db.exec(
-        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.user_id == current_user["id"])
-    ).first()
+    evaluation = await session.get(Evaluation, evaluation_id)
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")
 
-    results = db.exec(
-        select(EvaluationResult).where(EvaluationResult.evaluation_id == evaluation_id).limit(limit)
-    ).all()
-
-    metrics = []
-    if evaluation.metrics:
-        for key, value in evaluation.metrics.items():
-            metrics.append(MetricResult(metric=key, value=value))
-    elif results:
-        correct_count = sum(1 for r in results if r.is_correct)
-        if correct_count > 0:
-            metrics.append(MetricResult(metric="accuracy", value=correct_count / len(results)))
-
-    return EvaluationResultsResponse(
-        evaluation_id=evaluation_id, total_samples=len(results), metrics=metrics,
-        results=[{
-            "id": r.id,
-            "prompt": r.prompt[:100] + "..." if len(r.prompt) > 100 else r.prompt,
-            "expected_output": r.expected_output, "actual_output": r.actual_output,
-            "is_correct": r.is_correct, "score": r.score, "latency_ms": r.latency_ms
-        } for r in results]
+    result = await session.exec(
+        select(EvaluationResult).where(EvaluationResult.evaluation_id == evaluation_id)
     )
+    return result.all()
 
 
-@router.get("/leaderboard")
-def get_leaderboard(
-    dataset: Optional[str] = None, metric: str = "accuracy",
-    limit: int = Query(10, le=50),
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+@router.get("/leaderboard", response_model=list[LeaderboardEntry])
+async def get_leaderboard(
+    metric: str = Query(default="accuracy"),
+    session: AsyncSession = Depends(get_session),
 ):
-    """Get model leaderboard."""
-    query = select(Evaluation).where(
-        Evaluation.user_id == current_user["id"], Evaluation.status == TaskStatus.COMPLETED
+    # Fetch all completed evaluations with results
+    evals_result = await session.exec(
+        select(Evaluation).where(Evaluation.status == TaskStatus.COMPLETED)
     )
-    if dataset:
-        query = query.where(Evaluation.dataset_id == int(dataset))
+    evaluations = evals_result.all()
 
-    evaluations = db.exec(query).all()
+    entries: dict[uuid.UUID, dict[str, float]] = defaultdict(dict)
+    model_names: dict[uuid.UUID, str] = {}
+
+    for ev in evaluations:
+        model = await session.get(MLModel, ev.model_id)
+        if not model:
+            continue
+        model_names[model.id] = model.name
+
+        results = await session.exec(
+            select(EvaluationResult).where(
+                EvaluationResult.evaluation_id == ev.id,
+                EvaluationResult.metric_name == metric,
+            )
+        )
+        for r in results.all():
+            entries[model.id][r.dataset_name] = r.metric_value
+
     leaderboard = []
-    for e in evaluations:
-        if e.metrics and metric in e.metrics:
-            leaderboard.append(LeaderboardEntry(
-                model_id=e.model_config_id, model_name=f"Model {e.model_config_id}",
-                dataset=f"Dataset {e.dataset_id}", metric=metric,
-                value=e.metrics[metric], rank=0
-            ))
+    for model_id, scores in entries.items():
+        avg = sum(scores.values()) / len(scores) if scores else 0.0
+        leaderboard.append(
+            LeaderboardEntry(
+                model_name=model_names[model_id],
+                model_id=model_id,
+                scores=scores,
+                average=avg,
+            )
+        )
 
-    leaderboard.sort(key=lambda x: x.value, reverse=True)
-    for i, entry in enumerate(leaderboard):
-        entry.rank = i + 1
-    return leaderboard[:limit]
+    leaderboard.sort(key=lambda x: x.average, reverse=True)
+    return leaderboard
 
 
-@router.get("/charts/column")
-def get_column_chart(
-    model_ids: str, metric_ids: str, dataset_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+@router.get("/charts", response_model=list[ChartDataPoint])
+async def get_chart_data(
+    evaluation_ids: list[uuid.UUID] = Query(default=[]),
+    metric: str = Query(default="accuracy"),
+    session: AsyncSession = Depends(get_session),
 ):
-    """Get column chart data for multi-model comparison."""
-    model_id_list = [int(m) for m in model_ids.split(",")]
-    metric_id_list = metric_ids.split(",")
+    if not evaluation_ids:
+        return []
 
-    series = []
-    for model_id in model_id_list:
-        eval_obj = db.exec(
-            select(Evaluation).where(
-                Evaluation.model_config_id == model_id, Evaluation.dataset_id == dataset_id,
-                Evaluation.status == TaskStatus.COMPLETED
-            ).order_by(Evaluation.created_at.desc()).limit(1)
-        ).first()
+    # Group results by dataset for comparison charts
+    data_by_dataset: dict[str, dict[str, float]] = defaultdict(dict)
 
-        data = []
-        if eval_obj and eval_obj.metrics:
-            data = [round(eval_obj.metrics.get(m, 0), 4) for m in metric_id_list]
-        series.append({"name": f"Model {model_id}", "data": data})
+    for eval_id in evaluation_ids:
+        ev = await session.get(Evaluation, eval_id)
+        if not ev:
+            continue
+        model = await session.get(MLModel, ev.model_id)
+        if not model:
+            continue
 
-    return ColumnChartData(metrics=metric_id_list, series=series)
+        results = await session.exec(
+            select(EvaluationResult).where(
+                EvaluationResult.evaluation_id == eval_id,
+                EvaluationResult.metric_name == metric,
+            )
+        )
+        for r in results.all():
+            data_by_dataset[r.dataset_name][model.name] = r.metric_value
 
-
-@router.get("/charts/radar/{model_id}")
-def get_radar_chart(
-    model_id: int, dataset_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Get radar chart data for single model."""
-    eval_obj = db.exec(
-        select(Evaluation).where(
-            Evaluation.model_config_id == model_id, Evaluation.dataset_id == dataset_id,
-            Evaluation.status == TaskStatus.COMPLETED
-        ).order_by(Evaluation.created_at.desc()).limit(1)
-    ).first()
-
-    if not eval_obj or not eval_obj.metrics:
-        return RadarChartData(metrics=["accuracy", "precision", "recall", "f1"], values=[0.5, 0.5, 0.5, 0.5])
-
-    metrics = list(eval_obj.metrics.keys())[:6]
-    return RadarChartData(metrics=metrics, values=[round(eval_obj.metrics.get(m, 0), 4) for m in metrics])
-
-
-@router.get("/charts/line/{metric}")
-def get_line_chart(
-    metric: str,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Get line chart data for cross-version comparison."""
-    evaluations = db.exec(
-        select(Evaluation).where(
-            Evaluation.user_id == current_user["id"], Evaluation.status == TaskStatus.COMPLETED
-        ).order_by(Evaluation.created_at.asc())
-    ).all()
-
-    x_axis = []
-    series = {}
-    for e in evaluations:
-        if e.metrics and metric in e.metrics:
-            date = e.created_at.strftime("%Y-%m-%d")
-            model_key = f"Model {e.model_config_id}"
-            if date not in x_axis:
-                x_axis.append(date)
-            series.setdefault(model_key, []).append(round(e.metrics[metric], 4))
-
-    return LineChartData(x_axis=metric, series=[{"name": k, "data": v} for k, v in series.items()])
+    return [
+        ChartDataPoint(label=ds_name, values=values)
+        for ds_name, values in data_by_dataset.items()
+    ]

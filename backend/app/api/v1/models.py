@@ -1,150 +1,101 @@
-"""Model management endpoints."""
-from typing import List, Optional
+import uuid
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import SQLModel, Session, select
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.database import get_db
-from app.db.models import ModelConfig, ModelType
-from app.security import get_current_user
+from app.db.models import MLModel, ModelSourceType
+from app.db.session import get_session
 
-router = APIRouter()
-
-
-class ModelConfigCreate(SQLModel):
-    name: str
-    model_type: str
-    path: str
-    api_key: Optional[str] = None
-    config: Optional[dict] = None
-    is_public: bool = False
+router = APIRouter(prefix="/models", tags=["models"])
 
 
-class ModelConfigUpdate(SQLModel):
-    name: Optional[str] = None
-    api_key: Optional[str] = None
-    config: Optional[dict] = None
-    is_public: Optional[bool] = None
+# ---------- Schemas ----------
 
 
-class ModelConfigResponse(SQLModel):
-    id: int
-    name: str
-    model_type: str
-    path: str
-    config: Optional[dict] = None
-    is_public: bool
-    created_at: str
+class ModelCreate(MLModel, table=False):
+    id: uuid.UUID | None = None  # type: ignore[assignment]
+    created_at: datetime | None = None  # type: ignore[assignment]
+    updated_at: datetime | None = None  # type: ignore[assignment]
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "name": "Qwen-7B",
+                "source_type": "huggingface",
+                "path_or_endpoint": "Qwen/Qwen-7B",
+                "revision": "main",
+                "precision": "fp16",
+            }
+        }
 
 
-PRESET_MODELS = [
-    {"id": -1, "name": "Qwen/Qwen2.5-0.5B-Instruct", "model_type": "huggingface", "path": "Qwen/Qwen2.5-0.5B-Instruct"},
-    {"id": -2, "name": "Qwen/Qwen2.5-1.5B-Instruct", "model_type": "huggingface", "path": "Qwen/Qwen2.5-1.5B-Instruct"},
-    {"id": -3, "name": "Qwen/Qwen2.5-7B-Instruct", "model_type": "huggingface", "path": "Qwen/Qwen2.5-7B-Instruct"},
-    {"id": -4, "name": "meta-llama/Llama-3.2-1B-Instruct", "model_type": "huggingface", "path": "meta-llama/Llama-3.2-1B-Instruct"},
-    {"id": -5, "name": "meta-llama/Llama-3.2-3B-Instruct", "model_type": "huggingface", "path": "meta-llama/Llama-3.2-3B-Instruct"},
-    {"id": -6, "name": "Qwen/Qwen2-0.5B-Instruct", "model_type": "huggingface", "path": "Qwen/Qwen2-0.5B-Instruct"},
-    {"id": -7, "name": "Qwen/Qwen2-1.5B-Instruct", "model_type": "huggingface", "path": "Qwen/Qwen2-1.5B-Instruct"},
-]
+class ModelRead(MLModel, table=False):
+    pass
 
 
-@router.get("", response_model=List[ModelConfigResponse])
-def list_models(
+class ModelUpdate(MLModel, table=False):
+    name: str | None = None  # type: ignore[assignment]
+    source_type: ModelSourceType | None = None  # type: ignore[assignment]
+    path_or_endpoint: str | None = None  # type: ignore[assignment]
+
+
+# ---------- Endpoints ----------
+
+
+@router.post("", response_model=ModelRead, status_code=status.HTTP_201_CREATED)
+async def create_model(payload: ModelCreate, session: AsyncSession = Depends(get_session)):
+    model = MLModel.model_validate(payload)
+    session.add(model)
+    await session.commit()
+    await session.refresh(model)
+    return model
+
+
+@router.get("", response_model=list[ModelRead])
+async def list_models(
     skip: int = 0,
-    limit: int = 100,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    limit: int = 50,
+    session: AsyncSession = Depends(get_session),
 ):
-    """List all model configurations."""
-    user_models = db.exec(
-        select(ModelConfig).where(
-            (ModelConfig.user_id == current_user["id"]) | (ModelConfig.is_public == True)
-        ).offset(skip).limit(limit)
-    ).all()
-
-    all_models = []
-    for m in PRESET_MODELS:
-        all_models.append(ModelConfigResponse(
-            id=m["id"], name=m["name"], model_type=m["model_type"],
-            path=m["path"], config=None, is_public=True,
-            created_at="2024-01-01T00:00:00"
-        ))
-    for m in user_models:
-        all_models.append(ModelConfigResponse(
-            id=m.id, name=m.name, model_type=m.model_type,
-            path=m.path, config=m.config, is_public=m.is_public,
-            created_at=m.created_at.isoformat()
-        ))
-    return all_models
-
-
-@router.get("/presets")
-def list_preset_models():
-    """List preset models."""
-    return [{"id": m["id"], "name": m["name"], "path": m["path"]} for m in PRESET_MODELS]
-
-
-@router.post("", response_model=ModelConfigResponse, status_code=status.HTTP_201_CREATED)
-def create_model(
-    model: ModelConfigCreate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Create a new model configuration."""
-    db_model = ModelConfig(
-        name=model.name, model_type=ModelType(model.model_type),
-        path=model.path, api_key=model.api_key, config=model.config,
-        user_id=current_user["id"], is_public=model.is_public,
+    result = await session.exec(
+        select(MLModel).order_by(MLModel.created_at.desc()).offset(skip).limit(limit)  # type: ignore[attr-defined]
     )
-    db.add(db_model)
-    db.commit()
-    db.refresh(db_model)
-    return ModelConfigResponse(
-        id=db_model.id, name=db_model.name, model_type=db_model.model_type,
-        path=db_model.path, config=db_model.config, is_public=db_model.is_public,
-        created_at=db_model.created_at.isoformat()
-    )
+    return result.all()
 
 
-@router.get("/{model_id}", response_model=ModelConfigResponse)
-def get_model(
-    model_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Get a model configuration by ID."""
-    for m in PRESET_MODELS:
-        if m["id"] == model_id:
-            return ModelConfigResponse(
-                id=m["id"], name=m["name"], model_type=m["model_type"],
-                path=m["path"], config=None, is_public=True,
-                created_at="2024-01-01T00:00:00"
-            )
-
-    model = db.get(ModelConfig, model_id)
+@router.get("/{model_id}", response_model=ModelRead)
+async def get_model(model_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    model = await session.get(MLModel, model_id)
     if not model:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
-    return ModelConfigResponse(
-        id=model.id, name=model.name, model_type=model.model_type,
-        path=model.path, config=model.config, is_public=model.is_public,
-        created_at=model.created_at.isoformat()
-    )
+        raise HTTPException(status_code=404, detail="Model not found")
+    return model
+
+
+@router.patch("/{model_id}", response_model=ModelRead)
+async def update_model(
+    model_id: uuid.UUID,
+    payload: ModelUpdate,
+    session: AsyncSession = Depends(get_session),
+):
+    model = await session.get(MLModel, model_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(model, key, value)
+    model.updated_at = datetime.now(timezone.utc)
+    session.add(model)
+    await session.commit()
+    await session.refresh(model)
+    return model
 
 
 @router.delete("/{model_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_model(
-    model_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """Delete a model configuration."""
-    for m in PRESET_MODELS:
-        if m["id"] == model_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot delete preset models")
-
-    model = db.exec(
-        select(ModelConfig).where(ModelConfig.id == model_id, ModelConfig.user_id == current_user["id"])
-    ).first()
+async def delete_model(model_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    model = await session.get(MLModel, model_id)
     if not model:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
-    db.delete(model)
-    db.commit()
+        raise HTTPException(status_code=404, detail="Model not found")
+    await session.delete(model)
+    await session.commit()
