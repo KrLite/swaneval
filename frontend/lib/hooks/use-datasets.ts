@@ -47,9 +47,7 @@ export function useUploadDataset() {
       form.append("name", data.name);
       if (data.description) form.append("description", data.description);
       if (data.tags) form.append("tags", data.tags);
-      const res = await api.post<Dataset>("/datasets/upload", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const res = await api.post<Dataset>("/datasets/upload", form);
       return res.data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["datasets"] }),
