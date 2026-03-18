@@ -1,6 +1,5 @@
 """Database package."""
 from app.db.models import (
-    Base,
     User,
     UserRole,
     ModelConfig,
@@ -13,7 +12,6 @@ from app.db.models import (
 )
 
 __all__ = [
-    "Base",
     "User",
     "UserRole",
     "ModelConfig",
