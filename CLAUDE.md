@@ -12,12 +12,14 @@
 ## Tech Stack
 
 ### Backend
+
 - **Framework**: FastAPI (Python 3.10+)
 - **Database**: PostgreSQL with SQLAlchemy 2.0
 - **Task Queue**: Celery + Redis
 - **Integration**: EvalScope (wraps the CLI/API)
 
 ### Frontend
+
 - **Framework**: Next.js 14 (App Router)
 - **UI Library**: shadcn/ui + Tailwind CSS
 - **Charts**: Recharts
@@ -75,6 +77,7 @@ evalscope-gui/
 ## Development Setup
 
 ### Prerequisites
+
 - Python 3.10+
 - Node.js 18+
 - PostgreSQL 14+
@@ -82,6 +85,7 @@ evalscope-gui/
 - Docker & Docker Compose (optional)
 
 ### Backend Setup
+
 ```bash
 cd backend
 
@@ -94,7 +98,7 @@ source venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 
 # Set environment variables
-export DATABASE_URL="postgresql://user:password@localhost:5432/evalscope"
+export DATABASE_URL="postgresql://user:password@localhost:6001/evalscope"
 export REDIS_URL="redis://localhost:6379/0"
 
 # Run database migrations
@@ -105,6 +109,7 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 ### Frontend Setup
+
 ```bash
 cd frontend
 
@@ -119,6 +124,7 @@ npm run dev
 ```
 
 ### Docker Setup (Alternative)
+
 ```bash
 # Start all services
 docker-compose up -d
@@ -132,17 +138,20 @@ docker-compose logs -f
 ## Key Features
 
 ### 1. Model Management
+
 - Add models (HuggingFace, local, API endpoints)
 - Configure model parameters (revision, precision, device_map)
 - Manage API keys and endpoints
 
 ### 2. Dataset Management
+
 - Import from preset datasets (MMLU, C-Eval, GSM8K, etc.)
 - Import from HuggingFace/ModelScope
 - Upload custom datasets (JSONL, CSV, Parquet, Excel)
 - Version control for datasets
 
 ### 3. Evaluation Tasks
+
 - 4-step task creation wizard:
   1. Select model
   2. Select datasets
@@ -152,12 +161,14 @@ docker-compose logs -f
 - Task queue management (pause, resume, cancel)
 
 ### 4. Results & Visualization
+
 - Column charts (multi-model comparison)
 - Radar charts (capability overview)
 - Line charts (token speed, cross-version)
 - Leaderboard auto-generation
 
 ### 5. Report Generation
+
 - Performance reports
 - Export to PDF, Word, HTML, CSV
 
@@ -166,6 +177,7 @@ docker-compose logs -f
 ## API Endpoints
 
 ### Models
+
 ```
 POST   /api/v1/models           # Add model
 GET    /api/v1/models          # List models
@@ -174,6 +186,7 @@ DELETE /api/v1/models/{id}     # Remove model
 ```
 
 ### Datasets
+
 ```
 POST   /api/v1/datasets        # Import dataset
 GET    /api/v1/datasets        # List datasets
@@ -182,6 +195,7 @@ POST   /api/v1/datasets/{id}/version
 ```
 
 ### Evaluations
+
 ```
 POST   /api/v1/evaluations     # Create evaluation
 GET    /api/v1/evaluations     # List evaluations
@@ -189,6 +203,7 @@ GET    /api/v1/evaluations/{id}
 ```
 
 ### Results
+
 ```
 GET    /api/v1/results/{eval_id}
 GET    /api/v1/results/leaderboard
@@ -196,6 +211,7 @@ GET    /api/v1/results/charts
 ```
 
 ### Tasks
+
 ```
 GET    /api/v1/tasks
 GET    /api/v1/tasks/{id}
@@ -218,6 +234,7 @@ WS     /ws/tasks/{id}/progress
 ## Commands Reference
 
 ### Backend
+
 ```bash
 # Run server
 uvicorn app.main:app --reload
@@ -231,6 +248,7 @@ alembic revision --autogenerate -m "description"
 ```
 
 ### Frontend
+
 ```bash
 # Development
 npm run dev

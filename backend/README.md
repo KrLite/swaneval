@@ -24,18 +24,21 @@ backend/
 ## Setup
 
 1. Install dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
 
 2. Set environment variables:
+
    ```bash
-   export DATABASE_URL="postgresql://user:password@localhost:5432/evalscope"
+   export DATABASE_URL="postgresql://user:password@localhost:6001/evalscope"
    export REDIS_URL="redis://localhost:6379/0"
    export SECRET_KEY="your-secret-key"
    ```
 
 3. Run database migrations:
+
    ```bash
    alembic upgrade head
    ```
@@ -48,5 +51,6 @@ backend/
 ## API Documentation
 
 Once running, visit:
+
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
