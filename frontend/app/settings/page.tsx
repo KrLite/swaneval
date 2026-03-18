@@ -50,7 +50,7 @@ export default function SettingsPage() {
 
   const [dbSettings, setDbSettings] = useState({
     host: "localhost",
-    port: "6001",
+    port: "5432",
     username: "evalscope",
     password: "evalscope",
     database: "evalscope",

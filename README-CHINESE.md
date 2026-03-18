@@ -42,7 +42,7 @@ uv pip install -r requirements.txt
 pip install -r requirements.txt
 
 # 设置环境变量
-export DATABASE_URL="postgresql://evalscope:evalscope@localhost:6001/evalscope"
+export DATABASE_URL="postgresql://evalscope:evalscope@localhost:5432/evalscope"
 export REDIS_URL="redis://localhost:6379/0"
 
 # 如果在 Docker 中运行后端，请使用：
@@ -88,7 +88,7 @@ docker-compose down
 
 **连接字符串（本地开发）：**
 
-- PostgreSQL: `postgresql://evalscope:evalscope@localhost:6001/evalscope`
+- PostgreSQL: `postgresql://evalscope:evalscope@localhost:5432/evalscope`
 - Redis: `redis://localhost:6379/0`
 
 **连接字符串（Docker/容器化后端）：**
