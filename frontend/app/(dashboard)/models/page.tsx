@@ -11,8 +11,9 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -63,14 +64,26 @@ const typeLabel: Record<string, string> = {
   huggingface: "HuggingFace",
 };
 
+type PanelMode = { kind: "view"; id: string } | { kind: "create" } | null;
+
+const emptyForm = {
+  name: "",
+  provider: "",
+  endpoint_url: "",
+  api_key: "",
+  model_type: "api",
+  description: "",
+  model_name: "",
+  max_tokens: "4096",
+};
+
 export default function ModelsPage() {
   const { data: models = [], isLoading } = useModels();
   const create = useCreateModel();
   const deleteMut = useDeleteModel();
   const testModel = useTestModel();
 
-  const [showForm, setShowForm] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [panel, setPanel] = useState<PanelMode>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     name: string;
@@ -83,31 +96,23 @@ export default function ModelsPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("__all__");
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [form, setForm] = useState({ ...emptyForm });
 
-  const [form, setForm] = useState({
-    name: "",
-    provider: "",
-    endpoint_url: "",
-    api_key: "",
-    model_type: "api" as string,
-    description: "",
-    model_name: "",
-    max_tokens: "4096",
-  });
+  const selectedId = panel?.kind === "view" ? panel.id : null;
+  const isCreating = panel?.kind === "create";
+  const selectedModel = models.find((m) => m.id === selectedId);
+  const panelOpen = !!panel;
 
-  const resetForm = () => {
-    setForm({
-      name: "",
-      provider: "",
-      endpoint_url: "",
-      api_key: "",
-      model_type: "api",
-      description: "",
-      model_name: "",
-      max_tokens: "4096",
-    });
-    setShowForm(false);
+  const openCreate = () => {
+    setForm({ ...emptyForm });
+    setPanel({ kind: "create" });
   };
+
+  const openView = (id: string) => {
+    setPanel(panel?.kind === "view" && panel.id === id ? null : { kind: "view", id });
+  };
+
+  const closePanel = () => setPanel(null);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +126,7 @@ export default function ModelsPage() {
       model_name: form.model_name || undefined,
       max_tokens: form.max_tokens ? parseInt(form.max_tokens) : undefined,
     });
-    resetForm();
+    closePanel();
   };
 
   const handleTest = async (id: string) => {
@@ -148,7 +153,7 @@ export default function ModelsPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    if (selectedId === deleteTarget.id) setSelectedId(null);
+    if (selectedId === deleteTarget.id) closePanel();
     await deleteMut.mutateAsync(deleteTarget.id);
     setDeleteTarget(null);
   };
@@ -159,9 +164,6 @@ export default function ModelsPage() {
     setTimeout(() => setCopiedField(null), 1500);
   };
 
-  const selectedModel = models.find((m) => m.id === selectedId);
-
-  // Filtered data for type filter
   const filteredData = useMemo(
     () =>
       typeFilter === "__all__"
@@ -206,7 +208,7 @@ export default function ModelsPage() {
         accessorKey: "endpoint_url",
         header: "端点",
         cell: ({ getValue }) => (
-          <span className="font-mono text-xs text-muted-foreground truncate block max-w-[180px]">
+          <span className="font-mono text-xs text-muted-foreground truncate block max-w-[220px]">
             {getValue<string>()}
           </span>
         ),
@@ -216,7 +218,10 @@ export default function ModelsPage() {
         header: "连接",
         cell: ({ row }) => {
           const r = testResults[row.original.id];
-          if (!r) return <span className="text-xs text-muted-foreground">—</span>;
+          if (!r)
+            return (
+              <span className="text-xs text-muted-foreground">—</span>
+            );
           if (r.message === "测试中...")
             return (
               <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
@@ -266,7 +271,7 @@ export default function ModelsPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header with inline stats */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-5">
           <h1 className="text-lg font-semibold">模型管理</h1>
@@ -288,218 +293,59 @@ export default function ModelsPage() {
             ))}
           </div>
         </div>
-        <Button
-          size="sm"
-          onClick={() => setShowForm(!showForm)}
-          variant={showForm ? "outline" : "default"}
-        >
-          {showForm ? (
-            <>
-              <X className="mr-1 h-4 w-4" /> 取消
-            </>
-          ) : (
-            <>
-              <Plus className="mr-1 h-4 w-4" /> 添加模型
-            </>
-          )}
+        <Button size="sm" onClick={openCreate} disabled={isCreating}>
+          <Plus className="mr-1 h-4 w-4" /> 添加模型
         </Button>
       </div>
 
-      {/* Inline creation form — table-style rows */}
-      {showForm && (
-        <Card>
-          <CardContent className="p-0">
-            <form onSubmit={handleCreate}>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>显示名称 *</TableHead>
-                    <TableHead>提供商 *</TableHead>
-                    <TableHead>模型 ID</TableHead>
-                    <TableHead>类型</TableHead>
-                    <TableHead>端点 URL *</TableHead>
-                    <TableHead>API 密钥</TableHead>
-                    <TableHead>Token</TableHead>
-                    <TableHead className="w-20" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell className="py-2">
-                      <Input
-                        value={form.name}
-                        onChange={(e) =>
-                          setForm({ ...form, name: e.target.value })
-                        }
-                        placeholder="GPT-4o"
-                        className="h-8"
-                        required
-                      />
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Input
-                        value={form.provider}
-                        onChange={(e) =>
-                          setForm({ ...form, provider: e.target.value })
-                        }
-                        placeholder="openai"
-                        className="h-8"
-                        required
-                      />
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Input
-                        value={form.model_name}
-                        onChange={(e) =>
-                          setForm({ ...form, model_name: e.target.value })
-                        }
-                        placeholder="gpt-4o-2024-08-06"
-                        className="h-8 font-mono"
-                      />
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Select
-                        value={form.model_type}
-                        onValueChange={(v) =>
-                          setForm({ ...form, model_type: v })
-                        }
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="api">API</SelectItem>
-                          <SelectItem value="local">本地</SelectItem>
-                          <SelectItem value="huggingface">HuggingFace</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Input
-                        value={form.endpoint_url}
-                        onChange={(e) =>
-                          setForm({ ...form, endpoint_url: e.target.value })
-                        }
-                        placeholder="https://..."
-                        className="h-8 font-mono"
-                        required
-                      />
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Input
-                        type="password"
-                        value={form.api_key}
-                        onChange={(e) =>
-                          setForm({ ...form, api_key: e.target.value })
-                        }
-                        placeholder="sk-..."
-                        className="h-8"
-                      />
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Input
-                        type="number"
-                        value={form.max_tokens}
-                        onChange={(e) =>
-                          setForm({ ...form, max_tokens: e.target.value })
-                        }
-                        className="h-8 w-20"
-                      />
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <div className="flex gap-1">
-                        <Button
-                          type="submit"
-                          size="sm"
-                          className="h-8"
-                          disabled={create.isPending}
-                        >
-                          {create.isPending ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Check className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-8"
-                          onClick={resetForm}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  {form.description || true ? (
-                    <TableRow className="hover:bg-transparent border-t-0">
-                      <TableCell colSpan={8} className="py-1.5 pt-0">
-                        <Input
-                          value={form.description}
-                          onChange={(e) =>
-                            setForm({ ...form, description: e.target.value })
-                          }
-                          placeholder="描述（可选）"
-                          className="h-7 border-dashed text-xs"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Search + filter bar */}
-      <div className="flex items-center gap-3">
+      {/* Toolbar: search + filter — unified h-9 */}
+      <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder="搜索模型名称、提供商、端点..."
-            className="pl-9 h-9 border-border"
+            className="pl-9 h-9"
           />
         </div>
-        <div className="flex items-center border rounded-md overflow-hidden">
-          <button
-            onClick={() => setTypeFilter("__all__")}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors border-r ${
-              typeFilter === "__all__"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-          >
-            全部
-          </button>
-          {Object.entries(typeCounts).map(([type, count], i) => (
+        <div className="flex items-center h-9 border rounded-md overflow-hidden">
+          {[
+            { key: "__all__", label: "全部" },
+            ...Object.entries(typeCounts).map(([type, count]) => ({
+              key: type,
+              label: `${typeLabel[type] ?? type} ${count}`,
+            })),
+          ].map((item, i, arr) => (
             <button
-              key={type}
+              key={item.key}
               onClick={() =>
-                setTypeFilter(typeFilter === type ? "__all__" : type)
+                setTypeFilter(
+                  item.key === "__all__"
+                    ? "__all__"
+                    : typeFilter === item.key
+                      ? "__all__"
+                      : item.key,
+                )
               }
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                i < Object.keys(typeCounts).length - 1 ? "border-r" : ""
+              className={`h-full px-3.5 text-xs font-medium transition-colors ${
+                i < arr.length - 1 ? "border-r" : ""
               } ${
-                typeFilter === type
+                typeFilter === item.key
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
-              {typeLabel[type] ?? type}
-              <span className="ml-1 tabular-nums opacity-70">{count}</span>
+              {item.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Main content: table + detail panel */}
+      {/* Main: table + side panel */}
       <div className="flex gap-4 min-h-0">
         {/* Table */}
-        <Card className={selectedModel ? "flex-1" : "w-full"}>
+        <Card className={panelOpen ? "flex-1 min-w-0" : "w-full"}>
           <CardContent className="p-0">
             {isLoading ? (
               <div className="py-12 text-center text-muted-foreground">
@@ -507,10 +353,17 @@ export default function ModelsPage() {
                 加载中...
               </div>
             ) : table.getRowModel().rows.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground">
-                {models.length === 0
-                  ? "暂无已注册的模型。"
-                  : "无匹配结果。"}
+              <div className="py-12 text-center text-muted-foreground text-sm">
+                {models.length === 0 ? (
+                  <div className="space-y-2">
+                    <p>暂无已注册的模型</p>
+                    <Button size="sm" variant="outline" onClick={openCreate}>
+                      <Plus className="mr-1 h-3.5 w-3.5" /> 添加第一个模型
+                    </Button>
+                  </div>
+                ) : (
+                  "无匹配结果。"
+                )}
               </div>
             ) : (
               <Table>
@@ -547,13 +400,7 @@ export default function ModelsPage() {
                           ? "bg-accent"
                           : "hover:bg-muted/50"
                       }`}
-                      onClick={() =>
-                        setSelectedId(
-                          selectedId === row.original.id
-                            ? null
-                            : row.original.id,
-                        )
-                      }
+                      onClick={() => openView(row.original.id)}
                     >
                       {row.getVisibleCells().map((cell) => (
                         <TableCell key={cell.id} className="py-2.5">
@@ -578,165 +425,259 @@ export default function ModelsPage() {
           </CardContent>
         </Card>
 
-        {/* Detail panel */}
-        {selectedModel && (
-          <Card className="w-80 shrink-0 self-start">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium truncate">
-                  {selectedModel.name}
-                </CardTitle>
+        {/* Side panel: view OR create — same surface */}
+        {panelOpen && (
+          <div className="w-80 shrink-0">
+            <Card className="sticky top-4">
+              {/* Panel header */}
+              <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                <h3 className="text-sm font-semibold truncate">
+                  {isCreating
+                    ? "添加模型"
+                    : selectedModel?.name ?? ""}
+                </h3>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 shrink-0"
-                  onClick={() => setSelectedId(null)}
+                  className="h-7 w-7 shrink-0 -mr-1"
+                  onClick={closePanel}
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
-              {selectedModel.description && (
-                <p className="text-xs text-muted-foreground">
-                  {selectedModel.description}
-                </p>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-3 text-xs">
-              {/* Fields */}
-              <div className="space-y-2">
-                <DetailField
-                  label="提供商"
-                  value={selectedModel.provider}
-                />
-                <DetailField
-                  label="类型"
-                  value={
-                    <Badge variant="outline" className="text-xs font-normal">
-                      {typeLabel[selectedModel.model_type] ??
-                        selectedModel.model_type}
-                    </Badge>
-                  }
-                />
-                {selectedModel.model_name && (
-                  <DetailField
-                    label="模型 ID"
-                    value={
-                      <div className="flex items-center gap-1">
-                        <code className="font-mono truncate">
-                          {selectedModel.model_name}
-                        </code>
-                        <button
-                          onClick={() =>
-                            copyToClipboard(
-                              selectedModel.model_name,
-                              "model_name",
-                            )
-                          }
-                          className="shrink-0 text-muted-foreground hover:text-foreground"
-                        >
-                          {copiedField === "model_name" ? (
-                            <Check className="h-3 w-3 text-emerald-500" />
-                          ) : (
-                            <Copy className="h-3 w-3" />
-                          )}
-                        </button>
-                      </div>
-                    }
-                  />
-                )}
-                <DetailField
-                  label="端点"
-                  value={
-                    <div className="flex items-center gap-1">
-                      <code className="font-mono truncate text-[11px]">
-                        {selectedModel.endpoint_url}
-                      </code>
-                      <button
-                        onClick={() =>
-                          copyToClipboard(
-                            selectedModel.endpoint_url,
-                            "endpoint",
-                          )
+
+              {/* Create mode */}
+              {isCreating && (
+                <CardContent className="pt-0">
+                  <form onSubmit={handleCreate} className="space-y-3">
+                    <PanelField label="显示名称" required>
+                      <Input
+                        value={form.name}
+                        onChange={(e) =>
+                          setForm({ ...form, name: e.target.value })
                         }
-                        className="shrink-0 text-muted-foreground hover:text-foreground"
-                      >
-                        {copiedField === "endpoint" ? (
-                          <Check className="h-3 w-3 text-emerald-500" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </button>
+                        placeholder="GPT-4o"
+                        required
+                      />
+                    </PanelField>
+                    <div className="grid grid-cols-2 gap-2">
+                      <PanelField label="提供商" required>
+                        <Input
+                          value={form.provider}
+                          onChange={(e) =>
+                            setForm({ ...form, provider: e.target.value })
+                          }
+                          placeholder="openai"
+                          required
+                        />
+                      </PanelField>
+                      <PanelField label="类型">
+                        <Select
+                          value={form.model_type}
+                          onValueChange={(v) =>
+                            setForm({ ...form, model_type: v })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="api">API</SelectItem>
+                            <SelectItem value="local">本地</SelectItem>
+                            <SelectItem value="huggingface">
+                              HuggingFace
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </PanelField>
                     </div>
-                  }
-                />
-                {selectedModel.max_tokens && (
-                  <DetailField
-                    label="最大 Token"
-                    value={
-                      <span className="font-mono">
-                        {selectedModel.max_tokens.toLocaleString()}
-                      </span>
-                    }
-                  />
-                )}
-                <DetailField
-                  label="注册时间"
-                  value={new Date(
-                    selectedModel.created_at,
-                  ).toLocaleString()}
-                />
-              </div>
+                    <PanelField label="模型 ID">
+                      <Input
+                        value={form.model_name}
+                        onChange={(e) =>
+                          setForm({ ...form, model_name: e.target.value })
+                        }
+                        placeholder="gpt-4o-2024-08-06"
+                        className="font-mono"
+                      />
+                    </PanelField>
+                    <PanelField label="端点 URL" required>
+                      <Input
+                        value={form.endpoint_url}
+                        onChange={(e) =>
+                          setForm({ ...form, endpoint_url: e.target.value })
+                        }
+                        placeholder="https://api.openai.com/v1/..."
+                        className="font-mono"
+                        required
+                      />
+                    </PanelField>
+                    <div className="grid grid-cols-2 gap-2">
+                      <PanelField label="API 密钥">
+                        <Input
+                          type="password"
+                          value={form.api_key}
+                          onChange={(e) =>
+                            setForm({ ...form, api_key: e.target.value })
+                          }
+                          placeholder="sk-..."
+                        />
+                      </PanelField>
+                      <PanelField label="最大 Token">
+                        <Input
+                          type="number"
+                          value={form.max_tokens}
+                          onChange={(e) =>
+                            setForm({ ...form, max_tokens: e.target.value })
+                          }
+                        />
+                      </PanelField>
+                    </div>
+                    <PanelField label="描述">
+                      <Input
+                        value={form.description}
+                        onChange={(e) =>
+                          setForm({ ...form, description: e.target.value })
+                        }
+                        placeholder="备注（可选）"
+                      />
+                    </PanelField>
+                    <div className="pt-1">
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={create.isPending}
+                      >
+                        {create.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Plus className="mr-2 h-4 w-4" />
+                        )}
+                        {create.isPending ? "添加中..." : "添加模型"}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              )}
 
-              {/* Test result */}
-              {testResults[selectedModel.id] &&
-                testResults[selectedModel.id].message !== "测试中..." && (
-                  <div
-                    className={`rounded-md p-2.5 text-xs ${
-                      testResults[selectedModel.id].ok
-                        ? "bg-emerald-500/10 text-emerald-700"
-                        : "bg-destructive/10 text-destructive"
-                    }`}
-                  >
-                    {testResults[selectedModel.id].message}
-                  </div>
-                )}
-
-              {/* Actions */}
-              <div className="flex gap-2 pt-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 h-8 text-xs"
-                  onClick={() => handleTest(selectedModel.id)}
-                  disabled={testingId === selectedModel.id}
-                >
-                  {testingId === selectedModel.id ? (
-                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                  ) : (
-                    <Zap className="mr-1 h-3 w-3" />
+              {/* View mode */}
+              {selectedModel && !isCreating && (
+                <CardContent className="pt-0 space-y-4">
+                  {selectedModel.description && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedModel.description}
+                    </p>
                   )}
-                  测试连接
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 text-xs text-destructive hover:text-destructive"
-                  onClick={() =>
-                    setDeleteTarget({
-                      id: selectedModel.id,
-                      name: selectedModel.name,
-                    })
-                  }
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+
+                  <div className="space-y-2.5">
+                    <DetailRow label="提供商" value={selectedModel.provider} />
+                    <DetailRow
+                      label="类型"
+                      value={
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-normal"
+                        >
+                          {typeLabel[selectedModel.model_type] ??
+                            selectedModel.model_type}
+                        </Badge>
+                      }
+                    />
+                    {selectedModel.model_name && (
+                      <DetailRow
+                        label="模型 ID"
+                        value={
+                          <CopyableCode
+                            text={selectedModel.model_name}
+                            field="model_name"
+                            copiedField={copiedField}
+                            onCopy={copyToClipboard}
+                          />
+                        }
+                      />
+                    )}
+                    <DetailRow
+                      label="端点"
+                      value={
+                        <CopyableCode
+                          text={selectedModel.endpoint_url}
+                          field="endpoint"
+                          copiedField={copiedField}
+                          onCopy={copyToClipboard}
+                          small
+                        />
+                      }
+                    />
+                    {selectedModel.max_tokens && (
+                      <DetailRow
+                        label="最大 Token"
+                        value={
+                          <span className="font-mono">
+                            {selectedModel.max_tokens.toLocaleString()}
+                          </span>
+                        }
+                      />
+                    )}
+                    <DetailRow
+                      label="注册时间"
+                      value={new Date(
+                        selectedModel.created_at,
+                      ).toLocaleString()}
+                    />
+                  </div>
+
+                  {/* Test result banner */}
+                  {testResults[selectedModel.id] &&
+                    testResults[selectedModel.id].message !== "测试中..." && (
+                      <div
+                        className={`rounded-md px-3 py-2 text-xs ${
+                          testResults[selectedModel.id].ok
+                            ? "bg-emerald-500/10 text-emerald-700"
+                            : "bg-destructive/10 text-destructive"
+                        }`}
+                      >
+                        {testResults[selectedModel.id].message}
+                      </div>
+                    )}
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleTest(selectedModel.id)}
+                      disabled={testingId === selectedModel.id}
+                    >
+                      {testingId === selectedModel.id ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Zap className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      测试连接
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/5"
+                      onClick={() =>
+                        setDeleteTarget({
+                          id: selectedModel.id,
+                          name: selectedModel.name,
+                        })
+                      }
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          </div>
         )}
       </div>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete confirmation */}
       <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -763,7 +704,29 @@ export default function ModelsPage() {
   );
 }
 
-function DetailField({
+/* ── Sub-components ── */
+
+function PanelField({
+  label,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+function DetailRow({
   label,
   value,
 }: {
@@ -771,9 +734,46 @@ function DetailField({
   value: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-2">
-      <span className="text-muted-foreground shrink-0">{label}</span>
-      <div className="text-right min-w-0 truncate">{value}</div>
+    <div className="flex items-start justify-between gap-3 text-xs">
+      <span className="text-muted-foreground shrink-0 pt-0.5">{label}</span>
+      <div className="text-right min-w-0">{value}</div>
+    </div>
+  );
+}
+
+function CopyableCode({
+  text,
+  field,
+  copiedField,
+  onCopy,
+  small,
+}: {
+  text: string;
+  field: string;
+  copiedField: string | null;
+  onCopy: (text: string, field: string) => void;
+  small?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-1 justify-end">
+      <code
+        className={`font-mono truncate max-w-[160px] ${small ? "text-[11px]" : ""}`}
+      >
+        {text}
+      </code>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onCopy(text, field);
+        }}
+        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {copiedField === field ? (
+          <Check className="h-3 w-3 text-emerald-500" />
+        ) : (
+          <Copy className="h-3 w-3" />
+        )}
+      </button>
     </div>
   );
 }
