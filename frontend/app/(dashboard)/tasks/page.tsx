@@ -40,6 +40,7 @@ import {
   ChevronRight,
   ChevronLeft,
   AlertTriangle,
+  Check,
   Pause,
   Play,
   Ban,
@@ -447,11 +448,9 @@ export default function TasksPage() {
           <div className="w-80 shrink-0">
             <Card className="sticky top-4">
               {/* Panel header */}
-              <div className="flex items-center justify-between px-5 pt-5 pb-3">
+              <div className="flex items-center justify-between px-5 pt-5 pb-1">
                 <h3 className="text-sm font-semibold truncate">
-                  {isCreating
-                    ? `新建任务 (${step + 1}/${STEPS.length} ${STEPS[step].title})`
-                    : selectedTask?.name ?? ""}
+                  {isCreating ? "新建任务" : selectedTask?.name ?? ""}
                 </h3>
                 <Button
                   variant="ghost"
@@ -462,6 +461,46 @@ export default function TasksPage() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
+
+              {/* Stepper indicator */}
+              {isCreating && (
+                <div className="px-5 pb-3 pt-2">
+                  <div className="flex items-center">
+                    {STEPS.map((s, i) => (
+                      <div key={i} className="flex items-center flex-1 last:flex-none">
+                        <button
+                          type="button"
+                          onClick={() => i < step && setStep(i)}
+                          className={`relative flex items-center justify-center h-7 w-7 rounded-full text-xs font-medium shrink-0 transition-all ${
+                            i < step
+                              ? "bg-primary text-primary-foreground cursor-pointer"
+                              : i === step
+                                ? "bg-primary text-primary-foreground ring-4 ring-primary/15"
+                                : "bg-muted text-muted-foreground"
+                          }`}
+                          title={s.title}
+                        >
+                          {i < step ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : (
+                            i + 1
+                          )}
+                        </button>
+                        {i < STEPS.length - 1 && (
+                          <div
+                            className={`flex-1 h-0.5 mx-1.5 rounded-full transition-colors ${
+                              i < step ? "bg-primary" : "bg-border"
+                            }`}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    {STEPS[step].title}
+                  </p>
+                </div>
+              )}
 
               {/* Create mode -- wizard */}
               {isCreating && (
