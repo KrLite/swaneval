@@ -127,7 +127,7 @@ class Evaluation(SQLModel, table=True):
     completed_at: Optional[datetime] = Field(default=None)
 
     # Relationships
-    model_config: Optional["ModelConfig"] = Relationship(back_populates="evaluations")
+    eval_model: Optional["ModelConfig"] = Relationship(back_populates="evaluations")
     dataset: Optional["Dataset"] = Relationship(back_populates="evaluations")
     user: Optional["User"] = Relationship(back_populates="evaluations")
     results: List["EvaluationResult"] = Relationship(back_populates="evaluation")
