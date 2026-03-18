@@ -25,18 +25,6 @@ class ModelCreate(BaseModel):
     api_key: str | None = None
     extra_params: dict | None = None
 
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "name": "Qwen-7B",
-                "source_type": "huggingface",
-                "path_or_endpoint": "Qwen/Qwen-7B",
-                "revision": "main",
-                "precision": "fp16",
-            }
-        }
-    }
-
 
 class ModelRead(BaseModel):
     id: uuid.UUID

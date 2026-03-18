@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -8,7 +8,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db.models import Dataset, Evaluation, EvaluationDatasetLink, MLModel, TaskStatus
 from app.db.session import get_session
-from app.scheduler.tasks import run_evaluation
 
 router = APIRouter(prefix="/evaluations", tags=["evaluations"])
 
@@ -100,14 +99,7 @@ async def create_evaluation(
     await session.commit()
     await session.refresh(evaluation)
 
-    # Dispatch Celery task
-    celery_result = run_evaluation.delay(str(evaluation.id))
-    evaluation.celery_task_id = celery_result.id
-    evaluation.status = TaskStatus.PENDING
-    session.add(evaluation)
-    await session.commit()
-    await session.refresh(evaluation)
-
+    # TODO: dispatch Celery task when task queue is integrated
     return _eval_to_read(evaluation)
 
 

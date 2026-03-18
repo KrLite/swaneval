@@ -40,16 +40,6 @@ class DatasetRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class DatasetUpdate(BaseModel):
-    name: str | None = None
-    source_type: DatasetSourceType | None = None
-    source_path: str | None = None
-    description: str | None = None
-    version: str | None = None
-    row_count: int | None = None
-    schema_info: dict | None = None
-
-
 class DatasetVersionCreate(BaseModel):
     version: str
 

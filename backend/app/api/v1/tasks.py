@@ -1,14 +1,13 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db.models import Evaluation, TaskStatus
 from app.db.session import get_session
-from app.scheduler.celery_app import celery_app
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -62,49 +61,10 @@ async def cancel_task(task_id: uuid.UUID, session: AsyncSession = Depends(get_se
     if evaluation.status not in (TaskStatus.PENDING, TaskStatus.RUNNING):
         raise HTTPException(status_code=400, detail="Task cannot be cancelled in current state")
 
-    # Revoke Celery task
-    if evaluation.celery_task_id:
-        celery_app.control.revoke(evaluation.celery_task_id, terminate=True)
-
+    # TODO: revoke Celery task when task queue is integrated
     evaluation.status = TaskStatus.CANCELLED
     evaluation.finished_at = datetime.now(timezone.utc)
     session.add(evaluation)
     await session.commit()
     await session.refresh(evaluation)
     return evaluation
-
-
-# ---------- WebSocket ----------
-
-
-@router.websocket("/ws/{task_id}/progress")
-async def task_progress_ws(websocket: WebSocket, task_id: uuid.UUID):
-    await websocket.accept()
-    try:
-        while True:
-            # Wait for a message from client (acts as a poll trigger)
-            await websocket.receive_text()
-
-            async with get_session().__anext__() as session:  # type: ignore[union-attr]
-                evaluation = await session.get(Evaluation, task_id)
-                if not evaluation:
-                    await websocket.send_json({"error": "Task not found"})
-                    break
-
-                await websocket.send_json(
-                    {
-                        "id": str(evaluation.id),
-                        "status": evaluation.status,
-                        "progress": evaluation.progress,
-                        "error_message": evaluation.error_message,
-                    }
-                )
-
-                if evaluation.status in (
-                    TaskStatus.COMPLETED,
-                    TaskStatus.FAILED,
-                    TaskStatus.CANCELLED,
-                ):
-                    break
-    except WebSocketDisconnect:
-        pass

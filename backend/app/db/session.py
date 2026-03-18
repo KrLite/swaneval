@@ -12,8 +12,6 @@ _pg_url = settings.DATABASE_URL
 if _pg_url.startswith("postgresql://"):
     _pg_url = _pg_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-logger.debug("Async DB URL (driver): %s", _pg_url.split("@")[0].rsplit(":", 1)[0] + ":****@...")
-
 engine = create_async_engine(_pg_url, echo=False, pool_pre_ping=True)
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

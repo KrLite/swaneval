@@ -19,8 +19,6 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("=== Starting EvalScope GUI Backend ===")
     logger.info("DATABASE_URL = %s", _mask_url(settings.DATABASE_URL))
-    logger.info("REDIS_URL    = %s", settings.REDIS_URL)
-    logger.info("CORS_ORIGINS = %s", settings.CORS_ORIGINS)
 
     logger.info("Connecting to database...")
     try:
@@ -30,21 +28,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.info("Database tables created/verified")
     except Exception as exc:
         logger.error("!!! DATABASE CONNECTION FAILED !!!")
-        logger.error("Error type: %s", type(exc).__name__)
-        logger.error("Error details: %s", exc)
-        logger.error("")
-        logger.error("Troubleshooting:")
-        logger.error("  1. Is PostgreSQL running? Check: pg_isready -h localhost -p 6001")
-        logger.error("  2. Try connecting manually: psql postgresql://evalscope:evalscope@localhost:6001/evalscope")
-        logger.error("  3. If using Docker: docker compose up -d")
-        logger.error("  4. Or set DATABASE_URL in backend/.env to point to your Postgres instance")
+        logger.error("Error: %s: %s", type(exc).__name__, exc)
+        logger.error("Is PostgreSQL running? Try: docker compose up -d")
         raise
     yield
     logger.info("=== Shutting down EvalScope GUI Backend ===")
 
 
 def _mask_url(url: str) -> str:
-    """Mask password in database URL for safe logging."""
     try:
         from urllib.parse import urlparse, urlunparse
 

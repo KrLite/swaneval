@@ -61,7 +61,6 @@ async def get_leaderboard(
     metric: str = Query(default="accuracy"),
     session: AsyncSession = Depends(get_session),
 ):
-    # Fetch all completed evaluations with results
     evals_result = await session.exec(
         select(Evaluation).where(Evaluation.status == TaskStatus.COMPLETED)
     )
@@ -110,7 +109,6 @@ async def get_chart_data(
     if not evaluation_ids:
         return []
 
-    # Group results by dataset for comparison charts
     data_by_dataset: dict[str, dict[str, float]] = defaultdict(dict)
 
     for eval_id in evaluation_ids:
