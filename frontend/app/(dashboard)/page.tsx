@@ -3,6 +3,7 @@
 import { useRef, useCallback, useState, useEffect } from "react";
 import Link from "next/link";
 import Xarrow, { Xwrapper } from "react-xarrows";
+import { Logo } from "@/components/logo";
 import { Badge } from "@/components/ui/badge";
 import {
   Cpu,
@@ -117,9 +118,12 @@ export default function OverviewPage() {
 
         {/* ── Hero: title + HUD metrics ── */}
         <div className="relative z-10 flex flex-col items-center justify-center pt-14 pb-10 my-10 px-6 shrink-0">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground/90">
-            概览
-          </h1>
+          <div className="flex items-center gap-3">
+            <Logo className="h-9 w-9 text-primary/80" />
+            <h1 className="text-4xl font-bold tracking-tight text-foreground/90">
+              概览
+            </h1>
+          </div>
           <p className="text-sm text-muted-foreground mt-2">
             AI Model Evaluation
           </p>
