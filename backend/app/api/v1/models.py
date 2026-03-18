@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from sqlalchemy.exc import IntegrityError
+
 from app.api.deps import get_current_user, get_db
 from app.config import settings
 from app.models.llm_model import LLMModel
@@ -125,5 +127,12 @@ async def delete_model(
     m = await session.get(LLMModel, model_id)
     if not m:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
-    await session.delete(m)
-    await session.commit()
+    try:
+        await session.delete(m)
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "无法删除：该模型仍被评测任务引用，请先删除相关任务。",
+        )

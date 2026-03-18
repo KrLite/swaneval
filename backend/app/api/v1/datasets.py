@@ -3,6 +3,7 @@ import os
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -193,5 +194,12 @@ async def delete_dataset(
 
     await delete_dataset_versions(session, ds.id)
     cleanup_uploaded_file(ds)
-    await session.delete(ds)
-    await session.commit()
+    try:
+        await session.delete(ds)
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "无法删除：该数据集仍被评测任务或结果引用，请先删除相关任务。",
+        )

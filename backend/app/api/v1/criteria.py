@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -87,8 +88,15 @@ async def delete_criterion(
     c = await session.get(Criterion, criterion_id)
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Criterion not found")
-    await session.delete(c)
-    await session.commit()
+    try:
+        await session.delete(c)
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "无法删除：该评估标准仍被评测任务或结果引用，请先删除相关任务。",
+        )
 
 
 @router.post("/test")
