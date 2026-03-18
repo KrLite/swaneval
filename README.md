@@ -71,6 +71,7 @@ docker-compose logs -f
 ## API Documentation
 
 Once the backend is running:
+
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
@@ -84,12 +85,14 @@ Password: admin
 ## Tech Stack
 
 ### Backend
+
 - FastAPI
 - SQLAlchemy 2.0
 - PostgreSQL
 - Celery + Redis
 
 ### Frontend
+
 - Next.js 14 (App Router)
 - shadcn/ui + Tailwind CSS
 - Recharts
