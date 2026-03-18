@@ -1,70 +1,131 @@
+import asyncio
 import uuid
-from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.models import Evaluation, TaskStatus
-from app.db.session import get_session
+from app.api.deps import get_current_user, get_db
+from app.models.eval_task import EvalSubtask, EvalTask, TaskStatus
+from app.models.user import User
+from app.schemas.task import SubtaskResponse, TaskCreate, TaskResponse
+from app.services.task_runner import run_task
 
-router = APIRouter(prefix="/tasks", tags=["tasks"])
-
-
-# ---------- Schemas ----------
-
-
-class TaskRead(BaseModel):
-    id: uuid.UUID
-    name: str
-    status: TaskStatus
-    celery_task_id: str | None
-    progress: float
-    error_message: str | None
-    started_at: datetime | None
-    finished_at: datetime | None
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
+router = APIRouter()
 
 
-# ---------- Endpoints ----------
-
-
-@router.get("", response_model=list[TaskRead])
-async def list_tasks(
-    skip: int = 0,
-    limit: int = 50,
-    session: AsyncSession = Depends(get_session),
+@router.post("", response_model=TaskResponse, status_code=201)
+async def create_task(
+    body: TaskCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    result = await session.exec(
-        select(Evaluation).order_by(Evaluation.created_at.desc()).offset(skip).limit(limit)  # type: ignore[attr-defined]
+    task = EvalTask(
+        name=body.name,
+        status=TaskStatus.pending,
+        model_id=body.model_id,
+        dataset_ids=",".join(str(d) for d in body.dataset_ids),
+        criteria_ids=",".join(str(c) for c in body.criteria_ids),
+        params_json=body.params_json,
+        repeat_count=body.repeat_count,
+        seed_strategy=body.seed_strategy,
+        created_by=current_user.id,
     )
+    session.add(task)
+    await session.commit()
+    await session.refresh(task)
+
+    # Launch task in background
+    asyncio.create_task(run_task(task.id))
+
+    return task
+
+
+@router.get("", response_model=list[TaskResponse])
+async def list_tasks(
+    status_filter: TaskStatus | None = None,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    stmt = select(EvalTask).order_by(EvalTask.created_at.desc())
+    if status_filter:
+        stmt = stmt.where(EvalTask.status == status_filter)
+    result = await session.exec(stmt)
     return result.all()
 
 
-@router.get("/{task_id}", response_model=TaskRead)
-async def get_task(task_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
-    evaluation = await session.get(Evaluation, task_id)
-    if not evaluation:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return evaluation
+@router.get("/{task_id}", response_model=TaskResponse)
+async def get_task(
+    task_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    task = await session.get(EvalTask, task_id)
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+    return task
 
 
-@router.post("/{task_id}/cancel", response_model=TaskRead)
-async def cancel_task(task_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
-    evaluation = await session.get(Evaluation, task_id)
-    if not evaluation:
-        raise HTTPException(status_code=404, detail="Task not found")
+@router.get("/{task_id}/subtasks", response_model=list[SubtaskResponse])
+async def list_subtasks(
+    task_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    stmt = select(EvalSubtask).where(EvalSubtask.task_id == task_id).order_by(EvalSubtask.run_index)
+    result = await session.exec(stmt)
+    return result.all()
 
-    if evaluation.status not in (TaskStatus.PENDING, TaskStatus.RUNNING):
-        raise HTTPException(status_code=400, detail="Task cannot be cancelled in current state")
 
-    # TODO: revoke Celery task when task queue is integrated
-    evaluation.status = TaskStatus.CANCELLED
-    evaluation.finished_at = datetime.now(timezone.utc)
-    session.add(evaluation)
+@router.post("/{task_id}/pause", response_model=TaskResponse)
+async def pause_task(
+    task_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    task = await session.get(EvalTask, task_id)
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+    if task.status != TaskStatus.running:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Task is not running")
+    task.status = TaskStatus.paused
+    session.add(task)
     await session.commit()
-    await session.refresh(evaluation)
-    return evaluation
+    await session.refresh(task)
+    return task
+
+
+@router.post("/{task_id}/resume", response_model=TaskResponse)
+async def resume_task(
+    task_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    task = await session.get(EvalTask, task_id)
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+    if task.status not in (TaskStatus.paused, TaskStatus.failed):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Task cannot be resumed")
+    task.status = TaskStatus.pending
+    session.add(task)
+    await session.commit()
+    await session.refresh(task)
+
+    asyncio.create_task(run_task(task.id))
+    return task
+
+
+@router.post("/{task_id}/cancel", response_model=TaskResponse)
+async def cancel_task(
+    task_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    task = await session.get(EvalTask, task_id)
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+    task.status = TaskStatus.failed
+    session.add(task)
+    await session.commit()
+    await session.refresh(task)
+    return task

@@ -1,134 +1,137 @@
 import uuid
-from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends
+from sqlalchemy import func as sa_func
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.models import Evaluation, EvaluationResult, MLModel, TaskStatus
-from app.db.session import get_session
+from app.api.deps import get_current_user, get_db
+from app.models.criterion import Criterion
+from app.models.eval_result import EvalResult
+from app.models.eval_task import EvalTask
+from app.models.llm_model import LLMModel
+from app.models.user import User
+from app.schemas.result import EvalResultResponse
 
-router = APIRouter(prefix="/results", tags=["results"])
-
-
-# ---------- Schemas ----------
-
-
-class ResultRead(BaseModel):
-    id: uuid.UUID
-    evaluation_id: uuid.UUID
-    dataset_name: str
-    metric_name: str
-    metric_value: float
-    details: dict | None
-
-    model_config = {"from_attributes": True}
+router = APIRouter()
 
 
-class LeaderboardEntry(BaseModel):
-    model_name: str
-    model_id: uuid.UUID
-    scores: dict[str, float]
-    average: float
-
-
-class ChartDataPoint(BaseModel):
-    label: str
-    values: dict[str, float]
-
-
-# ---------- Endpoints ----------
-
-
-@router.get("/{evaluation_id}", response_model=list[ResultRead])
-async def get_results(
-    evaluation_id: uuid.UUID,
-    session: AsyncSession = Depends(get_session),
+@router.get("", response_model=list[EvalResultResponse])
+async def list_results(
+    task_id: uuid.UUID | None = None,
+    criterion_id: uuid.UUID | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    evaluation = await session.get(Evaluation, evaluation_id)
-    if not evaluation:
-        raise HTTPException(status_code=404, detail="Evaluation not found")
-
-    result = await session.exec(
-        select(EvaluationResult).where(EvaluationResult.evaluation_id == evaluation_id)
-    )
+    stmt = select(EvalResult).order_by(EvalResult.created_at.desc())
+    if task_id:
+        stmt = stmt.where(EvalResult.task_id == task_id)
+    if criterion_id:
+        stmt = stmt.where(EvalResult.criterion_id == criterion_id)
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    result = await session.exec(stmt)
     return result.all()
 
 
-@router.get("/leaderboard", response_model=list[LeaderboardEntry])
-async def get_leaderboard(
-    metric: str = Query(default="accuracy"),
-    session: AsyncSession = Depends(get_session),
+@router.get("/leaderboard")
+async def leaderboard(
+    criterion_id: uuid.UUID | None = None,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    evals_result = await session.exec(
-        select(Evaluation).where(Evaluation.status == TaskStatus.COMPLETED)
+    """Aggregate avg scores per model, per criterion."""
+    # Build query: join EvalResult -> EvalTask -> LLMModel, group by model+criterion
+    stmt = (
+        select(
+            EvalTask.model_id,
+            LLMModel.name.label("model_name"),
+            EvalResult.criterion_id,
+            Criterion.name.label("criterion_name"),
+            sa_func.avg(EvalResult.score).label("avg_score"),
+            sa_func.count(EvalResult.id).label("total_prompts"),
+            sa_func.avg(EvalResult.latency_ms).label("avg_latency_ms"),
+        )
+        .join(EvalTask, EvalResult.task_id == EvalTask.id)
+        .join(LLMModel, EvalTask.model_id == LLMModel.id)
+        .join(Criterion, EvalResult.criterion_id == Criterion.id)
+        .group_by(EvalTask.model_id, LLMModel.name, EvalResult.criterion_id, Criterion.name)
+        .order_by(sa_func.avg(EvalResult.score).desc())
     )
-    evaluations = evals_result.all()
+    if criterion_id:
+        stmt = stmt.where(EvalResult.criterion_id == criterion_id)
 
-    entries: dict[uuid.UUID, dict[str, float]] = defaultdict(dict)
-    model_names: dict[uuid.UUID, str] = {}
-
-    for ev in evaluations:
-        model = await session.get(MLModel, ev.model_id)
-        if not model:
-            continue
-        model_names[model.id] = model.name
-
-        results = await session.exec(
-            select(EvaluationResult).where(
-                EvaluationResult.evaluation_id == ev.id,
-                EvaluationResult.metric_name == metric,
-            )
-        )
-        for r in results.all():
-            entries[model.id][r.dataset_name] = r.metric_value
-
-    leaderboard = []
-    for model_id, scores in entries.items():
-        avg = sum(scores.values()) / len(scores) if scores else 0.0
-        leaderboard.append(
-            LeaderboardEntry(
-                model_name=model_names[model_id],
-                model_id=model_id,
-                scores=scores,
-                average=avg,
-            )
-        )
-
-    leaderboard.sort(key=lambda x: x.average, reverse=True)
-    return leaderboard
-
-
-@router.get("/charts", response_model=list[ChartDataPoint])
-async def get_chart_data(
-    evaluation_ids: list[uuid.UUID] = Query(default=[]),
-    metric: str = Query(default="accuracy"),
-    session: AsyncSession = Depends(get_session),
-):
-    if not evaluation_ids:
-        return []
-
-    data_by_dataset: dict[str, dict[str, float]] = defaultdict(dict)
-
-    for eval_id in evaluation_ids:
-        ev = await session.get(Evaluation, eval_id)
-        if not ev:
-            continue
-        model = await session.get(MLModel, ev.model_id)
-        if not model:
-            continue
-
-        results = await session.exec(
-            select(EvaluationResult).where(
-                EvaluationResult.evaluation_id == eval_id,
-                EvaluationResult.metric_name == metric,
-            )
-        )
-        for r in results.all():
-            data_by_dataset[r.dataset_name][model.name] = r.metric_value
-
+    result = await session.exec(stmt)
+    rows = result.all()
     return [
-        ChartDataPoint(label=ds_name, values=values)
-        for ds_name, values in data_by_dataset.items()
+        {
+            "model_id": str(r.model_id),
+            "model_name": r.model_name,
+            "criterion_id": str(r.criterion_id),
+            "criterion_name": r.criterion_name,
+            "avg_score": round(r.avg_score, 4),
+            "total_prompts": r.total_prompts,
+            "avg_latency_ms": round(r.avg_latency_ms, 2),
+        }
+        for r in rows
+    ]
+
+
+@router.get("/errors")
+async def error_results(
+    task_id: uuid.UUID,
+    page: int = 1,
+    page_size: int = 50,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return results where score < 1.0 (wrong answers)."""
+    stmt = (
+        select(EvalResult)
+        .where(EvalResult.task_id == task_id, EvalResult.score < 1.0)
+        .order_by(EvalResult.score.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    result = await session.exec(stmt)
+    return result.all()
+
+
+@router.get("/summary")
+async def task_summary(
+    task_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Summary stats for a task: avg score per criterion, latency stats."""
+    stmt = (
+        select(
+            EvalResult.criterion_id,
+            Criterion.name.label("criterion_name"),
+            sa_func.avg(EvalResult.score).label("avg_score"),
+            sa_func.min(EvalResult.score).label("min_score"),
+            sa_func.max(EvalResult.score).label("max_score"),
+            sa_func.count(EvalResult.id).label("count"),
+            sa_func.avg(EvalResult.latency_ms).label("avg_latency_ms"),
+            sa_func.avg(EvalResult.tokens_generated).label("avg_tokens"),
+        )
+        .join(Criterion, EvalResult.criterion_id == Criterion.id)
+        .where(EvalResult.task_id == task_id)
+        .group_by(EvalResult.criterion_id, Criterion.name)
+    )
+    result = await session.exec(stmt)
+    rows = result.all()
+    return [
+        {
+            "criterion_id": str(r.criterion_id),
+            "criterion_name": r.criterion_name,
+            "avg_score": round(r.avg_score, 4),
+            "min_score": round(r.min_score, 4),
+            "max_score": round(r.max_score, 4),
+            "count": r.count,
+            "avg_latency_ms": round(r.avg_latency_ms, 2),
+            "avg_tokens": round(r.avg_tokens, 1),
+        }
+        for r in rows
     ]
