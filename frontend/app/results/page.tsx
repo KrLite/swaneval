@@ -30,7 +30,7 @@ import {
   Download,
   FileText,
   BarChart3,
-  Radar,
+  Radar as RadarIcon,
   TrendingUp,
   Trophy,
   Filter,
@@ -192,7 +192,7 @@ export default function ResultsPage() {
                   Comparison
                 </TabsTrigger>
                 <TabsTrigger value="radar" className="flex items-center gap-2">
-                  <Radar className="h-4 w-4" />
+                  <RadarIcon className="h-4 w-4" />
                   Capability
                 </TabsTrigger>
                 <TabsTrigger value="performance" className="flex items-center gap-2">

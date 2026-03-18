@@ -6,7 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.db.models import Evaluation, EvaluationResult
+from app.db.models import Evaluation, EvaluationResult, TaskStatus
 from app.security import get_current_user
 
 router = APIRouter()
@@ -132,7 +132,7 @@ async def get_leaderboard(
     # Get all evaluations with results
     query = select(Evaluation).where(
         Evaluation.user_id == current_user["id"],
-        Evaluation.status == "completed"
+        Evaluation.status == TaskStatus.COMPLETED
     )
     if dataset:
         query = query.where(Evaluation.dataset_id == int(dataset))
@@ -179,7 +179,7 @@ async def get_column_chart(
             select(Evaluation).where(
                 Evaluation.model_config_id == model_id,
                 Evaluation.dataset_id == dataset_id,
-                Evaluation.status == "completed"
+                Evaluation.status == TaskStatus.COMPLETED
             ).order_by(Evaluation.created_at.desc()).limit(1)
         )
         eval_obj = result.scalar_one_or_none()
@@ -214,7 +214,7 @@ async def get_radar_chart(
         select(Evaluation).where(
             Evaluation.model_config_id == model_id,
             Evaluation.dataset_id == dataset_id,
-            Evaluation.status == "completed"
+            Evaluation.status == TaskStatus.COMPLETED
         ).order_by(Evaluation.created_at.desc()).limit(1)
     )
     eval_obj = result.scalar_one_or_none()
@@ -245,7 +245,7 @@ async def get_line_chart(
     result = await db.execute(
         select(Evaluation).where(
             Evaluation.user_id == current_user["id"],
-            Evaluation.status == "completed"
+            Evaluation.status == TaskStatus.COMPLETED
         ).order_by(Evaluation.created_at.asc())
     )
     evaluations = result.scalars().all()

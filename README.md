@@ -46,7 +46,7 @@ export DATABASE_URL="postgresql://evalscope:evalscope@localhost:6001/evalscope"
 export REDIS_URL="redis://localhost:6379/0"
 
 # Or if running backend IN DOCKER (not locally), use:
-# export DATABASE_URL="postgresql://evalscope:evalscope@postgres:6001/evalscope"
+# export DATABASE_URL="postgresql://evalscope:evalscope@postgres:5432/evalscope"
 # export REDIS_URL="redis://redis:6379/0"
 
 # Run database migrations
@@ -93,7 +93,7 @@ docker-compose down
 
 **Connection Strings (for Docker/containerized backend):**
 
-- PostgreSQL: `postgresql://evalscope:evalscope@postgres:6001/evalscope`
+- PostgreSQL: `postgresql://evalscope:evalscope@postgres:5432/evalscope`
 - Redis: `redis://redis:6379/0`
 
 Then run backend and frontend locally (see Backend Setup and Frontend Setup above).

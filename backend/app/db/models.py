@@ -1,5 +1,5 @@
 """Database models for EvalScope GUI."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy import (
     String, Integer, Boolean, DateTime, Text, JSON,
@@ -54,8 +54,8 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255))
     role: Mapped[UserRole] = mapped_column(SQLEnum(UserRole), default=UserRole.GUEST)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     evaluations: Mapped[List["Evaluation"]] = relationship("Evaluation", back_populates="user")
@@ -74,8 +74,8 @@ class ModelConfig(Base):
     config: Mapped[Optional[JSON]] = mapped_column(JSON, nullable=True)  # revision, precision, device_map
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="models")
@@ -95,8 +95,8 @@ class Dataset(Base):
     dataset_metadata: Mapped[Optional[JSON]] = mapped_column("metadata", JSON, nullable=True)
     row_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     evaluations: Mapped[List["Evaluation"]] = relationship("Evaluation", back_populates="dataset")
@@ -123,8 +123,8 @@ class Evaluation(Base):
     progress: Mapped[float] = mapped_column(Float, default=0.0)
     metrics: Mapped[Optional[JSON]] = mapped_column(JSON, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relationships
@@ -147,7 +147,7 @@ class EvaluationResult(Base):
     score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     dataset_metadata: Mapped[Optional[JSON]] = mapped_column("metadata", JSON, nullable=True)
     latency_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     evaluation: Mapped["Evaluation"] = relationship("Evaluation", back_populates="results")

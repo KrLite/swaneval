@@ -46,7 +46,7 @@ export DATABASE_URL="postgresql://evalscope:evalscope@localhost:6001/evalscope"
 export REDIS_URL="redis://localhost:6379/0"
 
 # 如果在 Docker 中运行后端，请使用：
-# export DATABASE_URL="postgresql://evalscope:evalscope@postgres:6001/evalscope"
+# export DATABASE_URL="postgresql://evalscope:evalscope@postgres:5432/evalscope"
 # export REDIS_URL="redis://redis:6379/0"
 
 # 运行数据库迁移
@@ -93,7 +93,7 @@ docker-compose down
 
 **连接字符串（Docker/容器化后端）：**
 
-- PostgreSQL: `postgresql://evalscope:evalscope@postgres:6001/evalscope`
+- PostgreSQL: `postgresql://evalscope:evalscope@postgres:5432/evalscope`
 - Redis: `redis://redis:6379/0`
 
 然后在本地运行后端和前端（见上文"后端配置"和"前端配置"部分）。
