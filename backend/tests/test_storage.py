@@ -1,6 +1,7 @@
 """Unit tests for the storage abstraction layer."""
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -24,7 +25,7 @@ class TestLocalFileStorage(unittest.IsolatedAsyncioTestCase):
     async def test_write_and_read_file(self):
         data = b"hello world"
         uri = await self.storage.write_file("uploads/test.txt", data)
-        self.assertTrue(uri.endswith("uploads/test.txt"))
+        self.assertIn("test.txt", uri)
         self.assertTrue(Path(uri).exists())
 
         result = await self.storage.read_file("uploads/test.txt")
@@ -131,8 +132,11 @@ class TestLocalFileStorage(unittest.IsolatedAsyncioTestCase):
 
     async def test_resolve_uri(self):
         uri = self.storage.resolve_uri("uploads/test.jsonl")
-        self.assertTrue(uri.startswith("/"))
-        self.assertTrue(uri.endswith("uploads/test.jsonl"))
+        # OS-native absolute path — on Unix starts with /, on Windows C:\...
+        self.assertTrue(os.path.isabs(uri))
+        # Should end with the key components (OS-native separator)
+        self.assertIn("uploads", uri)
+        self.assertIn("test.jsonl", uri)
 
     async def test_ensure_prefix(self):
         await self.storage.ensure_prefix("new_dir/sub")

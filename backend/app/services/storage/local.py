@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from app.services.storage.base import StorageBackend
+
+
+def _to_posix(path: str) -> str:
+    """Convert any OS path to forward-slash key (Windows compat)."""
+    return path.replace("\\", "/")
 
 
 class LocalFileStorage(StorageBackend):
@@ -16,7 +21,8 @@ class LocalFileStorage(StorageBackend):
         self._root = Path(root).resolve()
 
     def _full_path(self, key: str) -> Path:
-        return self._root / key
+        # key always uses '/', convert to OS path
+        return self._root / PurePosixPath(key)
 
     # -- write / read ---------------------------------------------------
 
@@ -89,11 +95,11 @@ class LocalFileStorage(StorageBackend):
                 for pat in patterns:
                     for p in root.rglob(pat):
                         if p.is_file():
-                            results.append(str(p.relative_to(self._root)))
+                            results.append(_to_posix(str(p.relative_to(self._root))))
             else:
                 for p in root.rglob("*"):
                     if p.is_file():
-                        results.append(str(p.relative_to(self._root)))
+                        results.append(_to_posix(str(p.relative_to(self._root))))
             return sorted(results)
 
         return await asyncio.to_thread(_list)
