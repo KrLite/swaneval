@@ -57,6 +57,7 @@ import {
   useTestModel,
 } from "@/lib/hooks/use-models";
 import type { LLMModel } from "@/lib/types";
+import { utc } from "@/lib/utils";
 
 const typeLabel: Record<string, string> = {
   api: "API",
@@ -631,9 +632,7 @@ export default function ModelsPage() {
                     )}
                     <DetailRow
                       label="注册时间"
-                      value={new Date(
-                        selectedModel.created_at,
-                      ).toLocaleString()}
+                      value={utc(selectedModel.created_at)?.toLocaleString()}
                     />
                   </div>
 

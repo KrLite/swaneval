@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { ArrowLeft, Pause, Play, XCircle, AlertTriangle, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { utc } from "@/lib/utils";
 import {
   useTask,
   useSubtasks,
@@ -116,7 +117,7 @@ export default function TaskDetailPage() {
         <div className="flex-1">
           <h1 className="text-lg font-semibold">{task.name}</h1>
           <p className="text-xs text-muted-foreground">
-            创建于 {new Date(task.created_at).toLocaleString()}
+            创建于 {utc(task.created_at)?.toLocaleString()}
           </p>
         </div>
         <Badge variant={statusVariant(task.status)} className="text-sm">

@@ -17,6 +17,7 @@ import { useDatasets } from "@/lib/hooks/use-datasets";
 import { useModels } from "@/lib/hooks/use-models";
 import { useTasks } from "@/lib/hooks/use-tasks";
 import type { EvalTask } from "@/lib/types";
+import { utc } from "@/lib/utils";
 
 const statusVariant = (
   s: EvalTask["status"],
@@ -250,7 +251,7 @@ export default function OverviewPage() {
                       <div className="min-w-0 flex-1 mr-3">
                         <p className="truncate text-sm font-medium">{t.name}</p>
                         <p className="text-xs text-muted-foreground tabular-nums">
-                          {new Date(t.created_at).toLocaleString()}
+                          {utc(t.created_at)?.toLocaleString()}
                         </p>
                       </div>
                       <Badge
@@ -298,7 +299,7 @@ export default function OverviewPage() {
                       <div className="min-w-0 flex-1 mr-3">
                         <p className="truncate text-sm font-medium">{t.name}</p>
                         <p className="text-xs text-muted-foreground tabular-nums">
-                          {new Date(t.created_at).toLocaleString()}
+                          {utc(t.created_at)?.toLocaleString()}
                         </p>
                       </div>
                       <Badge variant="destructive" className="shrink-0">

@@ -54,6 +54,7 @@ import {
   useDatasetPreview,
 } from "@/lib/hooks/use-datasets";
 import type { Dataset } from "@/lib/types";
+import { utc } from "@/lib/utils";
 
 const sourceTypeLabel: Record<string, string> = {
   upload: "上传",
@@ -690,9 +691,7 @@ export default function DatasetsPage() {
                     )}
                     <DetailRow
                       label="创建时间"
-                      value={new Date(
-                        selectedDataset.created_at,
-                      ).toLocaleString()}
+                      value={utc(selectedDataset.created_at)?.toLocaleString()}
                     />
                   </div>
 

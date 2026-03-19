@@ -68,6 +68,7 @@ import { useModels } from "@/lib/hooks/use-models";
 import { useDatasets } from "@/lib/hooks/use-datasets";
 import { useCriteria } from "@/lib/hooks/use-criteria";
 import type { EvalTask } from "@/lib/types";
+import { utc } from "@/lib/utils";
 
 const statusLabel: Record<string, string> = {
   completed: "已完成",
@@ -111,8 +112,8 @@ const emptyForm = {
 
 function formatDuration(start: string | null, end: string | null): string {
   if (!start) return "\u2014";
-  const s = new Date(start).getTime();
-  const e = end ? new Date(end).getTime() : Date.now();
+  const s = utc(start)!.getTime();
+  const e = end ? utc(end)!.getTime() : Date.now();
   const diff = Math.max(0, e - s);
   const seconds = Math.floor(diff / 1000);
   if (seconds < 60) return `${seconds}秒`;
@@ -254,7 +255,7 @@ export default function TasksPage() {
         header: "创建时间",
         cell: ({ getValue }) => (
           <span className="text-xs text-muted-foreground">
-            {new Date(getValue<string>()).toLocaleString()}
+            {utc(getValue<string>())?.toLocaleString()}
           </span>
         ),
       },
@@ -917,29 +918,15 @@ export default function TasksPage() {
                     })()}
                     <DetailRow
                       label="创建时间"
-                      value={new Date(
-                        selectedTask.created_at,
-                      ).toLocaleString()}
+                      value={utc(selectedTask.created_at)?.toLocaleString() ?? "\u2014"}
                     />
                     <DetailRow
                       label="开始时间"
-                      value={
-                        selectedTask.started_at
-                          ? new Date(
-                              selectedTask.started_at,
-                            ).toLocaleString()
-                          : "\u2014"
-                      }
+                      value={utc(selectedTask.started_at)?.toLocaleString() ?? "\u2014"}
                     />
                     <DetailRow
                       label="结束时间"
-                      value={
-                        selectedTask.finished_at
-                          ? new Date(
-                              selectedTask.finished_at,
-                            ).toLocaleString()
-                          : "\u2014"
-                      }
+                      value={utc(selectedTask.finished_at)?.toLocaleString() ?? "\u2014"}
                     />
                     <DetailRow
                       label="耗时"

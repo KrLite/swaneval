@@ -36,6 +36,7 @@ import {
   useDeleteCriterion,
   useTestCriterion,
 } from "@/lib/hooks/use-criteria";
+import { utc } from "@/lib/utils";
 
 const typeColors: Record<
   string,
@@ -379,7 +380,7 @@ export default function CriteriaPage() {
                       {configSummary(c.config_json, c.type)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {new Date(c.created_at).toLocaleDateString()}
+                      {utc(c.created_at)?.toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button
