@@ -502,7 +502,8 @@ export default function ModelsPage() {
                       {hg.headers.map((header) => (
                         <TableHead
                           key={header.id}
-                          className="cursor-pointer select-none"
+                          style={header.column.id === "select" ? { width: 40 } : undefined}
+                          className={header.column.getCanSort() ? "cursor-pointer select-none" : ""}
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           <span className="flex items-center gap-1">
@@ -532,7 +533,7 @@ export default function ModelsPage() {
                       onClick={() => openView(row.original.id)}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-2.5">
+                        <TableCell key={cell.id} className="py-2.5" style={cell.column.id === "select" ? { width: 40 } : undefined}>
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext(),
@@ -640,7 +641,7 @@ export default function ModelsPage() {
               {/* Create mode */}
               {isCreating && (
                 <CardContent className="pt-0">
-                  <div className="flex items-center justify-center gap-2 mb-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
                     <button
                       type="button"
                       className="hover:text-foreground transition-colors"

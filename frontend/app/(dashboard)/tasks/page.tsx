@@ -474,7 +474,8 @@ export default function TasksPage() {
                       {hg.headers.map((header) => (
                         <TableHead
                           key={header.id}
-                          className="cursor-pointer select-none"
+                          style={header.column.id === "select" ? { width: 40 } : undefined}
+                          className={header.column.getCanSort() ? "cursor-pointer select-none" : ""}
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           <span className="flex items-center gap-1">
@@ -504,7 +505,7 @@ export default function TasksPage() {
                       onClick={() => openView(row.original.id)}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-2.5">
+                        <TableCell key={cell.id} className="py-2.5" style={cell.column.id === "select" ? { width: 40 } : undefined}>
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext(),
