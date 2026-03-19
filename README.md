@@ -22,50 +22,46 @@ Enterprise LLM evaluation platform. Manage datasets, define evaluation criteria,
 
 ## Quick Start
 
-### Prerequisites
-
-- Python 3.10+
-- Node.js 18+
-- Docker (for PostgreSQL and Redis)
-
-### 1. Start Infrastructure
+### 方式一：全容器化（推荐）
 
 ```bash
-docker compose up -d postgres redis
+docker compose up --build -d
 ```
 
-### 2. Backend
+等待就绪后访问：
+- 前端：http://localhost:3000
+- 后端 API：http://localhost:8000
+- Swagger 文档：http://localhost:8000/docs
+
+### 方式二：混合开发模式
 
 ```bash
+# 启动基础设施
+docker compose up -d postgres redis
+
+# 后端
 cd backend
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8000
-```
 
-### 3. Frontend
-
-```bash
+# 前端（新终端）
 cd frontend
 npm install
 npm run dev
 ```
 
-- Backend API: http://localhost:8000
-- Frontend: http://localhost:3000
+### 可选服务
 
-### Environment Variables
+```bash
+# 本地模型推理（Ollama）
+docker compose --profile ollama up -d
 
-Backend reads from `backend/.env`:
-
+# S3 对象存储（MinIO）
+docker compose --profile s3 up -d
 ```
-DATABASE_URL=postgresql+asyncpg://evalscope:evalscope@localhost:6001/evalscope
-DATABASE_URL_SYNC=postgresql://evalscope:evalscope@localhost:6001/evalscope
-REDIS_URL=redis://localhost:6379/0
-CORS_ORIGINS=["http://localhost:3000"]
-SECRET_KEY=dev-secret-change-in-production
-UPLOAD_DIR=data/uploads
-```
+
+> **全流程操作指南**：从注册到可视化结果的完整步骤见 [docs/full-pipeline-guide.md](docs/full-pipeline-guide.md)
 
 ## API Endpoints
 

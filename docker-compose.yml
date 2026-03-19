@@ -1,4 +1,6 @@
 services:
+  # ── 基础设施 ──
+
   postgres:
     image: postgres:14
     container_name: evalscope-postgres
@@ -27,6 +29,60 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── 应用服务 ──
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: evalscope-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - evalscope_data:/data
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://evalscope:evalscope@postgres:5432/evalscope"
+      DATABASE_URL_SYNC: "postgresql://evalscope:evalscope@postgres:5432/evalscope"
+      REDIS_URL: "redis://redis:6379/0"
+      CORS_ORIGINS: '["http://localhost:3000"]'
+      STORAGE_BACKEND: local
+      STORAGE_ROOT: /data
+      # 模型 API key 通过前端界面添加模型时填写，存入数据库。
+      # 无需在此配置。
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: evalscope-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8000/api/v1"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ── 可选服务（需要 --profile 启用）──
+
+  # 本地模型推理: docker compose --profile ollama up
+  ollama:
+    image: ollama/ollama:latest
+    container_name: evalscope-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    profiles:
+      - ollama
+
+  # S3 对象存储: docker compose --profile s3 up
   minio:
     image: minio/minio:latest
     container_name: evalscope-minio
@@ -47,35 +103,8 @@ services:
     profiles:
       - s3
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: evalscope-backend
-    ports:
-      - "8000:8000"
-    volumes:
-      - evalscope_data:/data
-    environment:
-      DATABASE_URL: "postgresql://evalscope:evalscope@postgres:5432/evalscope"
-      REDIS_URL: "redis://redis:6379/0"
-      CORS_ORIGINS: '["http://localhost:3000"]'
-      STORAGE_BACKEND: local
-      STORAGE_ROOT: /data
-      # S3 mode (use with: docker compose --profile s3 up):
-      # STORAGE_BACKEND: s3
-      # S3_BUCKET: evalscope
-      # S3_ENDPOINT_URL: http://minio:9000
-      # S3_ACCESS_KEY: minioadmin
-      # S3_SECRET_KEY: minioadmin
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
 volumes:
   postgres_data:
   evalscope_data:
+  ollama_data:
   minio_data:
