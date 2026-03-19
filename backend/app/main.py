@@ -54,11 +54,14 @@ app = FastAPI(
 )
 
 # 添加CORS中间件 / Add CORS middleware
-# 允许前端跨域访问 / Allow frontend cross-origin access
+# 支持通配符: CORS_ORIGINS='["*"]' 允许所有来源（开发环境）
+# 生产环境建议指定具体域名: CORS_ORIGINS='["https://eval.example.com"]'
+_cors_origins = settings.CORS_ORIGINS
+_allow_all = "*" in _cors_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"] if _allow_all else _cors_origins,
+    allow_credentials=not _allow_all,  # credentials 与 * 不能同时使用
     allow_methods=["*"],
     allow_headers=["*"],
 )

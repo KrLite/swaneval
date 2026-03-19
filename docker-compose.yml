@@ -48,7 +48,7 @@ services:
       DATABASE_URL: "postgresql+asyncpg://evalscope:evalscope@postgres:5432/evalscope"
       DATABASE_URL_SYNC: "postgresql://evalscope:evalscope@postgres:5432/evalscope"
       REDIS_URL: "redis://redis:6379/0"
-      CORS_ORIGINS: '["http://localhost:${FRONTEND_PORT:-3000}"]'
+      CORS_ORIGINS: '["*"]'
       STORAGE_BACKEND: local
       STORAGE_ROOT: /data
     depends_on:
