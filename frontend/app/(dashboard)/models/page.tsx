@@ -799,7 +799,7 @@ export default function ModelsPage() {
               transformOrigin: "top right",
             }}
           >
-            <Card className="w-[32rem] shadow-xl">
+            <Card className="w-[33vw] shadow-xl">
               <div className="flex items-center justify-between px-5 pt-5 pb-3">
                 <h3 className="text-sm font-semibold">添加模型</h3>
               </div>

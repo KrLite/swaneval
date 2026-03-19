@@ -775,7 +775,7 @@ export default function CriteriaPage() {
             className="fixed z-50 animate-modal-expand"
             style={{ top: createPos.top, right: createPos.right, transformOrigin: "top right" }}
           >
-            <Card className="w-[32rem] shadow-xl">
+            <Card className="w-[33vw] shadow-xl">
               <div className="flex items-center justify-between px-5 pt-5 pb-3">
                 <h3 className="text-sm font-semibold">新建评估标准</h3>
               </div>
