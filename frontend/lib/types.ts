@@ -38,7 +38,7 @@ export interface LLMModel {
   name: string;
   provider: string;
   endpoint_url: string;
-  model_type: "api" | "local" | "huggingface";
+  model_type: "api" | "local";
   api_format: "openai" | "anthropic";
   description: string;
   model_name: string;

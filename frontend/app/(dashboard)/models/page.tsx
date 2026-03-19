@@ -65,7 +65,6 @@ import { utc } from "@/lib/utils";
 const typeLabel: Record<string, string> = {
   api: "API",
   local: "本地",
-  huggingface: "HuggingFace",
 };
 
 type PanelMode = { kind: "view"; id: string } | { kind: "create" } | null;
@@ -707,9 +706,6 @@ export default function ModelsPage() {
                           <SelectContent>
                             <SelectItem value="api">API</SelectItem>
                             <SelectItem value="local">本地</SelectItem>
-                            <SelectItem value="huggingface">
-                              HuggingFace
-                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </PanelField>
