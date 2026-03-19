@@ -55,6 +55,8 @@ async def create_task(
         params_json=body.params_json,
         repeat_count=body.repeat_count,
         seed_strategy=body.seed_strategy,
+        gpu_ids=body.gpu_ids,
+        env_vars=body.env_vars,
         created_by=current_user.id,
     )
     session.add(task)

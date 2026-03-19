@@ -62,6 +62,8 @@ export interface EvalTask {
   params_json: string;
   repeat_count: number;
   seed_strategy: "fixed" | "random";
+  gpu_ids: string;
+  env_vars: string;
   started_at: string | null;
   finished_at: string | null;
   created_at: string;

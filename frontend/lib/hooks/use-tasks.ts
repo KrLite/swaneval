@@ -50,6 +50,8 @@ export function useCreateTask() {
       params_json?: string;
       repeat_count?: number;
       seed_strategy?: string;
+      gpu_ids?: string;
+      env_vars?: string;
     }) => {
       const res = await api.post<EvalTask>("/tasks", data);
       return res.data;

@@ -64,6 +64,12 @@ class EvalTask(SQLModel, table=True):
     )
     # 种子策略 / Seed strategy (fixed/random)
 
+    gpu_ids: str = Field(default="")
+    # GPU 编号列表（逗号分隔）/ GPU IDs (comma-separated, e.g. "0,1")
+
+    env_vars: str = Field(default="")
+    # 环境变量 JSON / Environment variables JSON (e.g. {"CUDA_VISIBLE_DEVICES": "0"})
+
     created_by: uuid.UUID | None = Field(default=None, foreign_key="users.id")
     # 创建者ID / Creator user ID (foreign key to users)
 

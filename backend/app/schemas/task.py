@@ -14,6 +14,8 @@ class TaskCreate(BaseModel):
     params_json: str = '{"temperature": 0.7, "max_tokens": 1024}'
     repeat_count: int = 1
     seed_strategy: SeedStrategy = SeedStrategy.fixed
+    gpu_ids: str = ""
+    env_vars: str = ""
 
 
 class TaskResponse(BaseModel):
@@ -27,6 +29,8 @@ class TaskResponse(BaseModel):
     params_json: str
     repeat_count: int
     seed_strategy: SeedStrategy
+    gpu_ids: str = ""
+    env_vars: str = ""
     started_at: datetime | None
     finished_at: datetime | None
     created_at: datetime

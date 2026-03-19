@@ -96,6 +96,7 @@ const STEPS = [
   { title: "选择模型" },
   { title: "数据集与评测标准" },
   { title: "参数配置" },
+  { title: "运行环境" },
   { title: "确认提交" },
 ];
 
@@ -109,6 +110,8 @@ const emptyForm = {
   limit: "",
   repeat_count: "1",
   seed_strategy: "fixed",
+  gpu_ids: "",
+  env_vars: "",
 };
 
 function formatDuration(start: string | null, end: string | null): string {
@@ -211,6 +214,8 @@ export default function TasksPage() {
       params_json: JSON.stringify(paramsObj),
       repeat_count: parseInt(form.repeat_count),
       seed_strategy: form.seed_strategy,
+      gpu_ids: form.gpu_ids || undefined,
+      env_vars: form.env_vars || undefined,
     });
     closePanel();
   };
@@ -344,6 +349,7 @@ export default function TasksPage() {
     if (step === 1)
       return form.dataset_ids.length > 0 && form.criteria_ids.length > 0;
     if (step === 2) return !!form.name;
+    if (step === 3) return true; // hardware is optional
     return true;
   };
 
@@ -689,6 +695,12 @@ export default function TasksPage() {
                       </span>
                     }
                   />
+                  {selectedTask.gpu_ids && (
+                    <DetailRow
+                      label="GPU"
+                      value={<span className="font-mono">{selectedTask.gpu_ids}</span>}
+                    />
+                  )}
                 </div>
 
                 {/* Action buttons */}
@@ -1015,8 +1027,46 @@ export default function TasksPage() {
                     </>
                   )}
 
-                  {/* Step 3: Review */}
+                  {/* Step 3: Hardware & Environment */}
                   {step === 3 && (
+                    <>
+                      <PanelField label="GPU 编号">
+                        <Input
+                          value={form.gpu_ids}
+                          onChange={(e) =>
+                            setForm({ ...form, gpu_ids: e.target.value })
+                          }
+                          placeholder="例：0 或 0,1,2"
+                          className="font-mono"
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          指定 CUDA_VISIBLE_DEVICES，留空使用所有可用 GPU
+                        </p>
+                      </PanelField>
+                      <PanelField label="环境变量 (JSON)">
+                        <textarea
+                          value={form.env_vars}
+                          onChange={(e) =>
+                            setForm({ ...form, env_vars: e.target.value })
+                          }
+                          placeholder={'{\n  "OMP_NUM_THREADS": "4"\n}'}
+                          className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          可选。JSON 格式的环境变量，将在任务运行时注入
+                        </p>
+                      </PanelField>
+                      <div className="rounded-md bg-muted p-2.5 text-[11px] text-muted-foreground space-y-1">
+                        <p className="font-medium text-foreground/70 text-xs">常用环境变量</p>
+                        <p><code className="font-mono">CUDA_VISIBLE_DEVICES</code> — 指定 GPU（由上方 GPU 编号自动设置）</p>
+                        <p><code className="font-mono">OMP_NUM_THREADS</code> — OpenMP 线程数</p>
+                        <p><code className="font-mono">TOKENIZERS_PARALLELISM</code> — HuggingFace 分词器并行</p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Step 4: Review */}
+                  {step === 4 && (
                     <>
                       <div className="space-y-2.5">
                         <DetailRow label="任务名称" value={form.name} />
@@ -1084,6 +1134,18 @@ export default function TasksPage() {
                             form.seed_strategy === "fixed" ? "固定" : "随机"
                           }
                         />
+                        {form.gpu_ids && (
+                          <DetailRow
+                            label="GPU"
+                            value={<span className="font-mono">{form.gpu_ids}</span>}
+                          />
+                        )}
+                        {form.env_vars && (
+                          <DetailRow
+                            label="环境变量"
+                            value={<span className="font-mono text-[11px]">已配置</span>}
+                          />
+                        )}
                       </div>
 
                       {/* Config JSON preview toggle */}
@@ -1114,6 +1176,8 @@ export default function TasksPage() {
                               },
                               repeat_count: parseInt(form.repeat_count),
                               seed_strategy: form.seed_strategy,
+                              ...(form.gpu_ids ? { gpu_ids: form.gpu_ids } : {}),
+                              ...(form.env_vars ? { env_vars: form.env_vars } : {}),
                             },
                             null,
                             2,

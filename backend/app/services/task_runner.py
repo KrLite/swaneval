@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 import random
 import time
 import uuid
@@ -283,6 +284,17 @@ async def run_task(task_id: uuid.UUID):
         ]
         snapshot_params = json.loads(task.params_json or "{}")
         snapshot_repeat_count = task.repeat_count
+
+        # Apply GPU and environment variable settings
+        if task.gpu_ids:
+            os.environ["CUDA_VISIBLE_DEVICES"] = task.gpu_ids
+        if task.env_vars:
+            try:
+                env_dict = json.loads(task.env_vars)
+                for k, v in env_dict.items():
+                    os.environ[str(k)] = str(v)
+            except (json.JSONDecodeError, TypeError):
+                pass
 
         task.status = TaskStatus.running
         task.started_at = datetime.utcnow()
