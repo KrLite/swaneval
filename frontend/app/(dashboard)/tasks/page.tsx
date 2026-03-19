@@ -413,32 +413,33 @@ export default function TasksPage() {
             </button>
           ))}
         </div>
+        {Object.keys(rowSelection).length > 0 && (
+          <div className="flex items-center gap-2 ml-auto text-xs text-muted-foreground">
+            <span>
+              已选择{" "}
+              <span className="font-semibold text-foreground tabular-nums">
+                {Object.keys(rowSelection).length}
+              </span>{" "}
+              项
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => setRowSelection({})}
+            >
+              <Trash2 className="mr-1 h-3 w-3" />
+              删除
+            </Button>
+            <button
+              className="text-xs hover:text-foreground transition-colors"
+              onClick={() => setRowSelection({})}
+            >
+              取消
+            </button>
+          </div>
+        )}
       </div>
-
-      {Object.keys(rowSelection).length > 0 && (
-        <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-muted/60 border">
-          <span className="text-xs text-muted-foreground">
-            已选择 <span className="font-semibold text-foreground">{Object.keys(rowSelection).length}</span> 项
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={() => setRowSelection({})}
-          >
-            <Trash2 className="mr-1 h-3 w-3" />
-            删除所选
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 text-xs"
-            onClick={() => setRowSelection({})}
-          >
-            取消选择
-          </Button>
-        </div>
-      )}
 
       {/* Main: table + side panel */}
       <div className="flex gap-4 min-h-0">
