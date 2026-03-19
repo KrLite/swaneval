@@ -807,7 +807,11 @@ export default function ResultsPage() {
                       <SelectValue placeholder="选择任务..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {tasks.filter((t) => t.status === "completed").map((t) => (
+                      {tasks.filter((t) => t.status === "completed").length === 0 ? (
+                        <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                          暂无已完成的任务，<a href="/tasks" className="text-primary hover:underline">去创建</a>
+                        </div>
+                      ) : tasks.filter((t) => t.status === "completed").map((t) => (
                         <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1055,7 +1059,11 @@ export default function ResultsPage() {
                     <SelectValue placeholder="选择任务..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {tasks.map((t) => (
+                    {tasks.length === 0 ? (
+                      <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                        暂无任务，<a href="/tasks" className="text-primary hover:underline">去创建</a>
+                      </div>
+                    ) : tasks.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.name}
                       </SelectItem>

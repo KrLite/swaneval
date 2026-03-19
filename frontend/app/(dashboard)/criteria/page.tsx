@@ -966,7 +966,11 @@ export default function CriteriaPage() {
                             <SelectValue placeholder="选择用于评判的模型" />
                           </SelectTrigger>
                           <SelectContent>
-                            {models.map((m) => (
+                            {models.length === 0 ? (
+                              <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                                暂无模型，<a href="/models" className="text-primary hover:underline">去添加</a>
+                              </div>
+                            ) : models.map((m) => (
                               <SelectItem key={m.id} value={m.id}>
                                 {m.name}
                                 {m.model_name && (
