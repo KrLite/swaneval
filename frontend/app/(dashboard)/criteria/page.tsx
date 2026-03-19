@@ -426,7 +426,7 @@ export default function CriteriaPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-destructive"
+                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                               title="删除"
                               onClick={() =>
                                 setDeleteTarget({
