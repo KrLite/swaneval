@@ -907,7 +907,7 @@ function EditableText({
             {placeholder ?? "—"}
           </span>
         )}
-        <Pencil className="h-2.5 w-2.5 text-muted-foreground/0 group-hover/edit:text-muted-foreground/50 transition-colors shrink-0" />
+        <Pencil className="h-2.5 w-2.5 text-muted-foreground/30 group-hover/edit:text-muted-foreground/60 transition-colors shrink-0" />
       </div>
     </div>
   );
@@ -968,7 +968,7 @@ function EditableSelect({
         <Badge variant="outline" className="text-xs font-normal">
           {displayValue}
         </Badge>
-        <Pencil className="h-2.5 w-2.5 text-muted-foreground/0 group-hover/edit:text-muted-foreground/50 transition-colors shrink-0" />
+        <Pencil className="h-2.5 w-2.5 text-muted-foreground/30 group-hover/edit:text-muted-foreground/60 transition-colors shrink-0" />
       </div>
     </div>
   );
