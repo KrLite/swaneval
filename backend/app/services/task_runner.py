@@ -14,8 +14,8 @@ import httpx
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.database import engine
 from app.config import settings
+from app.database import engine
 from app.models.criterion import Criterion
 from app.models.dataset import Dataset
 from app.models.eval_result import EvalResult
@@ -29,6 +29,8 @@ from app.services.evalscope_adapter import (
 )
 from app.services.evalscope_result_ingestor import ingest_evalscope_results
 from app.services.evaluators import run_criterion
+from app.services.storage import StorageBackend, get_storage
+from app.services.storage.utils import uri_to_key
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +60,9 @@ def _extract_model_text(data: dict, anthropic_mode: bool) -> tuple[str, int]:
         for block in blocks:
             if not isinstance(block, dict):
                 continue
-            if block.get("type") == "text" and isinstance(block.get("text"), str):
+            if block.get("type") == "text" and isinstance(
+                block.get("text"), str
+            ):
                 text_parts.append(block["text"])
     if text_parts:
         output = "\n".join(part for part in text_parts if part)
@@ -70,11 +74,45 @@ def _extract_model_text(data: dict, anthropic_mode: bool) -> tuple[str, int]:
 
 def _should_use_evalscope(params: dict) -> bool:
     """Enable EvalScope runner only when explicitly requested in task params."""
-    return bool(params.get("use_evalscope") or params.get("runner") == "evalscope")
+    return bool(
+        params.get("use_evalscope") or params.get("runner") == "evalscope"
+    )
+
+
+async def _load_dataset_rows(
+    storage: StorageBackend, source_uri: str
+) -> list[dict]:
+    """Load JSONL/JSON dataset rows via storage backend."""
+    key = uri_to_key(source_uri)
+    if key is not None:
+        if not await storage.exists(key):
+            logger.error("Dataset file not found in storage: %s", key)
+            return []
+        text = await storage.read_text(key)
+    else:
+        # Mounted path — read directly from local filesystem
+        path = Path(source_uri)
+        if not path.exists():
+            logger.error("Dataset file not found: %s", source_uri)
+            return []
+        text = await asyncio.to_thread(path.read_text, encoding="utf-8")
+
+    is_json = source_uri.endswith(".json") or (key and key.endswith(".json"))
+    if is_json:
+        data = json.loads(text)
+        return data if isinstance(data, list) else [data]
+
+    rows: list[dict] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if line:
+            rows.append(json.loads(line))
+    return rows
 
 
 async def _run_task_with_evalscope(
     session: AsyncSession,
+    storage: StorageBackend,
     task_id: uuid.UUID,
     repeat_count: int,
     model: LLMModel,
@@ -106,30 +144,37 @@ async def _run_task_with_evalscope(
     await session.commit()
     await session.refresh(subtask)
 
-    work_dir = Path("data/evalscope_outputs") / str(task_id)
-    input_dir = work_dir / "input" / "general_qa"
-    input_file = input_dir / f"{Path(dataset.source_uri).stem}.jsonl"
+    # Build storage keys for work directory
+    work_dir_key = f"evalscope_outputs/{task_id}"
+    stem = Path(dataset.source_uri).stem
+    input_key = f"{work_dir_key}/input/general_qa/{stem}.jsonl"
 
-    converted_count = convert_dataset_to_general_qa_jsonl(dataset.source_uri, str(input_file))
+    converted_count = await convert_dataset_to_general_qa_jsonl(
+        storage, dataset.source_uri, input_key
+    )
     if converted_count == 0:
-        raise ValueError("No valid rows after converting dataset to EvalScope general_qa format")
+        raise ValueError(
+            "No valid rows after converting dataset to EvalScope format"
+        )
 
+    # Resolve URIs — local paths or s3:// URIs
+    input_dir_key = f"{work_dir_key}/input/general_qa"
     task_cfg = build_evalscope_task_config(
         model=model,
         dataset=dataset,
-        evalscope_input_root=str(input_dir),
+        evalscope_input_root=storage.resolve_uri(input_dir_key),
         params=params,
         repeat_count=repeat_count,
-        work_dir=str(work_dir),
+        work_dir=storage.resolve_uri(work_dir_key),
     )
 
-    # run_task is synchronous; execute in thread to avoid blocking the event loop.
     await asyncio.to_thread(run_evalscope_task, task_cfg)
 
-    score = extract_primary_score(str(work_dir))
-    ingested_results = ingest_evalscope_results(
-        work_dir=str(work_dir),
-        input_jsonl_path=str(input_file),
+    score = await extract_primary_score(storage, work_dir_key)
+    ingested_results = await ingest_evalscope_results(
+        storage=storage,
+        work_dir_key=work_dir_key,
+        input_jsonl_key=input_key,
         default_score=score,
     )
     for row in ingested_results:
@@ -148,31 +193,13 @@ async def _run_task_with_evalscope(
         )
         session.add(result)
 
-    subtask.last_completed_index = len(ingested_results) if ingested_results else converted_count
+    subtask.last_completed_index = (
+        len(ingested_results) if ingested_results else converted_count
+    )
     subtask.progress_pct = 100.0
     subtask.status = TaskStatus.completed
     session.add(subtask)
     await session.commit()
-
-
-def _load_dataset_rows(file_path: str) -> list[dict]:
-    """Load JSONL/JSON dataset rows. Each row must have 'prompt' and optionally 'expected'."""
-    rows = []
-    path = Path(file_path)
-    if not path.exists():
-        logger.error(f"Dataset file not found: {file_path}")
-        return rows
-
-    with open(path) as f:
-        if file_path.endswith(".json"):
-            data = json.load(f)
-            rows = data if isinstance(data, list) else [data]
-        else:
-            for line in f:
-                line = line.strip()
-                if line:
-                    rows.append(json.loads(line))
-    return rows
 
 
 async def _call_model(
@@ -181,74 +208,82 @@ async def _call_model(
     prompt: str,
     params: dict,
 ) -> tuple[str, float, float, int]:
-    """Call an OpenAI-compatible API endpoint.
-
-    Returns (output, latency_ms, first_token_ms, tokens).
-    """
+    """Call an OpenAI-compatible API endpoint."""
     headers = {}
     api_key = model.api_key or settings.DEFAULT_MODEL_API_KEY
     if not api_key:
-        raise ValueError("Missing api_key: set model.api_key or DEFAULT_MODEL_API_KEY")
+        raise ValueError(
+            "Missing api_key: set model.api_key or DEFAULT_MODEL_API_KEY"
+        )
     headers["Authorization"] = f"Bearer {api_key}"
 
     endpoint_url = _normalize_model_endpoint(
         model.endpoint_url or settings.DEFAULT_MODEL_ENDPOINT_URL
     )
     if not endpoint_url:
-        raise ValueError("Missing endpoint_url: set model.endpoint_url or DEFAULT_MODEL_ENDPOINT_URL")
+        raise ValueError(
+            "Missing endpoint_url: set model.endpoint_url or DEFAULT_MODEL_ENDPOINT_URL"
+        )
     anthropic_mode = _is_anthropic_endpoint(endpoint_url)
     if anthropic_mode:
         headers["anthropic-version"] = "2023-06-01"
 
     model_name = model.model_name or model.name or settings.DEFAULT_MODEL_NAME
     if not model_name:
-        raise ValueError("Missing model_name: set model.model_name/name or DEFAULT_MODEL_NAME")
+        raise ValueError(
+            "Missing model_name: set model.model_name/name or DEFAULT_MODEL_NAME"
+        )
 
     body = {
         "model": model_name,
         "messages": [{"role": "user", "content": prompt}],
-        **{k: v for k, v in params.items() if k in ("temperature", "max_tokens", "top_p", "seed")},
+        **{
+            k: v
+            for k, v in params.items()
+            if k in ("temperature", "max_tokens", "top_p", "seed")
+        },
     }
 
     t0 = time.perf_counter()
     first_token_ms = 0.0
     try:
         resp = await client.post(
-            endpoint_url,
-            json=body,
-            headers=headers,
-            timeout=120.0,
+            endpoint_url, json=body, headers=headers, timeout=120.0
         )
         latency_ms = (time.perf_counter() - t0) * 1000
         resp.raise_for_status()
         data = resp.json()
 
         content, tokens = _extract_model_text(data, anthropic_mode)
-        first_token_ms = latency_ms  # non-streaming, approximate
+        first_token_ms = latency_ms
         return content, latency_ms, first_token_ms, tokens
 
     except Exception as e:
         latency_ms = (time.perf_counter() - t0) * 1000
-        logger.error(f"Model call failed: {e}")
+        logger.error("Model call failed: %s", e)
         return f"[ERROR] {e}", latency_ms, 0.0, 0
 
 
 async def run_task(task_id: uuid.UUID):
     """Execute an evaluation task end-to-end."""
+    storage = get_storage()
+
     async with AsyncSession(engine, expire_on_commit=False) as session:
         task = await session.get(EvalTask, task_id)
         if not task:
-            logger.error(f"Task {task_id} not found")
+            logger.error("Task %s not found", task_id)
             return
 
-        # Snapshot fields before first commit to avoid expired attribute lazy-load issues.
         snapshot_model_id = task.model_id
-        snapshot_dataset_ids = [uuid.UUID(d) for d in task.dataset_ids.split(",") if d]
-        snapshot_criteria_ids = [uuid.UUID(c) for c in task.criteria_ids.split(",") if c]
+        snapshot_dataset_ids = [
+            uuid.UUID(d) for d in task.dataset_ids.split(",") if d
+        ]
+        snapshot_criteria_ids = [
+            uuid.UUID(c) for c in task.criteria_ids.split(",") if c
+        ]
         snapshot_params = json.loads(task.params_json or "{}")
         snapshot_repeat_count = task.repeat_count
 
-        # Mark running
         task.status = TaskStatus.running
         task.started_at = datetime.utcnow()
         session.add(task)
@@ -266,6 +301,7 @@ async def run_task(task_id: uuid.UUID):
             if _should_use_evalscope(params):
                 await _run_task_with_evalscope(
                     session=session,
+                    storage=storage,
                     task_id=task_id,
                     repeat_count=snapshot_repeat_count,
                     model=model,
@@ -285,7 +321,7 @@ async def run_task(task_id: uuid.UUID):
                 ds = await session.get(Dataset, ds_id)
                 if not ds:
                     continue
-                rows = _load_dataset_rows(ds.source_uri)
+                rows = await _load_dataset_rows(storage, ds.source_uri)
                 for row in rows:
                     all_rows.append((ds_id, row))
 
@@ -310,12 +346,10 @@ async def run_task(task_id: uuid.UUID):
                 session.add(st)
                 subtasks.append(st)
             await session.commit()
-            # Refresh to get IDs
             for st in subtasks:
                 await session.refresh(st)
 
             # Run evaluation
-            completed = 0
             async with httpx.AsyncClient() as client:
                 for run_idx, subtask in enumerate(subtasks):
                     run_params = dict(params)
@@ -325,9 +359,11 @@ async def run_task(task_id: uuid.UUID):
                         run_params["seed"] = 42 + run_idx
 
                     for ds_id, row in all_rows:
-                        # Check if task was paused/cancelled
                         await session.refresh(task)
-                        if task.status in (TaskStatus.paused, TaskStatus.failed):
+                        if task.status in (
+                            TaskStatus.paused,
+                            TaskStatus.failed,
+                        ):
                             subtask.status = TaskStatus.paused
                             session.add(subtask)
                             await session.commit()
@@ -335,20 +371,29 @@ async def run_task(task_id: uuid.UUID):
 
                         prompt = row.get(
                             "prompt",
-                            row.get("query", row.get("input", row.get("question", ""))),
+                            row.get(
+                                "query",
+                                row.get("input", row.get("question", "")),
+                            ),
                         )
                         expected = row.get(
                             "expected",
-                            row.get("response", row.get("output", row.get("answer", ""))),
+                            row.get(
+                                "response",
+                                row.get("output", row.get("answer", "")),
+                            ),
                         )
 
-                        output, latency, first_token, tokens = await _call_model(
-                            client, model, prompt, run_params
+                        output, latency, first_token, tokens = (
+                            await _call_model(client, model, prompt, run_params)
                         )
 
                         for criterion in criteria:
                             score = run_criterion(
-                                criterion.type, criterion.config_json, expected, output
+                                criterion.type,
+                                criterion.config_json,
+                                expected,
+                                output,
                             )
 
                             result = EvalResult(
@@ -365,7 +410,6 @@ async def run_task(task_id: uuid.UUID):
                                 first_token_ms=first_token,
                             )
                             session.add(result)
-                            completed += 1
 
                         subtask.last_completed_index += 1
                         subtask.progress_pct = (
@@ -383,9 +427,8 @@ async def run_task(task_id: uuid.UUID):
             task.finished_at = datetime.utcnow()
 
         except Exception as e:
-            logger.exception(f"Task {task_id} failed: {e}")
+            logger.exception("Task %s failed: %s", task_id, e)
             task.status = TaskStatus.failed
-            # Mark all pending subtasks as failed
             stmt = select(EvalSubtask).where(
                 EvalSubtask.task_id == task_id,
                 EvalSubtask.status != TaskStatus.completed,

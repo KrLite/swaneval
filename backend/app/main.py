@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,9 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import router as v1_router
 from app.config import settings
 from app.database import init_db
+from app.services.storage import get_storage
 
 # 配置日志 / Configure logging
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -17,12 +20,30 @@ async def lifespan(app: FastAPI):
     """
     应用生命周期管理 / Application lifespan management
 
-    启动时初始化数据库，关闭时清理资源。
-    Initialize database on startup, cleanup on shutdown.
+    启动时初始化数据库和存储后端，关闭时清理资源。
+    Initialize database and storage on startup, cleanup on shutdown.
     """
-    await init_db()  # 启动时初始化数据库表 / Initialize database tables on startup
+    await init_db()
+
+    # 初始化存储后端 / Initialize storage backend
+    storage = get_storage()
+    await storage.validate()
+    await storage.ensure_prefix("uploads")
+    await storage.ensure_prefix("evalscope_outputs")
+    logger.info("Storage backend validated and ready")
+
+    # S3 模式下设置 AWS 环境变量供 EvalScope/fsspec 使用
+    if settings.STORAGE_BACKEND.lower() == "s3":
+        if settings.S3_ENDPOINT_URL:
+            os.environ.setdefault("AWS_ENDPOINT_URL", settings.S3_ENDPOINT_URL)
+        if settings.S3_ACCESS_KEY:
+            os.environ.setdefault("AWS_ACCESS_KEY_ID", settings.S3_ACCESS_KEY)
+        if settings.S3_SECRET_KEY:
+            os.environ.setdefault("AWS_SECRET_ACCESS_KEY", settings.S3_SECRET_KEY)
+        if settings.S3_REGION:
+            os.environ.setdefault("AWS_DEFAULT_REGION", settings.S3_REGION)
+
     yield
-    # 关闭时可以添加清理逻辑 / Cleanup logic can be added here on shutdown
 
 
 # 创建FastAPI应用 / Create FastAPI application

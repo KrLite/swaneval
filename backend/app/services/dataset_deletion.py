@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-import os
 import uuid
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.dataset import Dataset, DatasetVersion, SourceType
+from app.services.storage.base import StorageBackend
+from app.services.storage.utils import uri_to_key
 
 
-def cleanup_uploaded_file(dataset: Dataset) -> bool:
-    """Delete uploaded dataset file if it exists.
+async def cleanup_uploaded_file(storage: StorageBackend, dataset: Dataset) -> bool:
+    """Delete uploaded dataset file from storage if it exists.
 
     Returns True only when a file is actually removed.
     """
@@ -20,14 +21,15 @@ def cleanup_uploaded_file(dataset: Dataset) -> bool:
         return False
     if not dataset.source_uri:
         return False
-    if not os.path.exists(dataset.source_uri):
+
+    key = uri_to_key(dataset.source_uri)
+    if key is None:
         return False
 
-    try:
-        os.remove(dataset.source_uri)
-        return True
-    except OSError:
+    if not await storage.exists(key):
         return False
+
+    return await storage.delete_file(key)
 
 
 async def delete_dataset_versions(session: AsyncSession, dataset_id: uuid.UUID) -> int:

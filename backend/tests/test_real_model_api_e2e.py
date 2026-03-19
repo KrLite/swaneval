@@ -144,7 +144,13 @@ class TestRealModelApiE2E(unittest.TestCase):
                 params={"task_id": task_id, "page_size": 20},
             )
             self.assertEqual(results_resp.status_code, 200, results_resp.text)
-            results = results_resp.json()
+            results_body = results_resp.json()
+            # GET /results returns paginated: {items, total, page, page_size}
+            results = (
+                results_body.get("items", results_body)
+                if isinstance(results_body, dict)
+                else results_body
+            )
 
         self.assertEqual(status, "completed", f"task status is {status}")
         self.assertGreaterEqual(len(results), 1, "result rows should be >= 1")
@@ -185,7 +191,8 @@ class TestRealModelApiE2E(unittest.TestCase):
                     "DATABASE_URL": f"sqlite+aiosqlite:///{db_file}",
                     "DATABASE_URL_SYNC": f"sqlite:///{db_file}",
                     "REDIS_URL": "redis://localhost:6379/9",
-                    "UPLOAD_DIR": str(upload_dir),
+                    "STORAGE_BACKEND": "local",
+                    "STORAGE_ROOT": str(tmpdir),
                     "CORS_ORIGINS": '["http://localhost:3000"]',
                 }
             )

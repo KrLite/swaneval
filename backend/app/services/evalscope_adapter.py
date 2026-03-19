@@ -1,6 +1,6 @@
 """EvalScope integration helpers for MVP migration.
 
-This module provides a minimal bridge from local dataset files and task params
+This module provides a minimal bridge from dataset files and task params
 into EvalScope TaskConfig + run_task, while keeping the existing backend API.
 """
 
@@ -10,76 +10,98 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from app.services.storage.base import StorageBackend
+from app.services.storage.utils import uri_to_key
+
 if TYPE_CHECKING:
     from app.models.dataset import Dataset
     from app.models.llm_model import LLMModel
 
 
 def _normalize_qa_row(row: dict[str, Any]) -> dict[str, str] | None:
-    """Normalize one row into EvalScope general_qa format.
-
-    Supported input fields are aligned with current backend conventions.
-    """
-    query = row.get("query") or row.get("prompt") or row.get("input") or row.get("question")
+    """Normalize one row into EvalScope general_qa format."""
+    query = (
+        row.get("query")
+        or row.get("prompt")
+        or row.get("input")
+        or row.get("question")
+    )
     if not query:
         return None
 
     normalized = {"query": str(query)}
-    response = row.get("response") or row.get("expected") or row.get("output") or row.get("answer")
+    response = (
+        row.get("response")
+        or row.get("expected")
+        or row.get("output")
+        or row.get("answer")
+    )
     if response is not None:
         normalized["response"] = str(response)
     return normalized
 
 
-def convert_dataset_to_general_qa_jsonl(source_uri: str, output_jsonl: str) -> int:
-    """Convert local JSON/JSONL dataset into EvalScope general_qa JSONL.
+async def convert_dataset_to_general_qa_jsonl(
+    storage: StorageBackend, source_uri: str, output_key: str
+) -> int:
+    """Convert JSON/JSONL dataset into EvalScope general_qa JSONL via storage.
 
     Returns converted row count.
     """
-    source = Path(source_uri)
-    if not source.exists():
-        raise FileNotFoundError(f"Dataset file not found: {source_uri}")
+    key = uri_to_key(source_uri)
+    if key is not None:
+        text = await storage.read_text(key)
+    else:
+        # Mounted path — read from local filesystem
+        import asyncio
 
+        text = await asyncio.to_thread(
+            Path(source_uri).read_text, encoding="utf-8"
+        )
+
+    # Parse rows
     rows: list[dict[str, Any]] = []
-    with source.open("r", encoding="utf-8") as f:
-        if source.suffix == ".json":
-            data = json.load(f)
-            if isinstance(data, list):
-                rows = data
-            elif isinstance(data, dict):
-                rows = [data]
-            else:
-                raise ValueError("Unsupported JSON structure for dataset conversion")
+    if source_uri.endswith(".json") or (key and key.endswith(".json")):
+        data = json.loads(text)
+        if isinstance(data, list):
+            rows = data
+        elif isinstance(data, dict):
+            rows = [data]
         else:
-            for line in f:
-                line = line.strip()
-                if line:
-                    rows.append(json.loads(line))
+            raise ValueError("Unsupported JSON structure for dataset conversion")
+    else:
+        for line in text.splitlines():
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
 
-    out_path = Path(output_jsonl)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    # Normalize and write output
+    output_lines: list[str] = []
+    for row in rows:
+        normalized = _normalize_qa_row(row)
+        if normalized:
+            output_lines.append(json.dumps(normalized, ensure_ascii=False))
 
-    converted = 0
-    with out_path.open("w", encoding="utf-8") as out:
-        for row in rows:
-            normalized = _normalize_qa_row(row)
-            if not normalized:
-                continue
-            out.write(json.dumps(normalized, ensure_ascii=False) + "\n")
-            converted += 1
+    if output_lines:
+        output_data = ("\n".join(output_lines) + "\n").encode("utf-8")
+        await storage.write_file(output_key, output_data)
 
-    return converted
+    return len(output_lines)
 
 
 def build_evalscope_task_config(
-    model: "LLMModel",
-    dataset: "Dataset",
+    model: LLMModel,
+    dataset: Dataset,
     evalscope_input_root: str,
     params: dict[str, Any],
     repeat_count: int,
     work_dir: str,
 ):
-    """Build EvalScope TaskConfig for minimal single-dataset integration."""
+    """Build EvalScope TaskConfig for minimal single-dataset integration.
+
+    ``evalscope_input_root`` and ``work_dir`` should be fully resolved URIs
+    (local path or s3:// URI) from ``storage.resolve_uri()``.
+    """
     from evalscope.config import TaskConfig
 
     api_key = (model.api_key or "").strip()
@@ -129,25 +151,21 @@ def run_evalscope_task(task_cfg) -> dict:
     return {"result": result}
 
 
-def extract_primary_score(work_dir: str) -> float:
-    """Extract one representative score from EvalScope reports directory.
-
-    This is a best-effort MVP extractor and may evolve with report schema.
-    """
-    reports_dir = Path(work_dir) / "reports"
-    if not reports_dir.exists():
-        return 0.0
-
-    for report_file in reports_dir.rglob("*.json"):
+async def extract_primary_score(
+    storage: StorageBackend, work_dir_key: str
+) -> float:
+    """Extract one representative score from EvalScope reports directory."""
+    reports_prefix = f"{work_dir_key}/reports"
+    files = await storage.list_files(reports_prefix, patterns=["*.json"])
+    for f in files:
         try:
-            data = json.loads(report_file.read_text(encoding="utf-8"))
+            text = await storage.read_text(f)
+            data = json.loads(text)
         except Exception:
             continue
-
         score = _find_numeric_score(data)
         if score is not None:
             return float(score)
-
     return 0.0
 
 

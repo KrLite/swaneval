@@ -118,7 +118,13 @@ def main():
             params={"task_id": task_id, "page_size": 20},
         )
         results_resp.raise_for_status()
-        results = results_resp.json()
+        results_body = results_resp.json()
+        # GET /results returns paginated: {items, total, page, page_size}
+        results = (
+            results_body.get("items", results_body)
+            if isinstance(results_body, dict)
+            else results_body
+        )
 
     print(f"TASK_ID= {task_id}")
     print(f"TASK_STATUS= {status}")
@@ -128,7 +134,6 @@ def main():
         print(f"FIRST_RESULT_MODEL_OUTPUT= {results[0].get('model_output')}")
 
     # 最小通过条件：任务完成 + 至少 1 条结果。
-    # 这说明后端调度、EvalScope 执行分支、结果写回都成功了。
     if status != "completed" or len(results) < 1:
         raise SystemExit(2)
 

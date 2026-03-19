@@ -27,8 +27,27 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     # 访问令牌过期时间(分钟) / Access token expiration time in minutes (default: 24 hours)
 
+    # ── 存储后端 / Storage backend ──
+    STORAGE_BACKEND: str = "local"
+    # 存储后端类型 / Storage backend type: "local" (filesystem) or "s3"
+
+    STORAGE_ROOT: str = "data"
+    # 共享存储根目录 / Shared storage root directory
+    # 本地模式为文件系统路径，所有持久化数据存放于此
+    # Local mode: filesystem path; all persistent data lives here
+
+    # ── S3 配置 / S3 configuration ──
+    S3_BUCKET: str = ""
+    S3_ENDPOINT_URL: str = ""
+    # S3 端点 / S3 endpoint URL (e.g. http://minio:9000 for MinIO)
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_REGION: str = "us-east-1"
+    S3_PREFIX: str = ""
+    # S3 key 前缀 / Optional key prefix within the bucket
+
     UPLOAD_DIR: str = "data/uploads"
-    # 上传文件目录 / Upload directory for dataset files
+    # 上传文件目录（仅 mount 模式回退用） / Upload directory (legacy, for mount fallback)
 
     DEFAULT_MODEL_PROVIDER: str = ""
     # 默认模型提供商 / Optional default provider injected by environment

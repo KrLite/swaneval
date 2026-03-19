@@ -1,12 +1,13 @@
-import os
 import tempfile
-import uuid
 import unittest
+import uuid
 from types import SimpleNamespace
 from typing import Any, cast
+from unittest.mock import patch
 
 from app.models.dataset import SourceType
 from app.services.dataset_deletion import cleanup_uploaded_file, delete_dataset_versions
+from app.services.storage.local import LocalFileStorage
 
 
 class _FakeExecResult:
@@ -31,42 +32,57 @@ class _FakeSession:
 
 
 class TestDatasetDeletion(unittest.IsolatedAsyncioTestCase):
-    def test_cleanup_uploaded_file_non_upload_or_missing(self):
-        ds_not_upload = cast(Any, SimpleNamespace(source_type=SourceType.server_path, source_uri="/tmp/x"))
-        self.assertFalse(cleanup_uploaded_file(ds_not_upload))
-
-        ds_empty_path = cast(Any, SimpleNamespace(source_type=SourceType.upload, source_uri=""))
-        self.assertFalse(cleanup_uploaded_file(ds_empty_path))
-
-        ds_missing_file = cast(Any, SimpleNamespace(source_type=SourceType.upload, source_uri="/tmp/not-exists"))
-        self.assertFalse(cleanup_uploaded_file(ds_missing_file))
-
-    def test_cleanup_uploaded_file_success_and_oserror(self):
+    async def test_cleanup_uploaded_file_non_upload_or_missing(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            fpath = os.path.join(tmpdir, "sample.jsonl")
-            with open(fpath, "w", encoding="utf-8") as f:
-                f.write("{}\n")
+            storage = LocalFileStorage(root=tmpdir)
 
-            ds_ok = cast(Any, SimpleNamespace(source_type=SourceType.upload, source_uri=fpath))
-            self.assertTrue(cleanup_uploaded_file(ds_ok))
-            self.assertFalse(os.path.exists(fpath))
+            ds_not_upload = cast(
+                Any,
+                SimpleNamespace(source_type=SourceType.server_path, source_uri="/tmp/x"),
+            )
+            self.assertFalse(await cleanup_uploaded_file(storage, ds_not_upload))
 
-            fpath2 = os.path.join(tmpdir, "sample2.jsonl")
-            with open(fpath2, "w", encoding="utf-8") as f:
-                f.write("{}\n")
+            ds_empty_path = cast(
+                Any,
+                SimpleNamespace(source_type=SourceType.upload, source_uri=""),
+            )
+            self.assertFalse(await cleanup_uploaded_file(storage, ds_empty_path))
 
-            ds_err = cast(Any, SimpleNamespace(source_type=SourceType.upload, source_uri=fpath2))
-            original_remove = os.remove
+    async def test_cleanup_uploaded_file_success(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage = LocalFileStorage(root=tmpdir)
 
-            def _raise_oserror(path):
-                _ = path
-                raise OSError("cannot remove")
+            key = "uploads/sample.jsonl"
+            await storage.write_file(key, b"{}\n")
+            uri = storage.resolve_uri(key)
 
-            try:
-                os.remove = _raise_oserror
-                self.assertFalse(cleanup_uploaded_file(ds_err))
-            finally:
-                os.remove = original_remove
+            with patch("app.services.storage.utils.settings") as mock_settings:
+                mock_settings.STORAGE_ROOT = tmpdir
+                mock_settings.S3_BUCKET = ""
+                mock_settings.S3_PREFIX = ""
+
+                ds_ok = cast(
+                    Any,
+                    SimpleNamespace(source_type=SourceType.upload, source_uri=uri),
+                )
+                self.assertTrue(await cleanup_uploaded_file(storage, ds_ok))
+                self.assertFalse(await storage.exists(key))
+
+    async def test_cleanup_uploaded_file_not_exists(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage = LocalFileStorage(root=tmpdir)
+            uri = storage.resolve_uri("uploads/nonexistent.jsonl")
+
+            with patch("app.services.storage.utils.settings") as mock_settings:
+                mock_settings.STORAGE_ROOT = tmpdir
+                mock_settings.S3_BUCKET = ""
+                mock_settings.S3_PREFIX = ""
+
+                ds = cast(
+                    Any,
+                    SimpleNamespace(source_type=SourceType.upload, source_uri=uri),
+                )
+                self.assertFalse(await cleanup_uploaded_file(storage, ds))
 
     async def test_delete_dataset_versions(self):
         versions = [
