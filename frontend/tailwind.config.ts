@@ -70,8 +70,13 @@ module.exports = {
           to: { opacity: "1", transform: "scale(1)" },
         },
         "float-up": {
-          from: { opacity: "0", transform: "translateX(-50%) translateY(16px)" },
-          to: { opacity: "1", transform: "translateX(-50%) translateY(0)" },
+          from: { opacity: "0", transform: "translateY(16px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "shake": {
+          "0%, 100%": { transform: "translateX(0)" },
+          "15%, 55%": { transform: "translateX(-5px)" },
+          "35%, 75%": { transform: "translateX(5px)" },
         },
         "backdrop-in": {
           from: { opacity: "0" },
@@ -82,7 +87,8 @@ module.exports = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "modal-expand": "modal-expand 0.2s ease-out",
-        "float-up": "float-up 0.25s ease-out",
+        "float-up": "float-up 0.25s ease-out forwards",
+        "shake": "shake 0.4s ease-in-out",
         "backdrop-in": "backdrop-in 0.15s ease-out",
       },
     },

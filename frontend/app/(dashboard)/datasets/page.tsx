@@ -121,6 +121,13 @@ export default function DatasetsPage() {
   const isCreating = panel?.kind === "create";
   const selectedDataset = datasets.find((d) => d.id === selectedId);
   const viewPanelOpen = panel?.kind === "view";
+  const [shakeCancel, setShakeCancel] = useState(false);
+
+  const formDirty = isCreating && (
+    Object.entries(emptyUploadForm).some(([k, v]) => uploadForm[k as keyof typeof uploadForm] !== v) ||
+    Object.entries(emptyMountForm).some(([k, v]) => mountForm[k as keyof typeof mountForm] !== v) ||
+    (fileRef.current?.files?.length ?? 0) > 0
+  );
 
   const openCreate = () => {
     setUploadForm({ ...emptyUploadForm });
@@ -386,7 +393,9 @@ export default function DatasetsPage() {
           ref={addBtnRef}
           size="sm"
           onClick={isCreating ? closePanel : openCreate}
-          variant={isCreating ? "outline" : "default"}
+          variant={isCreating ? "destructive" : "default"}
+          className={`${isCreating ? "relative z-50" : ""} ${shakeCancel ? "animate-shake" : ""}`}
+          onAnimationEnd={() => setShakeCancel(false)}
         >
           {isCreating ? (
             <><X className="mr-1 h-4 w-4" /> 取消</>
@@ -719,12 +728,15 @@ export default function DatasetsPage() {
       {/* Create modal */}
       {isCreating && createPos && (
         <>
-          <div className="fixed inset-0 bg-black/40 z-40 animate-backdrop-in" onClick={closePanel} />
+          <div className="fixed inset-0 bg-black/40 z-40 animate-backdrop-in" onClick={() => {
+            if (formDirty) { setShakeCancel(true); return; }
+            closePanel();
+          }} />
           <div
             className="fixed z-50 animate-modal-expand"
             style={{ top: createPos.top, right: createPos.right, transformOrigin: "top right" }}
           >
-            <Card className="w-96 shadow-xl">
+            <Card className="w-[32rem] shadow-xl">
               <div className="flex items-center justify-between px-5 pt-5 pb-3">
                 <h3 className="text-sm font-semibold">添加数据集</h3>
               </div>
@@ -978,8 +990,8 @@ export default function DatasetsPage() {
 
       {/* Floating selection bar */}
       {Object.keys(rowSelection).length > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-30 animate-float-up">
-          <div className="flex items-center gap-3 bg-background border rounded-full shadow-lg px-5 py-2.5 text-sm">
+        <div className="fixed bottom-6 left-0 right-0 z-30 flex justify-center pointer-events-none animate-float-up">
+          <div className="pointer-events-auto flex items-center gap-3 bg-background border rounded-full shadow-lg px-5 py-2.5 text-sm">
             <span className="text-muted-foreground">
               已选择{" "}
               <span className="font-semibold text-foreground tabular-nums">
