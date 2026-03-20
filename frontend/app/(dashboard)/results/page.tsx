@@ -13,12 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -133,6 +128,7 @@ export default function ResultsPage() {
   const createBenchmarkBatch = useCreateBenchmarkBatch();
   const deleteBenchmark = useDeleteBenchmark();
 
+  const [activeView, setActiveView] = useState("leaderboard");
   const [criterionFilter, setCriterionFilter] = useState<string>("__all__");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [importOpen, setImportOpen] = useState(false);
@@ -524,30 +520,48 @@ export default function ResultsPage() {
         ))}
       </div>
 
-      {/* Toolbar: criterion filter segmented tabs */}
-      <div className="flex items-center gap-2">
-        <FilterDropdown
-          label="标准"
-          options={criteria.map((c) => ({ key: c.id, label: c.name }))}
-          value={criterionFilter}
-          onChange={setCriterionFilter}
-        />
-      </div>
+      {/* Sidebar + Content */}
+      <div className="flex gap-4 min-h-0">
+        {/* Sidebar */}
+        <div className="w-48 shrink-0 space-y-1">
+          <div className="mb-2">
+            <FilterDropdown
+              label="标准"
+              options={criteria.map((c) => ({ key: c.id, label: c.name }))}
+              value={criterionFilter}
+              onChange={setCriterionFilter}
+            />
+          </div>
+          {[
+            { key: "leaderboard", label: "排行榜", icon: Medal },
+            { key: "champion", label: "天梯榜", icon: Trophy },
+            { key: "compare", label: "对比", icon: BarChart3 },
+            { key: "radar", label: "雷达图", icon: Hexagon },
+            { key: "external", label: "外部数据", icon: Globe },
+            { key: "reports", label: "报告", icon: FileText },
+            { key: "detail", label: "明细", icon: List },
+          ].map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setActiveView(item.key)}
+              className={cn(
+                "flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm transition-all",
+                activeView === item.key
+                  ? "bg-base-100 text-base-content font-medium shadow-sm"
+                  : "text-base-content/40 hover:bg-base-200/50 hover:text-base-content",
+              )}
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </button>
+          ))}
+        </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="leaderboard">
-        <TabsList>
-          <TabsTrigger value="leaderboard"><Medal className="mr-1 h-3.5 w-3.5" /> 排行榜</TabsTrigger>
-          <TabsTrigger value="champion"><Trophy className="mr-1 h-3.5 w-3.5" /> 天梯榜</TabsTrigger>
-          <TabsTrigger value="compare"><BarChart3 className="mr-1 h-3.5 w-3.5" /> 对比</TabsTrigger>
-          <TabsTrigger value="radar"><Hexagon className="mr-1 h-3.5 w-3.5" /> 雷达图</TabsTrigger>
-          <TabsTrigger value="external"><Globe className="mr-1 h-3.5 w-3.5" /> 外部数据</TabsTrigger>
-          <TabsTrigger value="reports"><FileText className="mr-1 h-3.5 w-3.5" /> 报告</TabsTrigger>
-          <TabsTrigger value="detail"><List className="mr-1 h-3.5 w-3.5" /> 明细</TabsTrigger>
-        </TabsList>
+        {/* Content */}
+        <div className="flex-1 min-w-0">
 
         {/* ── 排行榜 ── */}
-        <TabsContent value="leaderboard">
+        {activeView === "leaderboard" && (
           <Card>
             <CardContent className="p-0">
               {lbLoading ? (
@@ -591,10 +605,10 @@ export default function ResultsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
         {/* ── 对比 (Bar Chart) ── */}
-        <TabsContent value="compare">
+        {activeView === "compare" && (
           <Card>
             <CardContent className="pt-6">
               {leaderboard.length === 0 ? (
@@ -624,10 +638,10 @@ export default function ResultsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
         {/* ── 雷达图 ── */}
-        <TabsContent value="radar">
+        {activeView === "radar" && (
           <Card>
             <CardContent className="pt-6">
               {leaderboard.length === 0 ? (
@@ -662,10 +676,10 @@ export default function ResultsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
         {/* ── 天梯榜 (Champion per criterion) ── */}
-        <TabsContent value="champion">
+        {activeView === "champion" && (
           <Card>
             <CardContent className="pt-6">
               {championData.length === 0 ? (
@@ -699,10 +713,10 @@ export default function ResultsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
         {/* ── 外部数据 ── */}
-        <TabsContent value="external">
+        {activeView === "external" && (
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-4">
@@ -768,10 +782,10 @@ export default function ResultsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
         {/* ── 报告生成器 ── */}
-        <TabsContent value="reports">
+        {activeView === "reports" && (
           <Card>
             <CardContent className="p-0">
               {/* Controls */}
@@ -994,10 +1008,10 @@ export default function ResultsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
         {/* ── 明细 ── */}
-        <TabsContent value="detail">
+        {activeView === "detail" && (
           <Card>
             <CardContent className="p-0">
               {/* Task filter bar */}
@@ -1098,8 +1112,9 @@ export default function ResultsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        )}
+        </div>
+      </div>
 
       {/* Import benchmark dialog */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
