@@ -9,10 +9,10 @@ class Settings(BaseSettings):
     Load configuration from environment variables or .env file using pydantic-settings.
     """
 
-    DATABASE_URL: str = "postgresql+asyncpg://evalscope:evalscope@localhost:6001/evalscope"
+    DATABASE_URL: str = "postgresql+asyncpg://swaneval:swaneval@localhost:6001/swaneval"
     # 异步数据库连接URL / Async database connection URL (for SQLAlchemy async)
 
-    DATABASE_URL_SYNC: str = "postgresql://evalscope:evalscope@localhost:6001/evalscope"
+    DATABASE_URL_SYNC: str = "postgresql://swaneval:swaneval@localhost:6001/swaneval"
     # 同步数据库连接URL / Sync database connection URL (for Alembic migrations)
 
     REDIS_URL: str = "redis://localhost:6379/0"

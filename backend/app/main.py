@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
 
 # 创建FastAPI应用 / Create FastAPI application
 app = FastAPI(
-    title="EvalScope GUI API",
+    title="SwanEVAL API",
     version="0.1.0",
     lifespan=lifespan,
 )
