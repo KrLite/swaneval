@@ -39,7 +39,7 @@ export function DeleteDialog({
           </DialogDescription>
         </DialogHeader>
         {error && (
-          <p className="text-sm text-error px-1">{error}</p>
+          <p className="text-sm text-destructive px-1">{error}</p>
         )}
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={onCancel}>

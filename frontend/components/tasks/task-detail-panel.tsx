@@ -218,7 +218,7 @@ export function TaskDetailPanel({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="flex-1 text-error hover:text-error hover:bg-error/5"
+                  className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/5"
                   onClick={() => cancelTask.mutate(task.id)}
                   disabled={cancelTask.isPending}
                 >
@@ -251,7 +251,7 @@ export function TaskDetailPanel({
             <Button
               size="sm"
               variant="outline"
-              className="text-error hover:text-error hover:bg-error/5"
+              className="text-destructive hover:text-destructive hover:bg-destructive/5"
               onClick={() => onDelete({ id: task.id, name: task.name })}
             >
               <Trash2 className="h-3.5 w-3.5" />

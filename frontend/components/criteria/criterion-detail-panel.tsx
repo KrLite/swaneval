@@ -151,8 +151,8 @@ export function CriterionDetailPanel({
 
           {/* Raw config */}
           <div className="space-y-1">
-            <p className="text-xs text-base-content/50">配置 JSON</p>
-            <pre className="rounded-md bg-base-200 p-2.5 text-xs font-mono overflow-auto max-h-32">
+            <p className="text-xs text-muted-foreground">配置 JSON</p>
+            <pre className="rounded-md bg-muted p-2.5 text-xs font-mono overflow-auto max-h-32">
               {(() => {
                 try {
                   return JSON.stringify(
@@ -181,7 +181,7 @@ export function CriterionDetailPanel({
             <Button
               size="sm"
               variant="outline"
-              className="text-error hover:text-error hover:bg-error/5"
+              className="text-destructive hover:text-destructive hover:bg-destructive/5"
               onClick={() =>
                 onDelete({
                   id: criterion.id,

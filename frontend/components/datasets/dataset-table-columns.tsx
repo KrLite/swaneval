@@ -30,7 +30,7 @@ export function getDatasetColumns(): ColumnDef<Dataset>[] {
       header: ({ table }) => (
         <input
           type="checkbox"
-          className="h-3.5 w-3.5 rounded border-base-300 accent-primary"
+          className="h-3.5 w-3.5 rounded border-border accent-primary"
           checked={table.getIsAllPageRowsSelected()}
           onChange={(e) => table.toggleAllPageRowsSelected(e.target.checked)}
         />
@@ -38,7 +38,7 @@ export function getDatasetColumns(): ColumnDef<Dataset>[] {
       cell: ({ row }) => (
         <input
           type="checkbox"
-          className="h-3.5 w-3.5 rounded border-base-300 accent-primary"
+          className="h-3.5 w-3.5 rounded border-border accent-primary"
           checked={row.getIsSelected()}
           onChange={(e) => {
             e.stopPropagation();
@@ -55,7 +55,7 @@ export function getDatasetColumns(): ColumnDef<Dataset>[] {
         <div className="min-w-0">
           <p className="font-medium truncate">{row.original.name}</p>
           {row.original.description && (
-            <p className="text-xs text-base-content/50 truncate max-w-[200px]">
+            <p className="text-xs text-muted-foreground truncate max-w-[200px]">
               {row.original.description}
             </p>
           )}
@@ -75,14 +75,14 @@ export function getDatasetColumns(): ColumnDef<Dataset>[] {
       accessorKey: "format",
       header: "格式",
       cell: ({ getValue }) => (
-        <span className="text-base-content/50">{getValue<string>()}</span>
+        <span className="text-muted-foreground">{getValue<string>()}</span>
       ),
     },
     {
       accessorKey: "row_count",
       header: "行数",
       cell: ({ getValue }) => (
-        <span className="font-mono text-xs text-base-content/50">
+        <span className="font-mono text-xs text-muted-foreground">
           {getValue<number>().toLocaleString()}
         </span>
       ),
@@ -91,7 +91,7 @@ export function getDatasetColumns(): ColumnDef<Dataset>[] {
       accessorKey: "size_bytes",
       header: "大小",
       cell: ({ getValue }) => (
-        <span className="font-mono text-xs text-base-content/50">
+        <span className="font-mono text-xs text-muted-foreground">
           {formatBytes(getValue<number>())}
         </span>
       ),
@@ -101,7 +101,7 @@ export function getDatasetColumns(): ColumnDef<Dataset>[] {
       header: "标签",
       cell: ({ getValue }) => {
         const tags = getValue<string>();
-        if (!tags) return <span className="text-xs text-base-content/50">—</span>;
+        if (!tags) return <span className="text-xs text-muted-foreground">—</span>;
         return (
           <div className="flex flex-wrap gap-1">
             {tags.split(",").map((t) => (
@@ -117,7 +117,7 @@ export function getDatasetColumns(): ColumnDef<Dataset>[] {
       accessorKey: "version",
       header: "版本",
       cell: ({ getValue }) => (
-        <span className="text-xs text-base-content/50">v{getValue<number>()}</span>
+        <span className="text-xs text-muted-foreground">v{getValue<number>()}</span>
       ),
     },
   ];

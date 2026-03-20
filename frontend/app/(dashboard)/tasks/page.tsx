@@ -118,12 +118,12 @@ export default function TasksPage() {
       {
         id: "select", size: 32, enableSorting: false, enableResizing: false,
         header: ({ table }) => (
-          <input type="checkbox" className="h-3.5 w-3.5 rounded border-base-300 accent-primary"
+          <input type="checkbox" className="h-3.5 w-3.5 rounded border-border accent-primary"
             checked={table.getIsAllPageRowsSelected()}
             onChange={(e) => table.toggleAllPageRowsSelected(e.target.checked)} />
         ),
         cell: ({ row }) => (
-          <input type="checkbox" className="h-3.5 w-3.5 rounded border-base-300 accent-primary"
+          <input type="checkbox" className="h-3.5 w-3.5 rounded border-border accent-primary"
             checked={row.getIsSelected()}
             onChange={(e) => { e.stopPropagation(); row.toggleSelected(e.target.checked); }}
             onClick={(e) => e.stopPropagation()} />
@@ -133,7 +133,7 @@ export default function TasksPage() {
         accessorKey: "name", header: "名称",
         cell: ({ row }) => (
           <div className="flex items-center gap-1.5 min-w-0">
-            {row.original.status === "failed" && <AlertTriangle className="h-3.5 w-3.5 text-error shrink-0" />}
+            {row.original.status === "failed" && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
             <span className="font-medium truncate">{row.original.name}</span>
           </div>
         ),
@@ -147,19 +147,19 @@ export default function TasksPage() {
       },
       {
         accessorKey: "repeat_count", header: "重复",
-        cell: ({ getValue }) => <span className="text-xs font-mono text-base-content/50">{getValue<number>()}</span>,
+        cell: ({ getValue }) => <span className="text-xs font-mono text-muted-foreground">{getValue<number>()}</span>,
       },
       {
         accessorKey: "seed_strategy", header: "种子策略",
-        cell: ({ getValue }) => <span className="text-xs text-base-content/50">{getValue<string>() === "fixed" ? "固定" : "随机"}</span>,
+        cell: ({ getValue }) => <span className="text-xs text-muted-foreground">{getValue<string>() === "fixed" ? "固定" : "随机"}</span>,
       },
       {
         accessorKey: "created_at", header: "创建时间",
-        cell: ({ getValue }) => <span className="text-xs text-base-content/50">{utc(getValue<string>())?.toLocaleString()}</span>,
+        cell: ({ getValue }) => <span className="text-xs text-muted-foreground">{utc(getValue<string>())?.toLocaleString()}</span>,
       },
       {
         id: "duration", header: "耗时",
-        cell: ({ row }) => <span className="text-xs font-mono text-base-content/50">{formatDuration(row.original.started_at, row.original.finished_at)}</span>,
+        cell: ({ row }) => <span className="text-xs font-mono text-muted-foreground">{formatDuration(row.original.started_at, row.original.finished_at)}</span>,
       },
     ],
     [],
@@ -267,7 +267,7 @@ export default function TasksPage() {
                               header.getContext(),
                             )}
                             {header.column.getCanSort() && (
-                              <ArrowUpDown className="h-3 w-3 text-base-content/30" />
+                              <ArrowUpDown className="h-3 w-3 text-muted-foreground/60" />
                             )}
                           </span>
                         </TableHead>
@@ -282,8 +282,8 @@ export default function TasksPage() {
                       key={row.id}
                       className={`cursor-pointer transition-colors group/row ${
                         selectedId === row.original.id
-                          ? "bg-base-200"
-                          : "hover:bg-base-200/50"
+                          ? "bg-muted"
+                          : "hover:bg-muted/50"
                       }`}
                       onClick={() => openView(row.original.id)}
                     >
@@ -304,7 +304,7 @@ export default function TasksPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-error hover:text-error hover:bg-error/10"
+                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                               title="删除"
                               onClick={() =>
                                 setDeleteTarget({
@@ -317,7 +317,7 @@ export default function TasksPage() {
                             </Button>
                           </div>
                           <ChevronRight
-                            className={`h-3.5 w-3.5 text-base-content/30 transition-transform ${
+                            className={`h-3.5 w-3.5 text-muted-foreground/60 transition-transform ${
                               selectedId === row.original.id ? "rotate-90" : ""
                             }`}
                           />

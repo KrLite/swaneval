@@ -195,10 +195,10 @@ export function DatasetCreateForm({
 
   return (
     <>
-      <div className="flex items-center gap-2 mb-3 text-xs text-base-content/50">
+      <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
         <button
           type="button"
-          className="hover:text-base-content transition-colors"
+          className="hover:text-foreground transition-colors"
           onClick={async () => {
             try {
               const text = await navigator.clipboard.readText();
@@ -212,7 +212,7 @@ export function DatasetCreateForm({
           从剪贴板导入
         </button>
         <span className="text-border">|</span>
-        <label className="hover:text-base-content transition-colors cursor-pointer">
+        <label className="hover:text-foreground transition-colors cursor-pointer">
           <input
             type="file"
             accept=".json"
@@ -229,7 +229,7 @@ export function DatasetCreateForm({
           />
           从 JSON 导入
         </label>
-        {importError && <span className="text-error">{importError}</span>}
+        {importError && <span className="text-destructive">{importError}</span>}
       </div>
 
       <Tabs value={activeTab} onValueChange={onTabChange}>
@@ -260,7 +260,7 @@ export function DatasetCreateForm({
                   ? "border-primary bg-primary/5"
                   : selectedFile
                     ? "border-emerald-500/50 bg-emerald-500/5"
-                    : "border-muted-foreground/25 hover:border-muted-foreground/40 hover:bg-base-200/30"
+                    : "border-muted-foreground/25 hover:border-muted-foreground/40 hover:bg-muted/30"
               }`}
             >
               <input
@@ -283,20 +283,20 @@ export function DatasetCreateForm({
                   <p className="text-xs font-medium truncate max-w-full">
                     {selectedFile.name}
                   </p>
-                  <p className="text-[11px] text-base-content/50">
+                  <p className="text-[11px] text-muted-foreground">
                     {(selectedFile.size / 1024).toFixed(1)} KB — 点击更换文件
                   </p>
                 </>
               ) : (
                 <>
                   <Upload
-                    className={`h-6 w-6 ${dragOver ? "text-primary" : "text-base-content/30"}`}
+                    className={`h-6 w-6 ${dragOver ? "text-primary" : "text-muted-foreground/60"}`}
                   />
-                  <p className="text-xs text-base-content/50">
+                  <p className="text-xs text-muted-foreground">
                     拖拽文件到此处，或{" "}
                     <span className="text-primary font-medium">点击选择</span>
                   </p>
-                  <p className="text-[11px] text-base-content/40">
+                  <p className="text-[11px] text-muted-foreground">
                     支持 JSONL、CSV、JSON、Parquet、Excel
                   </p>
                 </>
@@ -388,7 +388,7 @@ export function DatasetCreateForm({
                 className="font-mono"
                 required
               />
-              <p className="text-[11px] text-base-content/50 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 {importForm.source === "huggingface"
                   ? "支持 Dataset ID（如 openai/gsm8k）或完整 URL"
                   : "支持 Dataset ID（如 modelscope/xxx）或完整 URL"}
@@ -433,7 +433,7 @@ export function DatasetCreateForm({
               />
             </PanelField>
             {onlineImportError && (
-              <div className="rounded-md bg-error/10 px-3 py-2 text-xs text-error">
+              <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 {onlineImportError}
               </div>
             )}

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const nav = [
   { href: "/", label: "概览", icon: LayoutDashboard },
@@ -44,7 +45,7 @@ export function Topbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-base-200/95 backdrop-blur supports-[backdrop-filter]:bg-base-200/60">
+    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-14 items-center px-6 gap-6">
         <Link href="/" className="shrink-0 mr-2 flex items-center gap-2 text-primary">
           <Logo className="h-5 w-5" />
@@ -65,7 +66,7 @@ export function Topbar() {
                   "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-all duration-150 whitespace-nowrap",
                   active
                     ? "bg-primary/10 text-primary font-medium"
-                    : "text-base-content/40 hover:bg-base-300/30 hover:text-base-content"
+                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                 )}
               >
                 <item.icon className="h-4 w-4" />
@@ -79,19 +80,20 @@ export function Topbar() {
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={handleAccountClick}
-              className="hidden sm:flex items-center gap-2 rounded-lg px-3 py-1.5 cursor-pointer hover:bg-base-300/30 transition-colors"
+              className="hidden sm:flex items-center gap-2 rounded-lg px-3 py-1.5 cursor-pointer hover:bg-accent/50 transition-colors"
             >
               <div className="text-right">
                 <p className="text-sm font-medium leading-none">{user.nickname || user.username}</p>
-                <p className="text-[11px] text-base-content/40 mt-0.5">{user.role}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{user.role}</p>
               </div>
             </button>
+            <ThemeToggle />
             <button
               onClick={() => {
                 logout();
                 window.location.href = "/login";
               }}
-              className="rounded-lg p-2 text-base-content/40 hover:bg-base-300/30 hover:text-base-content transition-colors"
+              className="rounded-lg p-2 text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors"
               title="退出登录"
             >
               <LogOut className="h-4 w-4" />

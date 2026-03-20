@@ -18,11 +18,11 @@ export function PageHeader({ title, stats, action }: PageHeaderProps) {
       <div className="flex items-center gap-5">
         <h1 className="text-lg font-semibold">{title}</h1>
         {stats && stats.length > 0 && (
-          <div className="hidden sm:flex items-center gap-4 text-xs text-base-content/50">
+          <div className="hidden sm:flex items-center gap-4 text-xs text-muted-foreground">
             {stats.map((s) => (
               <span key={s.label}>
                 {s.label}{" "}
-                <span className="font-semibold text-base-content tabular-nums">
+                <span className="font-semibold text-foreground tabular-nums">
                   {s.value}
                 </span>
               </span>
@@ -46,7 +46,7 @@ export function SearchToolbar({ value, onChange, placeholder = "搜索...", chil
   return (
     <div className="flex items-center gap-2">
       <div className="relative flex-1 max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-base-content/50" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           value={value}
           onChange={(e) => onChange(e.target.value)}

@@ -17,13 +17,13 @@ export function TableEmpty({ icon: Icon, title, description, action }: TableEmpt
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
       {Icon && (
-        <div className="rounded-xl bg-base-200 p-3 mb-3">
-          <Icon className="h-5 w-5 text-base-content/40" />
+        <div className="rounded-xl bg-muted p-3 mb-3">
+          <Icon className="h-5 w-5 text-muted-foreground" />
         </div>
       )}
-      <p className="text-sm text-base-content/50">{title}</p>
+      <p className="text-sm text-muted-foreground">{title}</p>
       {description && (
-        <p className="text-xs text-base-content/40 mt-1 max-w-xs">{description}</p>
+        <p className="text-xs text-muted-foreground mt-1 max-w-xs">{description}</p>
       )}
       {action && <div className="mt-3">{action}</div>}
     </div>
@@ -36,8 +36,8 @@ export function TableEmpty({ icon: Icon, title, description, action }: TableEmpt
 export function TableLoading({ text = "加载中..." }: { text?: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
-      <Loader2 className="h-5 w-5 animate-spin text-base-content/50 mb-2" />
-      <p className="text-sm text-base-content/50">{text}</p>
+      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mb-2" />
+      <p className="text-sm text-muted-foreground">{text}</p>
     </div>
   );
 }

@@ -85,7 +85,7 @@ export function PresetListPanel({
       <div className="px-4 pt-4 pb-2 space-y-2 shrink-0">
         <h3 className="text-sm font-semibold">{title}</h3>
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-base-content/50" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -97,12 +97,12 @@ export function PresetListPanel({
 
       <div className="flex-1 overflow-auto px-2 pb-2">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-12 text-base-content/50">
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin mb-2" />
             <p className="text-xs">加载中...</p>
           </div>
         ) : filtered.length === 0 ? (
-          <p className="text-xs text-base-content/50 text-center py-8">
+          <p className="text-xs text-muted-foreground text-center py-8">
             {search ? "无匹配项" : "暂无预设"}
           </p>
         ) : (
@@ -121,7 +121,7 @@ export function PresetListPanel({
                       ? "opacity-40 cursor-not-allowed"
                       : isSelected
                         ? "bg-primary/[0.08] ring-1 ring-primary/30"
-                        : "hover:bg-base-200/60",
+                        : "hover:bg-background/60",
                   )}
                 >
                   <div className="flex items-center gap-2">
@@ -150,7 +150,7 @@ export function PresetListPanel({
                           )}
                         </div>
                       </div>
-                      <p className="text-[11px] text-base-content/50 mt-0.5 line-clamp-1">{item.description}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{item.description}</p>
                     </div>
                   </div>
                   {item.tags && (
@@ -172,12 +172,12 @@ export function PresetListPanel({
       {/* Footer action */}
       <div className="shrink-0 px-3 pb-3 pt-1 border-t space-y-2">
         {error && (
-          <div className="rounded-lg bg-error/10 px-2.5 py-1.5 text-[11px] text-error">
+          <div className="rounded-lg bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
             {error}
           </div>
         )}
         {confirming && (
-          <div className="flex items-center gap-2 text-xs text-base-content/50">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
             处理中...
           </div>

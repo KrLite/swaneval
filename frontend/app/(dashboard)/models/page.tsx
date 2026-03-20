@@ -161,7 +161,7 @@ export default function ModelsPage() {
         header: ({ table }) => (
           <input
             type="checkbox"
-            className="h-3.5 w-3.5 rounded border-base-300 accent-primary"
+            className="h-3.5 w-3.5 rounded border-border accent-primary"
             checked={table.getIsAllPageRowsSelected()}
             onChange={(e) => table.toggleAllPageRowsSelected(e.target.checked)}
           />
@@ -169,7 +169,7 @@ export default function ModelsPage() {
         cell: ({ row }) => (
           <input
             type="checkbox"
-            className="h-3.5 w-3.5 rounded border-base-300 accent-primary"
+            className="h-3.5 w-3.5 rounded border-border accent-primary"
             checked={row.getIsSelected()}
             onChange={(e) => {
               e.stopPropagation();
@@ -186,7 +186,7 @@ export default function ModelsPage() {
           <div className="min-w-0">
             <p className="font-medium truncate">{row.original.name}</p>
             {row.original.model_name && (
-              <p className="text-xs text-base-content/50 font-mono truncate">
+              <p className="text-xs text-muted-foreground font-mono truncate">
                 {row.original.model_name}
               </p>
             )}
@@ -197,7 +197,7 @@ export default function ModelsPage() {
         accessorKey: "provider",
         header: "提供商",
         cell: ({ getValue }) => (
-          <span className="text-base-content/50">{getValue<string>()}</span>
+          <span className="text-muted-foreground">{getValue<string>()}</span>
         ),
       },
       {
@@ -213,7 +213,7 @@ export default function ModelsPage() {
         accessorKey: "endpoint_url",
         header: "端点",
         cell: ({ getValue }) => (
-          <span className="font-mono text-xs text-base-content/50 truncate block max-w-[220px]">
+          <span className="font-mono text-xs text-muted-foreground truncate block max-w-[220px]">
             {getValue<string>()}
           </span>
         ),
@@ -224,14 +224,14 @@ export default function ModelsPage() {
         cell: ({ row }) => {
           const r = testResults[row.original.id];
           if (!r)
-            return <span className="text-xs text-base-content/50">—</span>;
+            return <span className="text-xs text-muted-foreground">—</span>;
           if (r.message === "测试中...")
             return (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-base-content/50" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
             );
           return (
             <span
-              className={`inline-block h-2 w-2 rounded-full ${r.ok ? "bg-emerald-500" : "bg-error"}`}
+              className={`inline-block h-2 w-2 rounded-full ${r.ok ? "bg-emerald-500" : "bg-destructive"}`}
               title={r.message}
             />
           );
@@ -243,7 +243,7 @@ export default function ModelsPage() {
         cell: ({ getValue }) => {
           const v = getValue<number | null>();
           return (
-            <span className="text-xs font-mono text-base-content/50">
+            <span className="text-xs font-mono text-muted-foreground">
               {v ? v.toLocaleString() : "—"}
             </span>
           );
@@ -365,7 +365,7 @@ export default function ModelsPage() {
                               header.getContext(),
                             )}
                             {header.column.getCanSort() && (
-                              <ArrowUpDown className="h-3 w-3 text-base-content/30" />
+                              <ArrowUpDown className="h-3 w-3 text-muted-foreground/60" />
                             )}
                           </span>
                         </TableHead>
@@ -380,8 +380,8 @@ export default function ModelsPage() {
                       key={row.id}
                       className={`cursor-pointer transition-colors group/row ${
                         selectedId === row.original.id
-                          ? "bg-base-200"
-                          : "hover:bg-base-200/50"
+                          ? "bg-muted"
+                          : "hover:bg-muted/50"
                       }`}
                       onClick={() => openView(row.original.id)}
                     >
@@ -445,7 +445,7 @@ export default function ModelsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-error hover:text-error hover:bg-error/10"
+                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                               title="删除"
                               onClick={() =>
                                 setDeleteTarget({
@@ -458,7 +458,7 @@ export default function ModelsPage() {
                             </Button>
                           </div>
                           <ChevronRight
-                            className={`h-3.5 w-3.5 text-base-content/30 transition-transform ${
+                            className={`h-3.5 w-3.5 text-muted-foreground/60 transition-transform ${
                               selectedId === row.original.id ? "rotate-90" : ""
                             }`}
                           />

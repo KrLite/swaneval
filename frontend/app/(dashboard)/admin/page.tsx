@@ -137,9 +137,9 @@ export default function AdminPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-lg font-semibold">用户管理</h1>
-              <span className="text-xs text-base-content/50">
+              <span className="text-xs text-muted-foreground">
                 共{" "}
-                <span className="font-semibold text-base-content tabular-nums">
+                <span className="font-semibold text-foreground tabular-nums">
                   {users.length}
                 </span>{" "}
                 个用户
@@ -149,7 +149,7 @@ export default function AdminPage() {
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-base-content/50" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
@@ -191,8 +191,8 @@ export default function AdminPage() {
                     onClick={() => setSelectedUserId(user.id)}
                     className={`w-full text-left rounded-lg px-3 py-2.5 transition-colors ${
                       selectedUserId === user.id
-                        ? "bg-base-200"
-                        : "hover:bg-base-200/50"
+                        ? "bg-muted"
+                        : "hover:bg-muted/50"
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -209,10 +209,10 @@ export default function AdminPage() {
                     <div className="flex items-center gap-1.5 mt-1">
                       <span
                         className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${
-                          user.is_active ? "bg-success" : "bg-error"
+                          user.is_active ? "bg-emerald-500" : "bg-destructive"
                         }`}
                       />
-                      <span className="text-xs text-base-content/50 truncate">
+                      <span className="text-xs text-muted-foreground truncate">
                         {user.email}
                       </span>
                     </div>
@@ -232,7 +232,7 @@ export default function AdminPage() {
               {/* Detail header */}
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-base-200 flex items-center justify-center text-base-content/60 font-semibold text-lg">
+                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-foreground/60 font-semibold text-lg">
                     {selectedUser.username.charAt(0).toUpperCase()}
                   </div>
                   <div>
@@ -252,7 +252,7 @@ export default function AdminPage() {
                         {selectedUser.is_active ? "活跃" : "已禁用"}
                       </Badge>
                     </div>
-                    <p className="text-sm text-base-content/50 mt-0.5">
+                    <p className="text-sm text-muted-foreground mt-0.5">
                       {selectedUser.email}
                     </p>
                   </div>
@@ -300,7 +300,7 @@ export default function AdminPage() {
                 {/* Actions */}
                 {selectedUser.role === "admin" ? (
                   <div className="pt-4 border-t space-y-3">
-                    <p className="text-xs font-medium text-base-content/60">修改密码</p>
+                    <p className="text-xs font-medium text-foreground/60">修改密码</p>
                     <div className="space-y-2">
                       <div className="space-y-1">
                         <Label className="text-xs">旧密码</Label>
@@ -311,8 +311,8 @@ export default function AdminPage() {
                         <Input type="password" value={adminNewPw} onChange={(e) => setAdminNewPw(e.target.value)} className="h-8" autoComplete="new-password" />
                       </div>
                     </div>
-                    {pwError && <p className="text-xs text-error">{pwError}</p>}
-                    {pwSuccess && <p className="text-xs text-success">{pwSuccess}</p>}
+                    {pwError && <p className="text-xs text-destructive">{pwError}</p>}
+                    {pwSuccess && <p className="text-xs text-emerald-600">{pwSuccess}</p>}
                     <Button
                       size="sm"
                       variant="outline"
@@ -337,7 +337,7 @@ export default function AdminPage() {
                   <div className="pt-4 border-t space-y-4">
                     {/* Role selector */}
                     <div>
-                      <label className="text-xs font-medium text-base-content/60 mb-1.5 block">
+                      <label className="text-xs font-medium text-foreground/60 mb-1.5 block">
                         修改角色
                       </label>
                       <Select
@@ -381,7 +381,7 @@ export default function AdminPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-error hover:text-error hover:bg-error/10 border-error/30"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
                         onClick={() =>
                           setDeleteTarget({
                             id: selectedUser.id,
@@ -425,7 +425,7 @@ export default function AdminPage() {
 function DetailField({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-medium text-base-content/50">{label}</dt>
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className="text-sm mt-0.5">{value}</dd>
     </div>
   );

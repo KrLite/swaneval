@@ -70,7 +70,7 @@ export default function AccountPage() {
     <div className="max-w-lg mx-auto space-y-6">
       <div>
         <h1 className="text-lg font-semibold">账号设置</h1>
-        <p className="text-sm text-base-content/50 mt-1">管理您的个人信息和密码。</p>
+        <p className="text-sm text-muted-foreground mt-1">管理您的个人信息和密码。</p>
       </div>
 
       {/* Profile */}
@@ -83,7 +83,7 @@ export default function AccountPage() {
           <div className="space-y-3">
             <div className="space-y-1">
               <Label htmlFor="acc-username" className="text-xs">用户名</Label>
-              <Input id="acc-username" value={user.username} disabled className="h-9 bg-base-200/50" />
+              <Input id="acc-username" value={user.username} disabled className="h-9 bg-muted/50" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="acc-nickname" className="text-xs">昵称</Label>
@@ -94,8 +94,8 @@ export default function AccountPage() {
               <Input id="acc-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9" />
             </div>
           </div>
-          {profileError && <p className="text-xs text-error">{profileError}</p>}
-          {profileSuccess && <p className="text-xs text-success">{profileSuccess}</p>}
+          {profileError && <p className="text-xs text-destructive">{profileError}</p>}
+          {profileSuccess && <p className="text-xs text-emerald-600">{profileSuccess}</p>}
           <Button size="sm" onClick={handleSaveProfile} disabled={updateProfile.isPending}>
             {updateProfile.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
             保存
@@ -117,8 +117,8 @@ export default function AccountPage() {
               <Input id="acc-new-pw" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-9" autoComplete="new-password" />
             </div>
           </div>
-          {pwError && <p className="text-xs text-error">{pwError}</p>}
-          {pwSuccess && <p className="text-xs text-success">{pwSuccess}</p>}
+          {pwError && <p className="text-xs text-destructive">{pwError}</p>}
+          {pwSuccess && <p className="text-xs text-emerald-600">{pwSuccess}</p>}
           <Button size="sm" variant="outline" onClick={handleChangePassword} disabled={changePassword.isPending}>
             {changePassword.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
             修改密码

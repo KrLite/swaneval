@@ -67,8 +67,8 @@ export default function OverviewPage() {
     return [
       { label: "完成", count: completedCount, color: "bg-primary" },
       { label: "运行", count: runningCount, color: "bg-amber-500" },
-      { label: "失败", count: failedCount, color: "bg-error" },
-      { label: "等待", count: pendingCount, color: "bg-base-content/30" },
+      { label: "失败", count: failedCount, color: "bg-destructive" },
+      { label: "等待", count: pendingCount, color: "bg-foreground/30" },
     ].filter((s) => s.count > 0);
   }, [totalCount, completedCount, runningCount, failedCount, pendingCount]);
 
@@ -79,24 +79,24 @@ export default function OverviewPage() {
       {/* ── Hero: centered title + subtle metrics ── */}
       <div className="relative z-10 flex flex-col items-center justify-center pt-12 pb-6 px-6">
         <h1 className="text-3xl font-bold tracking-tight mb-1">SwanEVAL</h1>
-        <p className="text-sm text-base-content/40">
+        <p className="text-sm text-muted-foreground">
           企业级大模型评测平台
         </p>
 
         {/* Status strip */}
-        <div className="flex items-center gap-4 mt-5 text-xs text-base-content/40">
+        <div className="flex items-center gap-4 mt-5 text-xs text-muted-foreground">
           {runningCount > 0 && (
             <div className="flex items-center gap-1.5">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/60" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
               </span>
-              <span className="font-semibold text-base-content tabular-nums">{runningCount}</span>
+              <span className="font-semibold text-foreground tabular-nums">{runningCount}</span>
               <span>运行中</span>
             </div>
           )}
           {failedCount > 0 && (
-            <div className="flex items-center gap-1.5 text-error/70">
+            <div className="flex items-center gap-1.5 text-destructive/70">
               <AlertTriangle className="h-3 w-3" />
               <span className="tabular-nums">{failedCount}</span>
               <span>失败</span>
@@ -106,7 +106,7 @@ export default function OverviewPage() {
             <div className="flex items-center gap-1.5">
               <TrendingUp className="h-3 w-3" />
               <span>
-                最佳 <span className="font-medium text-base-content">{topModel.model_name}</span>{" "}
+                最佳 <span className="font-medium text-foreground">{topModel.model_name}</span>{" "}
                 <span className="tabular-nums">{(topModel.avg_score * 100).toFixed(1)}%</span>
               </span>
             </div>
@@ -127,10 +127,10 @@ export default function OverviewPage() {
             <Link
               key={m.label}
               href={m.href}
-              className="group flex items-center gap-2 text-base-content/40 hover:text-base-content transition-colors"
+              className="group flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
             >
               <m.icon className="h-3.5 w-3.5 group-hover:text-primary transition-colors" />
-              <span className="text-lg font-semibold tabular-nums text-base-content">{m.value}</span>
+              <span className="text-lg font-semibold tabular-nums text-foreground">{m.value}</span>
               <span className="text-xs">{m.label}</span>
             </Link>
           ))}
@@ -149,7 +149,7 @@ export default function OverviewPage() {
             </div>
             <Link
               href="/tasks"
-              className="text-[11px] text-base-content/40 hover:text-base-content flex items-center gap-0.5 transition-colors"
+              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
             >
               查看 <ArrowRight className="h-3 w-3" />
             </Link>
@@ -160,10 +160,10 @@ export default function OverviewPage() {
             {successRate !== null ? (
               <>
                 <p className="text-5xl font-bold tabular-nums text-primary">{successRate}%</p>
-                <p className="text-xs text-base-content/40 mt-1">成功率</p>
+                <p className="text-xs text-muted-foreground mt-1">成功率</p>
               </>
             ) : (
-              <div className="flex flex-col items-center gap-1.5 text-base-content/20">
+              <div className="flex flex-col items-center gap-1.5 text-muted-foreground/40">
                 <Zap className="h-6 w-6" />
                 <p className="text-xs">暂无任务</p>
               </div>
@@ -172,7 +172,7 @@ export default function OverviewPage() {
             {/* Segmented bar */}
             {taskSegments.length > 0 && (
               <div className="w-full mt-5 space-y-2">
-                <div className="flex h-2 rounded-full overflow-hidden bg-base-200/50">
+                <div className="flex h-2 rounded-full overflow-hidden bg-muted/50">
                   {taskSegments.map((seg) => (
                     <div
                       key={seg.label}
@@ -181,7 +181,7 @@ export default function OverviewPage() {
                     />
                   ))}
                 </div>
-                <div className="flex items-center justify-center gap-4 text-[10px] text-base-content/40">
+                <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
                   {taskSegments.map((seg) => (
                     <div key={seg.label} className="flex items-center gap-1">
                       <div className={`h-1.5 w-1.5 rounded-full ${seg.color}`} />
@@ -195,15 +195,15 @@ export default function OverviewPage() {
         </div>
 
         {/* Center: Score distribution — bar sparkline */}
-        <div className="col-span-5 rounded-2xl border border-base-300/40 bg-base-100/40 backdrop-blur-sm p-5 flex flex-col">
+        <div className="col-span-5 rounded-2xl border border-border/50 bg-card/40 backdrop-blur-sm p-5 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-base-content/40" />
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">模型得分分布</span>
             </div>
             <Link
               href="/results"
-              className="text-[11px] text-base-content/40 hover:text-base-content flex items-center gap-0.5 transition-colors"
+              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
             >
               排行榜 <ArrowRight className="h-3 w-3" />
             </Link>
@@ -213,7 +213,7 @@ export default function OverviewPage() {
             <div className="flex-1 flex items-end gap-1.5 pb-2">
               {scoreBars.map((score, i) => (
                 <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-[9px] tabular-nums text-base-content/40">
+                  <span className="text-[9px] tabular-nums text-muted-foreground">
                     {(score * 100).toFixed(0)}
                   </span>
                   <div
@@ -224,7 +224,7 @@ export default function OverviewPage() {
               ))}
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-base-content/20">
+            <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-muted-foreground/40">
               <BarChart3 className="h-6 w-6" />
               <p className="text-xs">暂无评测数据</p>
             </div>
@@ -234,7 +234,7 @@ export default function OverviewPage() {
         {/* Right: Quick status */}
         <div className="col-span-3 flex flex-col gap-4">
           {/* Running indicator */}
-          <div className="rounded-2xl border border-base-300/40 bg-base-100/40 backdrop-blur-sm p-4 flex-1 flex flex-col justify-center">
+          <div className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur-sm p-4 flex-1 flex flex-col justify-center">
             {runningCount > 0 ? (
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1.5 mb-2">
@@ -245,10 +245,10 @@ export default function OverviewPage() {
                   <span className="text-xs font-medium text-amber-600">运行中</span>
                 </div>
                 <p className="text-3xl font-bold tabular-nums">{runningCount}</p>
-                <p className="text-[10px] text-base-content/40 mt-0.5">个任务</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">个任务</p>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-1.5 text-base-content/20">
+              <div className="flex flex-col items-center gap-1.5 text-muted-foreground/40">
                 <CheckCircle2 className="h-6 w-6" />
                 <p className="text-xs">队列空闲</p>
               </div>
@@ -256,17 +256,17 @@ export default function OverviewPage() {
           </div>
 
           {/* Alerts */}
-          <div className="rounded-2xl border border-base-300/40 bg-base-100/40 backdrop-blur-sm p-4 flex-1 flex flex-col justify-center">
+          <div className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur-sm p-4 flex-1 flex flex-col justify-center">
             {failedCount > 0 ? (
               <Link href="/tasks" className="text-center group">
-                <AlertTriangle className="h-5 w-5 text-error/60 mx-auto mb-1.5" />
-                <p className="text-3xl font-bold tabular-nums text-error">{failedCount}</p>
-                <p className="text-[10px] text-base-content/40 mt-0.5 group-hover:text-base-content transition-colors">
+                <AlertTriangle className="h-5 w-5 text-destructive/60 mx-auto mb-1.5" />
+                <p className="text-3xl font-bold tabular-nums text-destructive">{failedCount}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 group-hover:text-foreground transition-colors">
                   失败任务 <ArrowRight className="inline h-2.5 w-2.5" />
                 </p>
               </Link>
             ) : (
-              <div className="flex flex-col items-center gap-1.5 text-base-content/20">
+              <div className="flex flex-col items-center gap-1.5 text-muted-foreground/40">
                 <CheckCircle2 className="h-6 w-6" />
                 <p className="text-xs">无异常</p>
               </div>
@@ -276,7 +276,7 @@ export default function OverviewPage() {
       </div>
 
       {/* App info */}
-      <div className="relative z-10 shrink-0 flex items-center justify-center gap-1.5 pb-3 text-[11px] text-base-content/25">
+      <div className="relative z-10 shrink-0 flex items-center justify-center gap-1.5 pb-3 text-[11px] text-muted-foreground/50">
         <span>SwanEVAL</span>
         <span className="font-mono">v{process.env.NEXT_PUBLIC_APP_VERSION}{process.env.NEXT_PUBLIC_BUILD_HASH ? `-${process.env.NEXT_PUBLIC_BUILD_HASH}` : ''}</span>
       </div>

@@ -196,7 +196,7 @@ export default function CriteriaPage() {
         header: ({ table }) => (
           <input
             type="checkbox"
-            className="h-3.5 w-3.5 rounded border-base-300 accent-primary"
+            className="h-3.5 w-3.5 rounded border-border accent-primary"
             checked={table.getIsAllPageRowsSelected()}
             onChange={(e) => table.toggleAllPageRowsSelected(e.target.checked)}
           />
@@ -204,7 +204,7 @@ export default function CriteriaPage() {
         cell: ({ row }) => (
           <input
             type="checkbox"
-            className="h-3.5 w-3.5 rounded border-base-300 accent-primary"
+            className="h-3.5 w-3.5 rounded border-border accent-primary"
             checked={row.getIsSelected()}
             onChange={(e) => {
               e.stopPropagation();
@@ -235,7 +235,7 @@ export default function CriteriaPage() {
         header: "配置",
         accessorFn: (row) => configSummary(row.config_json, row.type),
         cell: ({ getValue }) => (
-          <span className="font-mono text-xs text-base-content/50 truncate block max-w-[200px]">
+          <span className="font-mono text-xs text-muted-foreground truncate block max-w-[200px]">
             {getValue<string>()}
           </span>
         ),
@@ -244,7 +244,7 @@ export default function CriteriaPage() {
         accessorKey: "created_at",
         header: "创建时间",
         cell: ({ getValue }) => (
-          <span className="text-base-content/50">
+          <span className="text-muted-foreground">
             {utc(getValue<string>())?.toLocaleDateString()}
           </span>
         ),
@@ -369,7 +369,7 @@ export default function CriteriaPage() {
                               header.getContext(),
                             )}
                             {header.column.getCanSort() && (
-                              <ArrowUpDown className="h-3 w-3 text-base-content/30" />
+                              <ArrowUpDown className="h-3 w-3 text-muted-foreground/60" />
                             )}
                           </span>
                         </TableHead>
@@ -384,8 +384,8 @@ export default function CriteriaPage() {
                       key={row.id}
                       className={`cursor-pointer transition-colors group/row ${
                         selectedId === row.original.id
-                          ? "bg-base-200"
-                          : "hover:bg-base-200/50"
+                          ? "bg-muted"
+                          : "hover:bg-muted/50"
                       }`}
                       onClick={() => openView(row.original.id)}
                     >
@@ -440,7 +440,7 @@ export default function CriteriaPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-error hover:text-error hover:bg-error/10"
+                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                               title="删除"
                               onClick={() =>
                                 setDeleteTarget({
@@ -453,7 +453,7 @@ export default function CriteriaPage() {
                             </Button>
                           </div>
                           <ChevronRight
-                            className={`h-3.5 w-3.5 text-base-content/30 transition-transform ${
+                            className={`h-3.5 w-3.5 text-muted-foreground/60 transition-transform ${
                               selectedId === row.original.id ? "rotate-90" : ""
                             }`}
                           />
@@ -595,18 +595,18 @@ export default function CriteriaPage() {
               {test.isPending ? "测试中..." : "运行测试"}
             </Button>
             {testError && (
-              <div className="rounded bg-error/10 p-3 text-xs text-error">
+              <div className="rounded bg-destructive/10 p-3 text-xs text-destructive">
                 {testError}
               </div>
             )}
             {testResult !== null && (
-              <div className="rounded bg-base-200 p-3 text-center">
-                <span className="text-xs text-base-content/50">得分：</span>
+              <div className="rounded bg-muted p-3 text-center">
+                <span className="text-xs text-muted-foreground">得分：</span>
                 <span
                   className={`text-lg font-bold ${
                     testResult.score >= 1
-                      ? "text-success"
-                      : "text-error"
+                      ? "text-emerald-600"
+                      : "text-destructive"
                   }`}
                 >
                   {testResult.score}

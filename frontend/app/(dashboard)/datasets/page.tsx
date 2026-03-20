@@ -247,7 +247,7 @@ export default function DatasetsPage() {
                             <span className="flex items-center gap-1">
                               {flexRender(header.column.columnDef.header, header.getContext())}
                               {header.column.getCanSort() && (
-                                <ArrowUpDown className="h-3 w-3 text-base-content/30" />
+                                <ArrowUpDown className="h-3 w-3 text-muted-foreground/60" />
                               )}
                             </span>
                           </TableHead>
@@ -261,7 +261,7 @@ export default function DatasetsPage() {
                       <TableRow
                         key={row.id}
                         className={`cursor-pointer transition-colors group/row ${
-                          selectedId === row.original.id ? "bg-base-200" : "hover:bg-base-200/50"
+                          selectedId === row.original.id ? "bg-muted" : "hover:bg-muted/50"
                         }`}
                         onClick={() => openView(row.original.id)}
                       >
@@ -306,7 +306,7 @@ export default function DatasetsPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-error hover:text-error hover:bg-error/10"
+                                className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                                 title="删除"
                                 onClick={() => setDeleteTarget({ id: row.original.id, name: row.original.name })}
                               >
@@ -314,7 +314,7 @@ export default function DatasetsPage() {
                               </Button>
                             </div>
                             <ChevronRight
-                              className={`h-3.5 w-3.5 text-base-content/30 transition-transform ${
+                              className={`h-3.5 w-3.5 text-muted-foreground/60 transition-transform ${
                                 selectedId === row.original.id ? "rotate-90" : ""
                               }`}
                             />

@@ -67,7 +67,7 @@ function CopyableCode({
           e.stopPropagation();
           onCopy(text, field);
         }}
-        className="shrink-0 text-base-content/50 hover:text-base-content transition-colors"
+        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
       >
         {copiedField === field ? (
           <Check className="h-3 w-3 text-emerald-500" />
@@ -198,7 +198,7 @@ export function DatasetDetailPanel({
           {dataset.row_count === 0 &&
             (dataset.source_type === "preset" ||
               dataset.source_type === "huggingface") && (
-              <div className="rounded-md bg-base-200 px-3 py-2.5 text-xs text-base-content/50 space-y-2">
+              <div className="rounded-md bg-muted px-3 py-2.5 text-xs text-muted-foreground space-y-2">
                 <p>
                   该数据集尚未下载内容，点击下方按钮从 HuggingFace 下载。
                 </p>
@@ -229,7 +229,7 @@ export function DatasetDetailPanel({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 text-[11px] px-2 text-base-content/50"
+                    className="h-6 text-[11px] px-2 text-muted-foreground"
                     onClick={() => unsubscribeDs.mutate(dataset.id)}
                     disabled={unsubscribeDs.isPending}
                   >
@@ -258,7 +258,7 @@ export function DatasetDetailPanel({
                 )}
               </div>
               {dataset.auto_update && (
-                <div className="space-y-1 text-[11px] text-base-content/50">
+                <div className="space-y-1 text-[11px] text-muted-foreground">
                   <div className="flex items-baseline gap-1">
                     <span>状态：</span>
                     <span
@@ -268,7 +268,7 @@ export function DatasetDetailPanel({
                           : dataset.sync_status === "syncing"
                             ? "text-primary"
                             : dataset.sync_status === "failed"
-                              ? "text-error"
+                              ? "text-destructive"
                               : ""
                       }
                     >
@@ -322,7 +322,7 @@ export function DatasetDetailPanel({
             <Button
               size="sm"
               variant="outline"
-              className="text-error hover:text-error hover:bg-error/5"
+              className="text-destructive hover:text-destructive hover:bg-destructive/5"
               onClick={() => onDelete({ id: dataset.id, name: dataset.name })}
             >
               <Trash2 className="h-3.5 w-3.5" />

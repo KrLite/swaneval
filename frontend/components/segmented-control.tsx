@@ -11,7 +11,7 @@ interface SegmentedControlProps<T extends string> {
 
 /**
  * Segmented control matching the Tabs look.
- * Rounded-rectangle segments with bg-base-200 container.
+ * Rounded-rectangle segments with bg-muted container.
  */
 export function SegmentedControl<T extends string>({
   options,
@@ -22,7 +22,7 @@ export function SegmentedControl<T extends string>({
   return (
     <div
       className={cn(
-        "inline-flex h-9 items-center rounded-xl bg-base-200 p-1 gap-0.5",
+        "inline-flex h-9 items-center rounded-xl bg-muted p-1 gap-0.5",
         className,
       )}
     >
@@ -32,10 +32,10 @@ export function SegmentedControl<T extends string>({
           type="button"
           onClick={() => onChange(option.key)}
           className={cn(
-            "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1 text-xs font-medium text-base-content/40 transition-all",
+            "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1 text-xs font-medium text-muted-foreground transition-all",
             value === option.key
-              ? "bg-base-100 text-base-content shadow-sm"
-              : "hover:text-base-content",
+              ? "bg-card text-foreground shadow-sm"
+              : "hover:text-foreground",
           )}
         >
           {option.label}

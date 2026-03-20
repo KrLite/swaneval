@@ -14,10 +14,10 @@ export function SelectionBar({ count, onDelete, onClear }: SelectionBarProps) {
 
   return (
     <div className="fixed bottom-6 left-0 right-0 z-30 flex justify-center pointer-events-none animate-float-up">
-      <div className="pointer-events-auto flex items-center gap-3 bg-base-200 border rounded-full px-5 py-2.5 text-sm shadow-lg">
-        <span className="text-base-content/50">
+      <div className="pointer-events-auto flex items-center gap-3 bg-muted border rounded-full px-5 py-2.5 text-sm shadow-lg">
+        <span className="text-muted-foreground">
           已选择{" "}
-          <span className="font-semibold text-base-content tabular-nums">
+          <span className="font-semibold text-foreground tabular-nums">
             {count}
           </span>{" "}
           项

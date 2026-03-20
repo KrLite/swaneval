@@ -28,7 +28,7 @@ export function Sidebar() {
   const { user, logout } = useAuthStore();
 
   return (
-    <aside className="flex h-screen w-56 flex-col border-r bg-base-100">
+    <aside className="flex h-screen w-56 flex-col border-r bg-card">
       <div className="flex h-12 items-center border-b px-4">
         <span className="text-sm font-semibold tracking-tight">SwanEVAL</span>
       </div>
@@ -45,8 +45,8 @@ export function Sidebar() {
               className={cn(
                 "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors",
                 active
-                  ? "bg-base-200 text-base-content font-medium"
-                  : "text-base-content/50 hover:bg-base-200/50 hover:text-base-content"
+                  ? "bg-muted text-foreground font-medium"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
               )}
             >
               <item.icon className="h-4 w-4" />
@@ -60,14 +60,14 @@ export function Sidebar() {
           <div className="flex items-center justify-between">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{user.username}</p>
-              <p className="truncate text-xs text-base-content/50">{user.role}</p>
+              <p className="truncate text-xs text-muted-foreground">{user.role}</p>
             </div>
             <button
               onClick={() => {
                 logout();
                 window.location.href = "/login";
               }}
-              className="rounded p-1 text-base-content/50 hover:bg-base-200 hover:text-base-content"
+              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
               title="Logout"
             >
               <LogOut className="h-4 w-4" />

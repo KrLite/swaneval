@@ -118,10 +118,10 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
 
   return (
     <>
-      <div className="flex items-center gap-2 mb-3 text-xs text-base-content/50">
+      <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
         <button
           type="button"
-          className="hover:text-base-content transition-colors"
+          className="hover:text-foreground transition-colors"
           onClick={async () => {
             try {
               const text = await navigator.clipboard.readText();
@@ -135,7 +135,7 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
           从剪贴板导入
         </button>
         <span className="text-border">|</span>
-        <label className="hover:text-base-content transition-colors cursor-pointer">
+        <label className="hover:text-foreground transition-colors cursor-pointer">
           <input
             type="file"
             accept=".json"
@@ -153,7 +153,7 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
           从 JSON 导入
         </label>
         {importError && (
-          <span className="text-error">{importError}</span>
+          <span className="text-destructive">{importError}</span>
         )}
       </div>
 
@@ -187,13 +187,13 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
           </PanelField>
         </div>
 
-        <p className="text-xs text-base-content/50">
+        <p className="text-xs text-muted-foreground">
           {typeDescriptions[form.type]}
         </p>
 
         {form.type === "preset" && (
           <div className="space-y-2">
-            <Label className="text-xs text-base-content/50">
+            <Label className="text-xs text-muted-foreground">
               指标
             </Label>
             <div className="space-y-1.5">
@@ -207,11 +207,11 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
                   className={`w-full rounded-md border p-2.5 text-left transition-colors ${
                     form.metric === m.value
                       ? "border-primary bg-primary/5 ring-1 ring-primary"
-                      : "hover:bg-base-200"
+                      : "hover:bg-muted"
                   }`}
                 >
                   <p className="text-sm font-medium">{m.label}</p>
-                  <p className="text-xs text-base-content/50">
+                  <p className="text-xs text-muted-foreground">
                     {m.desc}
                   </p>
                 </button>
@@ -260,7 +260,7 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
                 placeholder="evaluate"
                 className="font-mono"
               />
-              <p className="text-[11px] text-base-content/50 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 默认为 evaluate。留空使用默认值。
               </p>
             </PanelField>
@@ -276,12 +276,12 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
                 placeholder='{"threshold": 0.8}'
                 className="font-mono"
               />
-              <p className="text-[11px] text-base-content/50 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 可选。将作为 config 参数传入脚本函数。
               </p>
             </PanelField>
-            <div className="rounded-md bg-base-200 p-2.5 text-[11px] font-mono text-base-content/50 space-y-0.5">
-              <p className="text-base-content/70 font-sans text-xs font-medium mb-1">
+            <div className="rounded-md bg-muted p-2.5 text-[11px] font-mono text-muted-foreground space-y-0.5">
+              <p className="text-foreground/70 font-sans text-xs font-medium mb-1">
                 脚本函数签名示例
               </p>
               <p>def evaluate(expected, actual, config=None):</p>
@@ -305,14 +305,14 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
                 </SelectTrigger>
                 <SelectContent>
                   {models.length === 0 ? (
-                    <div className="px-3 py-4 text-center text-xs text-base-content/50">
+                    <div className="px-3 py-4 text-center text-xs text-muted-foreground">
                       暂无模型，<a href="/models" className="text-primary hover:underline">去添加</a>
                     </div>
                   ) : models.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
                       {m.name}
                       {m.model_name && (
-                        <span className="text-base-content/50 ml-1">
+                        <span className="text-muted-foreground ml-1">
                           ({m.model_name})
                         </span>
                       )}
@@ -321,7 +321,7 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
                 </SelectContent>
               </Select>
               {models.length === 0 && (
-                <p className="text-xs text-base-content/50">
+                <p className="text-xs text-muted-foreground">
                   请先在模型页面添加一个模型。
                 </p>
               )}
@@ -336,7 +336,7 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
                   })
                 }
                 placeholder="你是一个评估专家。请根据以下标准对回答打分（0-1）..."
-                className="flex min-h-[120px] w-full rounded-md border border-base-300 bg-base-200 px-3 py-2 text-sm ring-offset-base-200 placeholder:text-base-content/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="flex min-h-[120px] w-full rounded-md border border-border bg-muted px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 required
               />
             </PanelField>
@@ -481,7 +481,7 @@ function RegexInput({
           aria-hidden
         >
           {value ? highlightRegex(value) : (
-            <span className="text-base-content/50">{!focused ? placeholder : ""}</span>
+            <span className="text-muted-foreground">{!focused ? placeholder : ""}</span>
           )}
         </div>
         {/* Actual input — transparent text, visible caret */}
@@ -496,11 +496,11 @@ function RegexInput({
           onBlur={() => setFocused(false)}
           placeholder=""
           required
-          className="flex h-10 w-full rounded-md border border-base-300 bg-base-200 px-3 py-2 text-sm font-mono text-transparent caret-foreground ring-offset-base-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          className="flex h-10 w-full rounded-md border border-border bg-muted px-3 py-2 text-sm font-mono text-transparent caret-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         />
       </div>
       {!valid && value && (
-        <p className="text-[11px] text-error">正则表达式语法错误</p>
+        <p className="text-[11px] text-destructive">正则表达式语法错误</p>
       )}
     </div>
   );

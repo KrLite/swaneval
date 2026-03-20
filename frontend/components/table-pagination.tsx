@@ -26,13 +26,13 @@ export function TablePagination<T>({ table }: TablePaginationProps<T>) {
       >
         <ChevronLeft className="h-3.5 w-3.5" />
       </Button>
-      <span className="text-xs text-base-content/50 px-2">
-        <span className="font-semibold text-base-content tabular-nums">
+      <span className="text-xs text-muted-foreground px-2">
+        <span className="font-semibold text-foreground tabular-nums">
           {pageIndex + 1}
         </span>
         {" / "}
         <span className="tabular-nums">{pageCount}</span>
-        <span className="ml-2 text-base-content/40">
+        <span className="ml-2 text-muted-foreground">
           共 {totalRows} 条
         </span>
       </span>

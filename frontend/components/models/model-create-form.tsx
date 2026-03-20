@@ -93,16 +93,16 @@ export function ModelCreateForm({ onSuccess, onClose: _onClose }: ModelCreateFor
 
   return (
     <>
-      <div className="flex items-center gap-2 mb-3 text-xs text-base-content/50">
+      <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
         <button
           type="button"
-          className="hover:text-base-content transition-colors"
+          className="hover:text-foreground transition-colors"
           onClick={importFromClipboard}
         >
           从剪贴板导入
         </button>
         <span className="text-border">|</span>
-        <label className="hover:text-base-content transition-colors cursor-pointer">
+        <label className="hover:text-foreground transition-colors cursor-pointer">
           <input
             type="file"
             accept=".json"
@@ -120,7 +120,7 @@ export function ModelCreateForm({ onSuccess, onClose: _onClose }: ModelCreateFor
           从 JSON 导入
         </label>
         {importError && (
-          <span className="text-error">{importError}</span>
+          <span className="text-destructive">{importError}</span>
         )}
       </div>
 
@@ -176,7 +176,7 @@ export function ModelCreateForm({ onSuccess, onClose: _onClose }: ModelCreateFor
                 className="font-mono"
                 required
               />
-              <p className="text-[11px] text-base-content/50 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 HuggingFace 模型仓库 ID，将通过 Inference API 调用
               </p>
             </PanelField>

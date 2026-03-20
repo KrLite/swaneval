@@ -34,12 +34,12 @@ export function DatasetPreviewDialog({ datasetId, onClose }: DatasetPreviewDialo
           <DialogDescription>显示数据集的前几行数据</DialogDescription>
         </DialogHeader>
         {preview.isLoading ? (
-          <div className="py-8 text-center text-base-content/50">
+          <div className="py-8 text-center text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
             加载中...
           </div>
         ) : preview.data?.rows.length === 0 ? (
-          <p className="text-base-content/50 text-center py-8">暂无数据</p>
+          <p className="text-muted-foreground text-center py-8">暂无数据</p>
         ) : (
           <div className="overflow-auto">
             <Table>
@@ -63,7 +63,7 @@ export function DatasetPreviewDialog({ datasetId, onClose }: DatasetPreviewDialo
                 ))}
               </TableBody>
             </Table>
-            <p className="mt-2 text-xs text-base-content/50">
+            <p className="mt-2 text-xs text-muted-foreground">
               显示 {preview.data?.rows.length} / {preview.data?.total} 行
             </p>
           </div>

@@ -123,7 +123,7 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
               </SelectTrigger>
               <SelectContent>
                 {models.length === 0 ? (
-                  <div className="px-3 py-4 text-center text-xs text-base-content/50">
+                  <div className="px-3 py-4 text-center text-xs text-muted-foreground">
                     暂无模型，<a href="/models" className="text-primary hover:underline">去添加</a>
                   </div>
                 ) : models.map((m) => (
@@ -134,7 +134,7 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
               </SelectContent>
             </Select>
             {models.length === 0 && (
-              <p className="text-xs text-base-content/50">
+              <p className="text-xs text-muted-foreground">
                 暂无已注册模型，请先在模型页面添加。
               </p>
             )}
@@ -160,15 +160,15 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
                     }}
                     className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
                       form.dataset_ids.includes(d.id)
-                        ? "bg-primary text-primary-content border-primary"
-                        : "text-base-content/50 hover:bg-base-200"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "text-muted-foreground hover:bg-muted"
                     }`}
                   >
                     {d.name}
                   </button>
                 ))}
                 {datasets.length === 0 && (
-                  <span className="text-xs text-base-content/50">
+                  <span className="text-xs text-muted-foreground">
                     暂无数据集
                   </span>
                 )}
@@ -190,15 +190,15 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
                     }}
                     className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
                       form.criteria_ids.includes(c.id)
-                        ? "bg-primary text-primary-content border-primary"
-                        : "text-base-content/50 hover:bg-base-200"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "text-muted-foreground hover:bg-muted"
                     }`}
                   >
                     {c.name}
                   </button>
                 ))}
                 {criteria.length === 0 && (
-                  <span className="text-xs text-base-content/50">
+                  <span className="text-xs text-muted-foreground">
                     暂无评测标准
                   </span>
                 )}
@@ -305,7 +305,7 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
                 placeholder="例：0 或 0,1,2"
                 className="font-mono"
               />
-              <p className="text-[11px] text-base-content/50 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 指定 CUDA_VISIBLE_DEVICES，留空使用所有可用 GPU
               </p>
             </PanelField>
@@ -316,14 +316,14 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
                   setForm({ ...form, env_vars: e.target.value })
                 }
                 placeholder={'{\n  "OMP_NUM_THREADS": "4"\n}'}
-                className="flex min-h-[80px] w-full rounded-md border border-base-300 bg-base-200 px-3 py-2 text-xs font-mono ring-offset-base-200 placeholder:text-base-content/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="flex min-h-[80px] w-full rounded-md border border-border bg-muted px-3 py-2 text-xs font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               />
-              <p className="text-[11px] text-base-content/50 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 可选。JSON 格式的环境变量，将在任务运行时注入
               </p>
             </PanelField>
-            <div className="rounded-md bg-base-200 p-2.5 text-[11px] text-base-content/50 space-y-1">
-              <p className="font-medium text-base-content/70 text-xs">常用环境变量</p>
+            <div className="rounded-md bg-muted p-2.5 text-[11px] text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground/70 text-xs">常用环境变量</p>
               <p><code className="font-mono">CUDA_VISIBLE_DEVICES</code> — 指定 GPU（由上方 GPU 编号自动设置）</p>
               <p><code className="font-mono">OMP_NUM_THREADS</code> — OpenMP 线程数</p>
               <p><code className="font-mono">TOKENIZERS_PARALLELISM</code> — HuggingFace 分词器并行</p>
@@ -420,13 +420,13 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
               onClick={() =>
                 setShowConfigPreview(!showConfigPreview)
               }
-              className="flex items-center gap-1 text-xs text-base-content/50 hover:text-base-content transition-colors"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <Code2 className="h-3 w-3" />
               {showConfigPreview ? "隐藏" : "查看"} JSON 配置
             </button>
             {showConfigPreview && (
-              <pre className="text-[11px] bg-base-200 rounded-md p-3 overflow-auto max-h-40 font-mono">
+              <pre className="text-[11px] bg-muted rounded-md p-3 overflow-auto max-h-40 font-mono">
                 {JSON.stringify(
                   {
                     name: form.name,

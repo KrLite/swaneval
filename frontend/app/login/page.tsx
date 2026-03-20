@@ -111,20 +111,20 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="flex flex-1 items-center justify-center bg-base-200 px-6">
+      <div className="flex flex-1 items-center justify-center bg-muted px-6">
         <div className="w-full max-w-sm space-y-8">
           <div className="lg:hidden flex items-center gap-2.5">
             <Logo className="h-7 w-7 text-primary" />
             <div>
               <h1 className="text-2xl font-bold tracking-tight leading-none">SwanEVAL</h1>
-              <p className="text-xs text-base-content/50 mt-0.5">AI Model Evaluation</p>
+              <p className="text-xs text-muted-foreground mt-0.5">AI Model Evaluation</p>
             </div>
           </div>
 
           {countLoading ? (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <Loader2 className="h-6 w-6 animate-spin text-base-content/50" />
-              <p className="text-sm text-base-content/50">加载中...</p>
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">加载中...</p>
             </div>
           ) : (
             <>
@@ -136,7 +136,7 @@ export default function LoginPage() {
                       ? "登录"
                       : "创建账号"}
                 </h2>
-                <p className="text-base-content/50 mt-1">
+                <p className="text-muted-foreground mt-1">
                   {isFirstUser
                     ? "首次使用，请创建管理员账号"
                     : mode === "login"
@@ -145,7 +145,7 @@ export default function LoginPage() {
                 </p>
               </div>
 
-              {error && <p className="text-sm text-error">{error}</p>}
+              {error && <p className="text-sm text-destructive">{error}</p>}
               {success && <p className="text-sm text-emerald-600">{success}</p>}
 
               {mode === "login" && !isFirstUser ? (
@@ -180,7 +180,7 @@ export default function LoginPage() {
                   <Button type="submit" className="w-full h-10" disabled={loading}>
                     {loading ? "登录中..." : "登录"}
                   </Button>
-                  <p className="text-center text-sm text-base-content/50">
+                  <p className="text-center text-sm text-muted-foreground">
                     还没有账号？{" "}
                     <button
                       type="button"
@@ -243,7 +243,7 @@ export default function LoginPage() {
                     {loading ? "创建中..." : isFirstUser ? "创建管理员账号" : "创建账号"}
                   </Button>
                   {!isFirstUser && (
-                    <p className="text-center text-sm text-base-content/50">
+                    <p className="text-center text-sm text-muted-foreground">
                       已有账号？{" "}
                       <button
                         type="button"

@@ -94,7 +94,7 @@ export function ModelDetailPanel({
         </div>
         <CardContent className="pt-0 space-y-4">
           {model.description && (
-            <p className="text-xs text-base-content/50">
+            <p className="text-xs text-muted-foreground">
               {model.description}
             </p>
           )}
@@ -199,7 +199,7 @@ export function ModelDetailPanel({
                 className={`rounded-md px-3 py-2 text-xs ${
                   testResults[model.id].ok
                     ? "bg-emerald-500/10 text-emerald-700"
-                    : "bg-error/10 text-error"
+                    : "bg-destructive/10 text-destructive"
                 }`}
               >
                 {testResults[model.id].message}
@@ -225,7 +225,7 @@ export function ModelDetailPanel({
             <Button
               size="sm"
               variant="outline"
-              className="text-error hover:text-error hover:bg-error/5"
+              className="text-destructive hover:text-destructive hover:bg-destructive/5"
               onClick={() =>
                 onDelete({
                   id: model.id,
@@ -270,7 +270,7 @@ function EditableText({
   if (editing) {
     return (
       <div className="flex items-start justify-between gap-3 text-xs">
-        <span className="text-base-content/50 shrink-0 pt-1.5">{label}</span>
+        <span className="text-muted-foreground shrink-0 pt-1.5">{label}</span>
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -291,13 +291,13 @@ function EditableText({
 
   return (
     <div
-      className="flex items-baseline gap-2 text-xs group/edit cursor-pointer rounded-sm px-1 -mx-1 py-0.5 -my-0.5 hover:bg-base-200/60 transition-colors"
+      className="flex items-baseline gap-2 text-xs group/edit cursor-pointer rounded-sm px-1 -mx-1 py-0.5 -my-0.5 hover:bg-background/60 transition-colors"
       onClick={() => {
         setDraft(value);
         setEditing(true);
       }}
     >
-      <span className="text-base-content/50 shrink-0">{label}</span>
+      <span className="text-muted-foreground shrink-0">{label}</span>
       <div className="flex-1 border-b border-dashed border-muted-foreground/20 min-w-4 translate-y-[-3px]" />
       <div className="flex items-center gap-1 shrink-0">
         {value ? (
@@ -307,11 +307,11 @@ function EditableText({
             {value}
           </span>
         ) : (
-          <span className="text-base-content/30 italic">
+          <span className="text-muted-foreground/60 italic">
             {placeholder ?? "\u2014"}
           </span>
         )}
-        <Pencil className="h-2.5 w-2.5 text-base-content/50/30 group-hover/edit:text-base-content/40 transition-colors shrink-0" />
+        <Pencil className="h-2.5 w-2.5 text-muted-foreground/30 group-hover/edit:text-muted-foreground transition-colors shrink-0" />
       </div>
     </div>
   );
@@ -341,7 +341,7 @@ function EditableSecret({
   if (editing) {
     return (
       <div className="flex items-start justify-between gap-3 text-xs">
-        <span className="text-base-content/50 shrink-0 pt-1.5">{label}</span>
+        <span className="text-muted-foreground shrink-0 pt-1.5">{label}</span>
         <Input
           type="password"
           value={draft}
@@ -364,17 +364,17 @@ function EditableSecret({
 
   return (
     <div
-      className="flex items-baseline gap-2 text-xs group/edit cursor-pointer rounded-sm px-1 -mx-1 py-0.5 -my-0.5 hover:bg-base-200/60 transition-colors"
+      className="flex items-baseline gap-2 text-xs group/edit cursor-pointer rounded-sm px-1 -mx-1 py-0.5 -my-0.5 hover:bg-background/60 transition-colors"
       onClick={() => setEditing(true)}
     >
-      <span className="text-base-content/50 shrink-0">{label}</span>
+      <span className="text-muted-foreground shrink-0">{label}</span>
       <div className="flex-1 border-b border-dashed border-muted-foreground/20 min-w-4 translate-y-[-3px]" />
       <div className="flex items-center gap-1 shrink-0">
-        <span className="font-mono text-base-content/50/70">{'••••••••'}</span>
+        <span className="font-mono text-muted-foreground/70">{'••••••••'}</span>
         {saved ? (
           <Check className="h-2.5 w-2.5 text-emerald-500 shrink-0" />
         ) : (
-          <KeyRound className="h-2.5 w-2.5 text-base-content/50/30 group-hover/edit:text-base-content/40 transition-colors shrink-0" />
+          <KeyRound className="h-2.5 w-2.5 text-muted-foreground/30 group-hover/edit:text-muted-foreground transition-colors shrink-0" />
         )}
       </div>
     </div>
@@ -399,7 +399,7 @@ function EditableSelect({
   if (editing) {
     return (
       <div className="flex items-start justify-between gap-3 text-xs">
-        <span className="text-base-content/50 shrink-0 pt-1.5">{label}</span>
+        <span className="text-muted-foreground shrink-0 pt-1.5">{label}</span>
         <Select
           value={value}
           onValueChange={(v) => {
@@ -428,16 +428,16 @@ function EditableSelect({
 
   return (
     <div
-      className="flex items-baseline gap-2 text-xs group/edit cursor-pointer rounded-sm px-1 -mx-1 py-0.5 -my-0.5 hover:bg-base-200/60 transition-colors"
+      className="flex items-baseline gap-2 text-xs group/edit cursor-pointer rounded-sm px-1 -mx-1 py-0.5 -my-0.5 hover:bg-background/60 transition-colors"
       onClick={() => setEditing(true)}
     >
-      <span className="text-base-content/50 shrink-0">{label}</span>
+      <span className="text-muted-foreground shrink-0">{label}</span>
       <div className="flex-1 border-b border-dashed border-muted-foreground/20 min-w-4 translate-y-[-3px]" />
       <div className="flex items-center gap-1 shrink-0">
         <Badge variant="outline" className="text-xs font-normal">
           {displayValue}
         </Badge>
-        <Pencil className="h-2.5 w-2.5 text-base-content/50/30 group-hover/edit:text-base-content/40 transition-colors shrink-0" />
+        <Pencil className="h-2.5 w-2.5 text-muted-foreground/30 group-hover/edit:text-muted-foreground transition-colors shrink-0" />
       </div>
     </div>
   );
