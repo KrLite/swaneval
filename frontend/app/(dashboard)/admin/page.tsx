@@ -61,8 +61,6 @@ export default function AdminPage() {
   const updateTokens = useUpdateUserTokens();
   const [adminHfToken, setAdminHfToken] = useState("");
   const [adminMsToken, setAdminMsToken] = useState("");
-  const [tokenSuccess, setTokenSuccess] = useState("");
-  const [tokenError, setTokenError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     name: string;
@@ -300,14 +298,42 @@ export default function AdminPage() {
                         : "—"
                     }
                   />
-                  <DetailField
-                    label="HuggingFace Token"
-                    value={selectedUser.hf_token_masked || "未配置"}
-                  />
-                  <DetailField
-                    label="ModelScope Token"
-                    value={selectedUser.ms_token_masked || "未配置"}
-                  />
+                </div>
+
+                {/* API Tokens section */}
+                <div className="pt-4 border-t space-y-2.5">
+                  <p className="text-xs font-medium text-muted-foreground">API 令牌</p>
+                  {selectedUser.role === "admin" ? (
+                    <>
+                      {[
+                        { label: "HuggingFace", value: adminHfToken, set: setAdminHfToken, key: "hf_token" as const, masked: selectedUser.hf_token_masked },
+                        { label: "ModelScope", value: adminMsToken, set: setAdminMsToken, key: "ms_token" as const, masked: selectedUser.ms_token_masked },
+                      ].map((t) => (
+                        <div key={t.key}>
+                          <dt className="text-[11px] text-muted-foreground">{t.label}</dt>
+                          <Input
+                            type="password"
+                            value={t.value}
+                            onChange={(e) => t.set(e.target.value)}
+                            onBlur={async () => {
+                              if (!t.value) return;
+                              try {
+                                await updateTokens.mutateAsync({ [t.key]: t.value });
+                                t.set("");
+                              } catch { /* ignore */ }
+                            }}
+                            className="h-7 mt-0.5 max-w-xs text-xs"
+                            placeholder={t.masked || "未配置"}
+                          />
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      <DetailField label="HuggingFace" value={selectedUser.hf_token_masked || "未配置"} />
+                      <DetailField label="ModelScope" value={selectedUser.ms_token_masked || "未配置"} />
+                    </>
+                  )}
                 </div>
 
                 {/* Actions */}
@@ -345,43 +371,6 @@ export default function AdminPage() {
                       {changePassword.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                       修改密码
                     </Button>
-
-                    {/* Token editing for admin's own account */}
-                    <div className="pt-3 border-t space-y-2">
-                      <p className="text-xs font-medium text-foreground/60">API 令牌</p>
-                      <div className="space-y-1">
-                        <Label className="text-xs">HuggingFace Token</Label>
-                        <Input type="password" value={adminHfToken} onChange={(e) => setAdminHfToken(e.target.value)} className="h-8 max-w-xs" placeholder={selectedUser.hf_token_set ? "已设置，输入新值替换" : "hf_..."} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">ModelScope Token</Label>
-                        <Input type="password" value={adminMsToken} onChange={(e) => setAdminMsToken(e.target.value)} className="h-8 max-w-xs" placeholder={selectedUser.ms_token_set ? "已设置，输入新值替换" : "输入 Token"} />
-                      </div>
-                      {tokenError && <p className="text-xs text-destructive">{tokenError}</p>}
-                      {tokenSuccess && <p className="text-xs text-emerald-600">{tokenSuccess}</p>}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={updateTokens.isPending || (!adminHfToken && !adminMsToken)}
-                        onClick={async () => {
-                          setTokenError(""); setTokenSuccess("");
-                          const payload: Record<string, string> = {};
-                          if (adminHfToken) payload.hf_token = adminHfToken;
-                          if (adminMsToken) payload.ms_token = adminMsToken;
-                          try {
-                            await updateTokens.mutateAsync(payload);
-                            setTokenSuccess("令牌已保存");
-                            setAdminHfToken(""); setAdminMsToken("");
-                            setTimeout(() => setTokenSuccess(""), 3000);
-                          } catch (err: unknown) {
-                            setTokenError(extractErrorDetail(err, "保存失败"));
-                          }
-                        }}
-                      >
-                        {updateTokens.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                        保存令牌
-                      </Button>
-                    </div>
                   </div>
                 ) : (
                   <div className="pt-4 border-t space-y-4">
