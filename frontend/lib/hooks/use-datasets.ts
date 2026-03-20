@@ -14,16 +14,6 @@ export function useDatasets(tag?: string, page = 1, pageSize = 200) {
   });
 }
 
-export function useDataset(id: string) {
-  return useQuery({
-    queryKey: ["datasets", id],
-    queryFn: async () => {
-      const res = await api.get<Dataset>(`/datasets/${id}`);
-      return res.data;
-    },
-    enabled: !!id,
-  });
-}
 
 export function useDatasetPreview(id: string, enabled = false) {
   return useQuery({

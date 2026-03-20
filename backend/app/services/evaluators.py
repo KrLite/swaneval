@@ -3,7 +3,9 @@
 import importlib.util
 import inspect
 import json
+import math
 import re
+from collections import Counter
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -48,7 +50,6 @@ def evaluate_bleu(expected: str, actual: str) -> float:
         return 0.0
 
     # Compute modified precision for n-grams 1..4
-    from collections import Counter
     scores = []
     for n in range(1, 5):
         ref_ngrams = Counter(tuple(ref_tokens[i:i + n]) for i in range(len(ref_tokens) - n + 1))
@@ -62,7 +63,6 @@ def evaluate_bleu(expected: str, actual: str) -> float:
     if any(s == 0 for s in scores):
         return 0.0
 
-    import math
     log_avg = sum(math.log(s) for s in scores) / 4
     # Brevity penalty
     ratio = len(ref_tokens) / max(len(hyp_tokens), 1)
@@ -113,8 +113,6 @@ def evaluate_f1(expected: str, actual: str) -> float:
 
 def evaluate_cosine_similarity(expected: str, actual: str) -> float:
     """Character n-gram cosine similarity (n=3)."""
-    import math
-    from collections import Counter
 
     def char_ngrams(text: str, n: int = 3) -> Counter:
         t = text.strip().lower()

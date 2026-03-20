@@ -285,14 +285,24 @@ async def run_task(task_id: uuid.UUID):
         snapshot_params = json.loads(task.params_json or "{}")
         snapshot_repeat_count = task.repeat_count
 
-        # Apply GPU and environment variable settings
+        # Apply GPU and environment variable settings (scoped)
+        _ENV_ALLOWLIST = {
+            "CUDA_VISIBLE_DEVICES", "OMP_NUM_THREADS",
+            "TOKENIZERS_PARALLELISM", "CUDA_LAUNCH_BLOCKING",
+        }
+        saved_env: dict[str, str | None] = {}
         if task.gpu_ids:
+            saved_env["CUDA_VISIBLE_DEVICES"] = os.environ.get(
+                "CUDA_VISIBLE_DEVICES"
+            )
             os.environ["CUDA_VISIBLE_DEVICES"] = task.gpu_ids
         if task.env_vars:
             try:
                 env_dict = json.loads(task.env_vars)
                 for k, v in env_dict.items():
-                    os.environ[str(k)] = str(v)
+                    if str(k) in _ENV_ALLOWLIST:
+                        saved_env[str(k)] = os.environ.get(str(k))
+                        os.environ[str(k)] = str(v)
             except (json.JSONDecodeError, TypeError):
                 pass
 
@@ -468,6 +478,13 @@ async def run_task(task_id: uuid.UUID):
                 st.status = TaskStatus.failed
                 st.error_log = str(e)
                 session.add(st)
+
+        # Restore environment variables
+        for k, orig in saved_env.items():
+            if orig is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = orig
 
         session.add(task)
         await session.commit()

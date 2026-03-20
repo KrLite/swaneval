@@ -110,42 +110,36 @@ PRESET_DATASETS = [
 ]
 
 
-async def seed_preset_datasets():
-    """
-    种子预置数据集 / Seed preset datasets
-
-    逐条检查预置数据集，缺失则补建（支持部分删除后重启恢复）。
-    Check each preset individually and re-create missing ones.
-    """
-    from app.models.dataset import Dataset, SourceType
-
+async def _seed_by_name(model_class, name_filter, presets, build_fn):
+    """Generic idempotent seeder — skips presets whose name already exists."""
     async with AsyncSession(engine) as session:
-        # Get names of all existing preset datasets
-        result = await session.exec(
-            select(Dataset.name).where(Dataset.source_type == SourceType.preset)
-        )
-        existing_names = set(result.all())
-
+        stmt = select(model_class.name)
+        if name_filter is not None:
+            stmt = stmt.where(name_filter)
+        existing = set((await session.exec(stmt)).all())
         added = 0
-        for preset in PRESET_DATASETS:
-            if preset["name"] in existing_names:
-                continue
-            dataset = Dataset(
-                name=preset["name"],
-                description=preset["description"],
-                source_type=SourceType.preset,
-                source_uri=preset["hf_id"],
-                format=preset["format"],
-                tags=preset["tags"],
-                version=1,
-                size_bytes=0,
-                row_count=0,
-                created_by=None,
-            )
-            session.add(dataset)
-            added += 1
+        for p in presets:
+            if p["name"] not in existing:
+                session.add(build_fn(p))
+                added += 1
         if added:
             await session.commit()
+
+
+async def seed_preset_datasets():
+    from app.models.dataset import Dataset, SourceType
+
+    await _seed_by_name(
+        Dataset,
+        Dataset.source_type == SourceType.preset,
+        PRESET_DATASETS,
+        lambda p: Dataset(
+            name=p["name"], description=p["description"],
+            source_type=SourceType.preset, source_uri=p["hf_id"],
+            format=p["format"], tags=p["tags"],
+            version=1, size_bytes=0, row_count=0, created_by=None,
+        ),
+    )
 
 
 # 预置评测标准定义 / Preset evaluation criteria definitions
@@ -229,29 +223,12 @@ PRESET_CRITERIA = [
 
 
 async def seed_preset_criteria():
-    """
-    种子预置评测标准 / Seed preset evaluation criteria
-
-    逐条检查预置标准，缺失则补建。
-    Check each preset criterion individually and re-create missing ones.
-    """
     from app.models.criterion import Criterion, CriterionType
 
-    async with AsyncSession(engine) as session:
-        result = await session.exec(select(Criterion.name))
-        existing_names = set(result.all())
-
-        added = 0
-        for preset in PRESET_CRITERIA:
-            if preset["name"] in existing_names:
-                continue
-            criterion = Criterion(
-                name=preset["name"],
-                type=CriterionType(preset["type"]),
-                config_json=preset["config_json"],
-                created_by=None,
-            )
-            session.add(criterion)
-            added += 1
-        if added:
-            await session.commit()
+    await _seed_by_name(
+        Criterion, None, PRESET_CRITERIA,
+        lambda p: Criterion(
+            name=p["name"], type=CriterionType(p["type"]),
+            config_json=p["config_json"], created_by=None,
+        ),
+    )

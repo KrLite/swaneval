@@ -37,26 +37,31 @@ def _resolve_path(uri: str) -> str:
 
 async def _count_rows(storage: StorageBackend, source_uri: str) -> int:
     """Count rows in a data file via the storage backend."""
-    import pandas as pd
-
     path = _resolve_path(source_uri)
     lower = path.lower()
 
-    # Parquet — use pyarrow metadata for fast row count
+    # Parquet — read row count from metadata (no data parsing)
     if lower.endswith(".parquet"):
         content = await _read_bytes(storage, source_uri)
         if content is None:
             return 0
         import io
-        return len(pd.read_parquet(io.BytesIO(content)))
 
-    # Excel
+        import pyarrow.parquet as pq
+        return pq.ParquetFile(io.BytesIO(content)).metadata.num_rows
+
+    # Excel — use openpyxl read-only mode for row count
     if lower.endswith((".xlsx", ".xls")):
         content = await _read_bytes(storage, source_uri)
         if content is None:
             return 0
         import io
-        return len(pd.read_excel(io.BytesIO(content)))
+
+        from openpyxl import load_workbook
+        wb = load_workbook(io.BytesIO(content), read_only=True)
+        count = wb.active.max_row - 1 if wb.active else 0  # minus header
+        wb.close()
+        return max(0, count)
 
     # CSV
     if lower.endswith(".csv"):
@@ -391,17 +396,21 @@ async def preview_dataset(
 
     rows: list[dict] = []
 
-    # Binary formats — Parquet, Excel
+    # Binary formats — Parquet, Excel (read only needed rows)
     if lower.endswith((".parquet", ".xlsx", ".xls")):
         content = await _read_bytes(storage, ds.source_uri)
         if content is None:
             return {"rows": [], "total": 0}
         import io
         if lower.endswith(".parquet"):
-            df = pd.read_parquet(io.BytesIO(content))
+            import pyarrow.parquet as pq
+            tbl = pq.read_table(io.BytesIO(content)).slice(0, limit)
+            df = tbl.to_pandas()
         else:
-            df = pd.read_excel(io.BytesIO(content))
-        rows = df.head(limit).fillna("").to_dict(orient="records")
+            df = pd.read_excel(
+                io.BytesIO(content), nrows=limit,
+            )
+        rows = df.fillna("").to_dict(orient="records")
         return {"rows": rows, "total": ds.row_count}
 
     # Text formats — JSON, JSONL, CSV

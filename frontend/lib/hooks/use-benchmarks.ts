@@ -15,26 +15,6 @@ export function useBenchmarks(modelName?: string, benchmarkName?: string) {
   });
 }
 
-export function useCreateBenchmark() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (data: {
-      model_name: string;
-      provider?: string;
-      benchmark_name: string;
-      score: number;
-      score_display?: string;
-      source_url?: string;
-      source_platform?: string;
-      notes?: string;
-    }) => {
-      const res = await api.post<ExternalBenchmark>("/benchmarks", data);
-      return res.data;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["benchmarks"] }),
-  });
-}
-
 export function useCreateBenchmarkBatch() {
   const qc = useQueryClient();
   return useMutation({

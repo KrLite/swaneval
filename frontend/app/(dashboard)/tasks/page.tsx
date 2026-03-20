@@ -15,16 +15,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { PanelField, DetailRow } from "@/components/panel-helpers";
 import {
   Select,
   SelectContent,
@@ -71,6 +63,9 @@ import { useCriteria } from "@/lib/hooks/use-criteria";
 import type { EvalTask } from "@/lib/types";
 import { utc } from "@/lib/utils";
 import { FilterDropdown } from "@/components/filter-dropdown";
+import { CreateModal } from "@/components/create-modal";
+import { SelectionBar } from "@/components/selection-bar";
+import { DeleteDialog } from "@/components/delete-dialog";
 
 const statusLabel: Record<string, string> = {
   completed: "已完成",
@@ -774,22 +769,16 @@ export default function TasksPage() {
       </div>
 
       {/* Create modal */}
-      {isCreating && createPos && (
-        <>
-          <div className="fixed inset-0 bg-black/40 z-50 animate-backdrop-in" onClick={() => {
-            if (formDirty) { setShakeCancel(true); return; }
-            closePanel();
-          }} />
-          <div
-            className="fixed z-[60] animate-modal-expand"
-            style={{ top: createPos.top, right: createPos.right, transformOrigin: "top right" }}
-          >
-            <Card className="w-[33vw] ">
-              <div className="flex items-center justify-between px-5 pt-5 pb-1">
-                <h3 className="text-sm font-semibold">新建任务</h3>
-              </div>
+      <CreateModal
+        open={isCreating}
+        position={createPos}
+        formDirty={formDirty}
+        onClose={closePanel}
+        onShake={() => setShakeCancel(true)}
+        title="新建任务"
+      >
               {/* Stepper indicator */}
-              <div className="px-5 pb-3 pt-2">
+              <div className="pb-3 pt-2">
                 <div className="flex items-center">
                   {STEPS.map((s, i) => (
                     <div key={i} className="flex items-center flex-1 last:flex-none">
@@ -825,7 +814,6 @@ export default function TasksPage() {
                   {STEPS[step].title}
                 </p>
               </div>
-              <CardContent className="pt-0 max-h-[60vh] overflow-auto">
                 <div className="space-y-3">
                   {/* Step 0: Select model */}
                   {step === 0 && (
@@ -1214,131 +1202,49 @@ export default function TasksPage() {
                     )}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </>
-      )}
+      </CreateModal>
 
       {/* Floating selection bar */}
-      {Object.keys(rowSelection).length > 0 && (
-        <div className="fixed bottom-6 left-0 right-0 z-30 flex justify-center pointer-events-none animate-float-up">
-          <div className="pointer-events-auto flex items-center gap-3 bg-background border rounded-full  px-5 py-2.5 text-sm">
-            <span className="text-muted-foreground">
-              已选择{" "}
-              <span className="font-semibold text-foreground tabular-nums">
-                {Object.keys(rowSelection).length}
-              </span>{" "}
-              项
-            </span>
-            <Button
-              size="sm"
-              variant="destructive"
-              className="h-7 rounded-full text-xs"
-              onClick={async () => {
-                const ids = Object.keys(rowSelection).map(
-                  (idx) => filteredData[parseInt(idx)]?.id,
-                ).filter(Boolean);
-                for (const id of ids) {
-                  try { await deleteTask.mutateAsync(id); } catch { /* skip */ }
-                }
-                setRowSelection({});
-              }}
-            >
-              <Trash2 className="mr-1 h-3 w-3" />
-              删除
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 rounded-full text-xs"
-              onClick={() => setRowSelection({})}
-            >
-              取消
-            </Button>
-          </div>
-        </div>
-      )}
+      <SelectionBar
+        count={Object.keys(rowSelection).length}
+        onDelete={async () => {
+          const ids = Object.keys(rowSelection).map(
+            (idx) => filteredData[parseInt(idx)]?.id,
+          ).filter(Boolean);
+          for (const id of ids) {
+            try { await deleteTask.mutateAsync(id); } catch { /* skip */ }
+          }
+          setRowSelection({});
+        }}
+        onClear={() => setRowSelection({})}
+      />
 
       {/* Delete confirmation */}
-      <Dialog open={!!deleteTarget} onOpenChange={() => { setDeleteTarget(null); setDeleteError(""); }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>删除任务</DialogTitle>
-            <DialogDescription>
-              确定要删除 &quot;{deleteTarget?.name}&quot; 吗？相关的子任务和评测结果也将被删除，此操作不可撤销。
-            </DialogDescription>
-          </DialogHeader>
-          {deleteError && (
-            <p className="text-sm text-destructive px-1">{deleteError}</p>
-          )}
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => { setDeleteTarget(null); setDeleteError(""); }}>
-              取消
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={async () => {
-                setDeleteError("");
-                try {
-                  const id = deleteTarget!.id;
-                  if (selectedId === id) closePanel();
-                  await deleteTask.mutateAsync(id);
-                  setDeleteTarget(null);
-                } catch (err: unknown) {
-                  const detail =
-                    err && typeof err === "object" && "response" in err
-                      ? (err as { response?: { data?: { detail?: string } } }).response
-                          ?.data?.detail
-                      : undefined;
-                  setDeleteError(detail || "删除失败");
-                }
-              }}
-              disabled={deleteTask.isPending}
-            >
-              {deleteTask.isPending ? "删除中..." : "删除"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteDialog
+        open={!!deleteTarget}
+        title="删除任务"
+        name={deleteTarget?.name ?? ""}
+        error={deleteError}
+        isPending={deleteTask.isPending}
+        onConfirm={async () => {
+          setDeleteError("");
+          try {
+            const id = deleteTarget!.id;
+            if (selectedId === id) closePanel();
+            await deleteTask.mutateAsync(id);
+            setDeleteTarget(null);
+          } catch (err: unknown) {
+            const detail =
+              err && typeof err === "object" && "response" in err
+                ? (err as { response?: { data?: { detail?: string } } }).response
+                    ?.data?.detail
+                : undefined;
+            setDeleteError(detail || "删除失败");
+          }
+        }}
+        onCancel={() => { setDeleteTarget(null); setDeleteError(""); }}
+      />
     </div>
   );
 }
 
-/* -- Sub-components -- */
-
-function PanelField({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">
-        {label}
-        {required && <span className="text-destructive ml-0.5">*</span>}
-      </Label>
-      {children}
-    </div>
-  );
-}
-
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-baseline gap-2 text-xs">
-      <span className="text-muted-foreground shrink-0">{label}</span>
-      <div className="flex-1 border-b border-dashed border-muted-foreground/20 min-w-4 translate-y-[-3px]" />
-      <div className="text-right shrink-0 min-w-0">{value}</div>
-    </div>
-  );
-}

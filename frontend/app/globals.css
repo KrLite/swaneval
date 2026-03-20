@@ -58,22 +58,6 @@
   }
 }
 
-/* Login page animated mesh gradient */
-@keyframes login-gradient {
-  0%, 100% {
-    background-position: 0% 50%;
-  }
-  25% {
-    background-position: 50% 0%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  75% {
-    background-position: 50% 100%;
-  }
-}
-
 @keyframes blob-drift-1 {
   0%, 100% { transform: translate(0%, 0%) scale(1); }
   33% { transform: translate(30%, -20%) scale(1.1); }
