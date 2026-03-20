@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface CreateModalProps {
@@ -24,18 +25,24 @@ export function CreateModal({
 }: CreateModalProps) {
   if (!open || !position) return null;
 
+  // Portal only the backdrop to document.body so it covers the full viewport
+  // including the sticky topbar. The modal card stays in-flow (portaled too)
+  // so everything is above the backdrop.
   return (
     <>
-      <div
-        className="fixed inset-0 bg-black/40 z-50 animate-backdrop-in"
-        onClick={() => {
-          if (formDirty) {
-            onShake();
-            return;
-          }
-          onClose();
-        }}
-      />
+      {createPortal(
+        <div
+          className="fixed inset-0 bg-black/40 z-50 animate-backdrop-in"
+          onClick={() => {
+            if (formDirty) {
+              onShake();
+              return;
+            }
+            onClose();
+          }}
+        />,
+        document.body,
+      )}
       <div
         className="fixed z-[60] animate-modal-expand"
         style={{
