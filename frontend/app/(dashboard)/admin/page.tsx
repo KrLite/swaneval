@@ -32,12 +32,13 @@ import {
 } from "@/components/ui/table";
 import {
   Trash2,
-  Loader2,
   Search,
   ArrowUpDown,
   ShieldCheck,
   ShieldOff,
+  Users,
 } from "lucide-react";
+import { TableEmpty, TableLoading } from "@/components/table-states";
 import { useUsers, useUpdateUser, useDeleteUser } from "@/lib/hooks/use-users";
 import { DeleteDialog } from "@/components/delete-dialog";
 import { FilterDropdown } from "@/components/filter-dropdown";
@@ -301,14 +302,16 @@ export default function AdminPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="py-12 text-center text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-              加载中...
-            </div>
+            <TableLoading />
           ) : table.getRowModel().rows.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground text-sm">
-              {users.length === 0 ? "暂无用户" : "无匹配结果。"}
-            </div>
+            (users ?? []).length === 0 ? (
+              <TableEmpty
+                icon={Users}
+                title="暂无用户"
+              />
+            ) : (
+              <TableEmpty title="无匹配结果" />
+            )
           ) : (
             <>
               <Table>

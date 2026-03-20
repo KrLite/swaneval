@@ -45,6 +45,7 @@ import {
   Check,
   Pause,
   Play,
+  PlayCircle,
   Ban,
   ExternalLink,
   Trash2,
@@ -68,6 +69,7 @@ import { CreateModal } from "@/components/create-modal";
 import { SelectionBar } from "@/components/selection-bar";
 import { DeleteDialog } from "@/components/delete-dialog";
 import { TablePagination } from "@/components/table-pagination";
+import { TableEmpty, TableLoading } from "@/components/table-states";
 
 const statusLabel: Record<string, string> = {
   completed: "已完成",
@@ -435,23 +437,22 @@ export default function TasksPage() {
         <Card className={viewPanelOpen ? "flex-1 min-w-0" : "w-full"}>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="py-12 text-center text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-                加载中...
-              </div>
+              <TableLoading />
             ) : table.getRowModel().rows.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-sm">
-                {tasks.length === 0 ? (
-                  <div className="space-y-2">
-                    <p>暂无评测任务</p>
+              tasks.length === 0 ? (
+                <TableEmpty
+                  icon={PlayCircle}
+                  title="暂无评测任务"
+                  description="选择模型和数据集，配置参数后启动评测"
+                  action={
                     <Button size="sm" variant="outline" onClick={openCreate}>
                       <Plus className="mr-1 h-3.5 w-3.5" /> 创建第一个任务
                     </Button>
-                  </div>
-                ) : (
-                  "无匹配结果。"
-                )}
-              </div>
+                  }
+                />
+              ) : (
+                <TableEmpty title="无匹配结果" />
+              )
             ) : (
               <>
               <Table>

@@ -84,6 +84,8 @@ import { useTasks } from "@/lib/hooks/use-tasks";
 import type { LeaderboardEntry, EvalResult } from "@/lib/types";
 import { FilterDropdown } from "@/components/filter-dropdown";
 import { TablePagination } from "@/components/table-pagination";
+import { TableEmpty, TableLoading } from "@/components/table-states";
+import { SegmentedControl } from "@/components/segmented-control";
 
 const BAR_COLORS = [
   "#6366f1",
@@ -549,14 +551,9 @@ export default function ResultsPage() {
           <Card>
             <CardContent className="p-0">
               {lbLoading ? (
-                <div className="py-12 text-center text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-                  加载中...
-                </div>
+                <TableLoading />
               ) : leaderboard.length === 0 ? (
-                <div className="py-12 text-center text-muted-foreground text-sm">
-                  暂无评测结果
-                </div>
+                <TableEmpty icon={Medal} title="暂无评测结果" />
               ) : (
                 <>
                 <Table>
@@ -601,9 +598,7 @@ export default function ResultsPage() {
           <Card>
             <CardContent className="pt-6">
               {leaderboard.length === 0 ? (
-                <div className="py-12 text-center text-muted-foreground text-sm">
-                  暂无评测结果
-                </div>
+                <TableEmpty icon={Medal} title="暂无评测结果" />
               ) : (
                 <ResponsiveContainer width="100%" height={400}>
                   <BarChart data={barData}>
@@ -636,9 +631,7 @@ export default function ResultsPage() {
           <Card>
             <CardContent className="pt-6">
               {leaderboard.length === 0 ? (
-                <div className="py-12 text-center text-muted-foreground text-sm">
-                  暂无评测结果
-                </div>
+                <TableEmpty icon={Medal} title="暂无评测结果" />
               ) : (
                 <ResponsiveContainer width="100%" height={400}>
                   <RadarChart data={radarData}>
@@ -676,9 +669,7 @@ export default function ResultsPage() {
           <Card>
             <CardContent className="pt-6">
               {championData.length === 0 ? (
-                <div className="py-12 text-center text-muted-foreground text-sm">
-                  暂无评测结果
-                </div>
+                <TableEmpty icon={Medal} title="暂无评测结果" />
               ) : (
                 <div className="space-y-2">
                   {championData.map((entry) => (
@@ -727,13 +718,11 @@ export default function ResultsPage() {
               </div>
 
               {benchmarks.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground text-sm space-y-3">
-                  <Globe className="h-8 w-8 mx-auto text-muted-foreground/30" />
-                  <p>暂无外部基准数据</p>
-                  <p className="text-xs">
-                    点击「导入数据」粘贴 JSON 格式的评测数据
-                  </p>
-                </div>
+                <TableEmpty
+                  icon={Globe}
+                  title="暂无外部基准数据"
+                  description="点击「导入数据」粘贴 JSON 格式的评测数据"
+                />
               ) : (
                 <Table>
                   <TableHeader>
@@ -804,28 +793,16 @@ export default function ResultsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-center h-9 border rounded-md overflow-hidden">
-                  {([
+                <SegmentedControl
+                  options={[
                     { key: "performance" as const, label: "性能" },
                     { key: "safety" as const, label: "安全" },
                     { key: "cost" as const, label: "成本" },
                     { key: "value" as const, label: "性价比" },
-                  ]).map((item, i) => (
-                    <button
-                      key={item.key}
-                      onClick={() => setReportType(item.key)}
-                      className={`h-full px-3.5 text-xs font-medium transition-colors ${
-                        i < 3 ? "border-r" : ""
-                      } ${
-                        reportType === item.key
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
+                  ]}
+                  value={reportType}
+                  onChange={setReportType}
+                />
                 {reportTaskId && (
                   <div className="flex items-center gap-1 ml-auto">
                     {(["docx", "html", "csv"] as const).map((fmt) => (
@@ -847,18 +824,11 @@ export default function ResultsPage() {
 
               {/* Report content */}
               {!reportTaskId ? (
-                <div className="py-12 text-center text-muted-foreground text-sm">
-                  请选择一个已完成的任务生成报告
-                </div>
+                <TableEmpty icon={FileText} title="请选择一个已完成的任务生成报告" />
               ) : reportLoading ? (
-                <div className="py-12 text-center text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-                  生成报告中...
-                </div>
+                <TableLoading text="生成报告中..." />
               ) : !reportData ? (
-                <div className="py-12 text-center text-muted-foreground text-sm">
-                  暂无数据
-                </div>
+                <TableEmpty title="暂无数据" />
               ) : (
                 <div className="space-y-4">
                   {/* Report header */}
@@ -1031,7 +1001,7 @@ export default function ResultsPage() {
           <Card>
             <CardContent className="p-0">
               {/* Task filter bar */}
-              <div className="flex items-center gap-3 px-4 py-3 border-b">
+              <div className="flex items-center gap-3 px-4 py-3">
                 <span className="text-xs text-muted-foreground shrink-0">
                   任务筛选
                 </span>
@@ -1060,16 +1030,12 @@ export default function ResultsPage() {
               </div>
 
               {detailLoading ? (
-                <div className="py-12 text-center text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-                  加载中...
-                </div>
+                <TableLoading />
               ) : detailResults.length === 0 ? (
-                <div className="py-12 text-center text-muted-foreground text-sm">
-                  {detailTaskId
-                    ? "该任务暂无明细结果"
-                    : "请选择一个任务查看明细"}
-                </div>
+                <TableEmpty
+                  icon={List}
+                  title={detailTaskId ? "该任务暂无明细结果" : "请选择一个任务查看明细"}
+                />
               ) : (
                 <>
                   <Table>

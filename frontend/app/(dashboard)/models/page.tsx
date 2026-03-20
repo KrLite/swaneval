@@ -48,7 +48,9 @@ import {
   Copy,
   Check,
   KeyRound,
+  Cpu,
 } from "lucide-react";
+import { TableEmpty, TableLoading } from "@/components/table-states";
 import {
   useModels,
   useCreateModel,
@@ -447,23 +449,22 @@ export default function ModelsPage() {
         <Card className={viewPanelOpen ? "flex-1 min-w-0" : "w-full"}>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="py-12 text-center text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-                加载中...
-              </div>
+              <TableLoading />
             ) : table.getRowModel().rows.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-sm">
-                {models.length === 0 ? (
-                  <div className="space-y-2">
-                    <p>暂无已注册的模型</p>
+              models.length === 0 ? (
+                <TableEmpty
+                  icon={Cpu}
+                  title="暂无已注册的模型"
+                  description="添加 API 模型、本地模型或 HuggingFace 模型"
+                  action={
                     <Button size="sm" variant="outline" onClick={openCreate}>
                       <Plus className="mr-1 h-3.5 w-3.5" /> 添加第一个模型
                     </Button>
-                  </div>
-                ) : (
-                  "无匹配结果。"
-                )}
-              </div>
+                  }
+                />
+              ) : (
+                <TableEmpty title="无匹配结果" />
+              )
             ) : (
               <>
               <Table>

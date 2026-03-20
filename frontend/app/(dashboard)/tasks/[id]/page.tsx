@@ -22,7 +22,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Pause, Play, XCircle, AlertTriangle, Trash2 } from "lucide-react";
+import { ArrowLeft, Pause, Play, XCircle, AlertTriangle, Trash2, BarChart3 } from "lucide-react";
 import { useState } from "react";
 import { utc } from "@/lib/utils";
 import {
@@ -34,6 +34,7 @@ import {
   useDeleteTask,
 } from "@/lib/hooks/use-tasks";
 import { useTaskSummary, useErrorResults } from "@/lib/hooks/use-results";
+import { TableEmpty, TableLoading } from "@/components/table-states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart,
@@ -252,10 +253,12 @@ export default function TaskDetailPage() {
         <TabsContent value="summary" className="space-y-4">
           {summary.length === 0 ? (
             <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                {task.status === "running" || task.status === "pending"
-                  ? "任务仍在运行中..."
-                  : "暂无结果。"}
+              <CardContent className="p-0">
+                {task.status === "running" || task.status === "pending" ? (
+                  <TableLoading text="任务仍在运行中..." />
+                ) : (
+                  <TableEmpty icon={BarChart3} title="暂无结果" />
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -349,9 +352,7 @@ export default function TaskDetailPage() {
           <Card>
             <CardContent className="p-0">
               {errors.length === 0 ? (
-                <p className="py-8 text-center text-muted-foreground">
-                  未发现错误。
-                </p>
+                <TableEmpty title="未发现错误" />
               ) : (
                 <Table>
                   <TableHeader>

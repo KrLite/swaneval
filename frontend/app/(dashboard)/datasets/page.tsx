@@ -55,7 +55,9 @@ import {
   Bell,
   BellOff,
   BookOpen,
+  Database,
 } from "lucide-react";
+import { TableEmpty, TableLoading } from "@/components/table-states";
 import {
   useDatasets,
   useUploadDataset,
@@ -73,6 +75,7 @@ import type { Dataset } from "@/lib/types";
 import { utc } from "@/lib/utils";
 import { FilterDropdown } from "@/components/filter-dropdown";
 import { TablePagination } from "@/components/table-pagination";
+import { SegmentedControl } from "@/components/segmented-control";
 
 const sourceTypeLabel: Record<string, string> = {
   upload: "上传",
@@ -520,23 +523,22 @@ export default function DatasetsPage() {
         <Card className={viewPanelOpen ? "flex-1 min-w-0" : "w-full"}>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="py-12 text-center text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-                加载中...
-              </div>
+              <TableLoading />
             ) : table.getRowModel().rows.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-sm">
-                {datasets.length === 0 ? (
-                  <div className="space-y-2">
-                    <p>暂无数据集</p>
+              datasets.length === 0 ? (
+                <TableEmpty
+                  icon={Database}
+                  title="暂无数据集"
+                  description="上传文件、导入在线数据集或挂载服务器路径"
+                  action={
                     <Button size="sm" variant="outline" onClick={openCreate}>
                       <Plus className="mr-1 h-3.5 w-3.5" /> 添加第一个数据集
                     </Button>
-                  </div>
-                ) : (
-                  "无匹配结果。"
-                )}
-              </div>
+                  }
+                />
+              ) : (
+                <TableEmpty title="无匹配结果" />
+              )
             ) : (
               <>
               <Table>
@@ -1144,27 +1146,15 @@ export default function DatasetsPage() {
                   <TabsContent value="online">
                     <form onSubmit={handleImport} className="space-y-3">
                       <PanelField label="数据源">
-                        <div className="flex items-center h-9 border rounded-md overflow-hidden">
-                          {([
-                            { key: "huggingface", label: "HuggingFace" },
-                            { key: "modelscope", label: "ModelScope" },
-                          ] as const).map((item, i) => (
-                            <button
-                              key={item.key}
-                              type="button"
-                              onClick={() => setImportForm({ ...importForm, source: item.key })}
-                              className={`h-full px-3.5 text-xs font-medium flex-1 transition-colors ${
-                                i === 0 ? "border-r" : ""
-                              } ${
-                                importForm.source === item.key
-                                  ? "bg-primary text-primary-foreground"
-                                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                              }`}
-                            >
-                              {item.label}
-                            </button>
-                          ))}
-                        </div>
+                        <SegmentedControl
+                          options={[
+                            { key: "huggingface" as const, label: "HuggingFace" },
+                            { key: "modelscope" as const, label: "ModelScope" },
+                          ]}
+                          value={importForm.source}
+                          onChange={(v) => setImportForm({ ...importForm, source: v })}
+                          className="w-full"
+                        />
                       </PanelField>
                       <PanelField
                         label={importForm.source === "huggingface" ? "HuggingFace Dataset ID 或 URL" : "ModelScope Dataset ID 或 URL"}

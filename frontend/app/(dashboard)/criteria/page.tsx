@@ -51,7 +51,9 @@ import {
   X,
   ChevronRight,
   BookOpen,
+  Ruler,
 } from "lucide-react";
+import { TableEmpty, TableLoading } from "@/components/table-states";
 import {
   useCriteria,
   useCriteriaPresets,
@@ -439,23 +441,22 @@ export default function CriteriaPage() {
         <Card className={viewPanelOpen ? "flex-1 min-w-0" : "w-full"}>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="py-12 text-center text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-                加载中...
-              </div>
+              <TableLoading />
             ) : table.getRowModel().rows.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-sm">
-                {criteria.length === 0 ? (
-                  <div className="space-y-2">
-                    <p>暂无评估标准</p>
+              criteria.length === 0 ? (
+                <TableEmpty
+                  icon={Ruler}
+                  title="暂无评估标准"
+                  description="创建预设指标、正则、脚本或 LLM 评判标准"
+                  action={
                     <Button size="sm" variant="outline" onClick={openCreate}>
                       <Plus className="mr-1 h-3.5 w-3.5" /> 创建第一个标准
                     </Button>
-                  </div>
-                ) : (
-                  "无匹配结果。"
-                )}
-              </div>
+                  }
+                />
+              ) : (
+                <TableEmpty title="无匹配结果" />
+              )
             ) : (
               <>
               <Table>
