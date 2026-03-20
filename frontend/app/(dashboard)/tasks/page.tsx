@@ -413,7 +413,7 @@ export default function TasksPage() {
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder="搜索任务名称..."
-            className="pl-9 h-9"
+            className="pl-9 h-8 rounded-full text-xs"
           />
         </div>
         <FilterDropdown

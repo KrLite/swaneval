@@ -409,7 +409,7 @@ export default function CriteriaPage() {
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder="搜索标准名称、配置..."
-            className="pl-9 h-9"
+            className="pl-9 h-8 rounded-full text-xs"
           />
         </div>
         <FilterDropdown

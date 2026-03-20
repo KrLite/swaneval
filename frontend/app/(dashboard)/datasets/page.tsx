@@ -484,7 +484,7 @@ export default function DatasetsPage() {
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder="搜索数据集名称、格式、标签..."
-            className="pl-9 h-9"
+            className="pl-9 h-8 rounded-full text-xs"
           />
         </div>
         <FilterDropdown

@@ -427,7 +427,7 @@ export default function ModelsPage() {
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder="搜索模型名称、提供商、端点..."
-            className="pl-9 h-9"
+            className="pl-9 h-8 rounded-full text-xs"
           />
         </div>
         <FilterDropdown
