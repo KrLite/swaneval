@@ -1,0 +1,82 @@
+[
+  {
+    "name": "GSM8K",
+    "description": "Grade School Math 8K — 8500道小学数学应用题，评估模型的多步数学推理能力",
+    "source": "huggingface",
+    "source_id": "openai/gsm8k",
+    "subset": "main",
+    "split": "test",
+    "format": "jsonl",
+    "tags": "math,reasoning,preset"
+  },
+  {
+    "name": "MATH (Algebra)",
+    "description": "竞赛级代数数学题，评估高级数学推理（hendrycks MATH 数据集 algebra 子集）",
+    "source": "huggingface",
+    "source_id": "EleutherAI/hendrycks_math",
+    "subset": "algebra",
+    "split": "test",
+    "format": "jsonl",
+    "tags": "math,reasoning,competition,preset"
+  },
+  {
+    "name": "BBH (Boolean Expressions)",
+    "description": "BIG-Bench Hard 布尔表达式任务，评估模型的逻辑推理能力",
+    "source": "huggingface",
+    "source_id": "lukaemon/bbh",
+    "subset": "boolean_expressions",
+    "split": "test",
+    "format": "jsonl",
+    "tags": "reasoning,logic,preset"
+  },
+  {
+    "name": "HumanEval",
+    "description": "164道 Python 编程题，评估模型的代码生成能力（Pass@k 指标）",
+    "source": "huggingface",
+    "source_id": "openai/openai_humaneval",
+    "subset": "openai_humaneval",
+    "split": "test",
+    "format": "jsonl",
+    "tags": "code,python,preset"
+  },
+  {
+    "name": "MBPP",
+    "description": "Mostly Basic Python Problems — 974道 Python 编程题，评估基础代码生成能力",
+    "source": "huggingface",
+    "source_id": "google-research-datasets/mbpp",
+    "subset": "full",
+    "split": "test",
+    "format": "jsonl",
+    "tags": "code,python,preset"
+  },
+  {
+    "name": "AlpacaEval",
+    "description": "805条指令，评估模型的指令跟随和开放式生成质量，常用于对话模型对比",
+    "source": "huggingface",
+    "source_id": "tatsu-lab/alpaca_eval",
+    "subset": "",
+    "split": "",
+    "format": "jsonl",
+    "tags": "instruction,chat,preset"
+  },
+  {
+    "name": "MT-Bench",
+    "description": "80组多轮对话题目，涵盖写作、推理、数学等8个类别，评估多轮对话能力",
+    "source": "huggingface",
+    "source_id": "HuggingFaceH4/mt_bench_prompts",
+    "subset": "default",
+    "split": "train",
+    "format": "jsonl",
+    "tags": "chat,multi-turn,preset"
+  },
+  {
+    "name": "LongBench v2",
+    "description": "长文本理解基准 v2，涵盖摘要、问答、代码补全等多任务评估",
+    "source": "huggingface",
+    "source_id": "THUDM/LongBench-v2",
+    "subset": "default",
+    "split": "train",
+    "format": "jsonl",
+    "tags": "long-context,comprehension,preset"
+  }
+]

@@ -392,7 +392,7 @@ async def download_preset_content(
     if ds.source_type == SourceType.preset:
         for preset in PRESET_DATASETS:
             if preset["name"] == ds.name:
-                hf_id = preset["hf_id"]
+                hf_id = preset.get("source_id", preset.get("hf_id", ""))
                 subset = preset.get("subset", "")
                 split = preset.get("split", "test")
                 break

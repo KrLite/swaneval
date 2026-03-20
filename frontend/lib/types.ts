@@ -130,7 +130,10 @@ export interface ExternalBenchmark {
 export interface PresetDataset {
   name: string;
   description: string;
-  hf_id: string;
+  source: string;
+  source_id: string;
+  /** @deprecated use source_id */
+  hf_id?: string;
   subset: string;
   split: string;
   format: string;

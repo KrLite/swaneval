@@ -65,7 +65,7 @@ export function useImportDataset() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
-      source: "huggingface" | "modelscope";
+      source: string;
       dataset_id: string;
       name?: string;
       subset?: string;

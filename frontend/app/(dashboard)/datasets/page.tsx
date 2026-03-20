@@ -361,7 +361,7 @@ export default function DatasetsPage() {
             multi
             loading={presets.length === 0}
             items={presets.map((p): PresetItem => ({
-              key: p.hf_id,
+              key: p.source_id,
               name: p.name,
               description: p.description,
               tags: p.tags,
@@ -370,13 +370,13 @@ export default function DatasetsPage() {
                 (d) => d.name === p.name && d.row_count > 0,
               ),
               importing: importJobs.some(
-                (j) => j.id.includes(p.hf_id.replace("/", "--")) && j.status === "importing",
+                (j) => j.id.includes(p.source_id.replace("/", "--")) && j.status === "importing",
               ),
               importProgress: importJobs.find(
-                (j) => j.id.includes(p.hf_id.replace("/", "--")) && j.status === "importing",
+                (j) => j.id.includes(p.source_id.replace("/", "--")) && j.status === "importing",
               )?.progress,
               importPhase: importJobs.find(
-                (j) => j.id.includes(p.hf_id.replace("/", "--")) && j.status === "importing",
+                (j) => j.id.includes(p.source_id.replace("/", "--")) && j.status === "importing",
               )?.phase,
             }))}
             selected={presetSelected}
@@ -385,10 +385,10 @@ export default function DatasetsPage() {
               setOnlineImportError("");
               setPresetSelected([]);
               for (const key of keys) {
-                const p = presets.find((x) => x.hf_id === key);
+                const p = presets.find((x) => x.source_id === key);
                 if (!p) continue;
-                const jobId = `preset-${p.hf_id.replace("/", "--")}-${Date.now()}`;
-                addJob({ id: jobId, name: p.name, source: "HuggingFace 预设" });
+                const jobId = `preset-${p.source_id.replace("/", "--")}-${Date.now()}`;
+                addJob({ id: jobId, name: p.name, source: `${sourceTypeLabel[p.source] ?? p.source} 预设` });
                 // Subscribe to SSE progress
                 const unsub = subscribeImportProgress(jobId, (data) => {
                   if (data.status === "done") {
@@ -416,8 +416,8 @@ export default function DatasetsPage() {
                 // Fire import (non-blocking)
                 importDs
                   .mutateAsync({
-                    source: "huggingface",
-                    dataset_id: p.hf_id,
+                    source: p.source || "huggingface",
+                    dataset_id: p.source_id,
                     name: p.name,
                     subset: p.subset || undefined,
                     split: p.split,
