@@ -88,6 +88,7 @@ export default function DatasetsPage() {
   const [formDirty, setFormDirty] = useState(false);
   const [importFormOverride, setImportFormOverride] = useState<ImportFormState | null>(null);
   const [presetSelected, setPresetSelected] = useState<string[]>([]);
+  const [importingPresets, setImportingPresets] = useState<Set<string>>(new Set());
   const [onlineImportError, setOnlineImportError] = useState("");
   const [shakeCancel, setShakeCancel] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement>(null);
@@ -211,7 +212,7 @@ export default function DatasetsPage() {
       </SearchToolbar>
 
       {/* Main: table + side panel */}
-      <div className="flex gap-4 min-h-0">
+      <div className="flex gap-4 min-h-0 items-start">
         <Card className={viewPanelOpen ? "flex-1 min-w-0" : "w-full"}>
           <CardContent className="p-0">
             {isLoading ? (
@@ -349,52 +350,60 @@ export default function DatasetsPage() {
         onShake={() => setShakeCancel(true)}
         title="添加数据集"
         sidePanel={
-          createTab === "online" ? (
-            <PresetListPanel
-              title="预设基准数据集"
-              loading={presets.length === 0}
-              items={presets.map((p): PresetItem => ({
-                key: p.hf_id,
-                name: p.name,
-                description: p.description,
-                tags: p.tags,
-                badge: p.split,
-                done: (datasetsData?.items ?? []).some((d) => d.name === p.name && d.row_count > 0),
-              }))}
-              selected={presetSelected}
-              onSelectionChange={(keys) => {
-                setPresetSelected(keys);
-                const key = keys[keys.length - 1];
+          <PresetListPanel
+            title="预设基准数据集"
+            multi
+            loading={presets.length === 0}
+            items={presets.map((p): PresetItem => ({
+              key: p.hf_id,
+              name: p.name,
+              description: p.description,
+              tags: p.tags,
+              badge: p.split,
+              done: (datasetsData?.items ?? []).some(
+                (d) => d.name === p.name && d.row_count > 0,
+              ),
+              importing: importingPresets.has(p.hf_id),
+            }))}
+            selected={presetSelected}
+            onSelectionChange={setPresetSelected}
+            onConfirm={async (keys) => {
+              setOnlineImportError("");
+              // Mark all as importing (non-blocking)
+              setImportingPresets((prev) => {
+                const next = new Set(prev);
+                keys.forEach((k) => next.add(k));
+                return next;
+              });
+              setPresetSelected([]);
+              // Import sequentially but don't block UI
+              for (const key of keys) {
                 const p = presets.find((x) => x.hf_id === key);
-                if (p) {
-                  setImportFormOverride({
-                    source: "huggingface", dataset_id: p.hf_id, name: p.name,
-                    subset: "", split: p.split, description: p.description, tags: p.tags,
+                if (!p) continue;
+                try {
+                  await importDs.mutateAsync({
+                    source: "huggingface",
+                    dataset_id: p.hf_id,
+                    name: p.name,
+                    split: p.split,
+                    description: p.description,
+                    tags: p.tags,
+                  });
+                } catch (err: unknown) {
+                  setOnlineImportError(extractErrorDetail(err, `导入 ${p.name} 失败`));
+                } finally {
+                  setImportingPresets((prev) => {
+                    const next = new Set(prev);
+                    next.delete(key);
+                    return next;
                   });
                 }
-              }}
-              onConfirm={async (keys) => {
-                setOnlineImportError("");
-                for (const key of keys) {
-                  const p = presets.find((x) => x.hf_id === key);
-                  if (!p) continue;
-                  try {
-                    await importDs.mutateAsync({
-                      source: "huggingface", dataset_id: p.hf_id, name: p.name,
-                      split: p.split, description: p.description, tags: p.tags,
-                    });
-                  } catch (err: unknown) {
-                    setOnlineImportError(extractErrorDetail(err, "导入失败"));
-                    return;
-                  }
-                }
-                setPresetSelected([]);
-              }}
-              confirmLabel="下载导入"
-              confirming={importDs.isPending}
-              error={onlineImportError}
-            />
-          ) : undefined
+              }
+            }}
+            confirmLabel="下载导入"
+            confirming={false}
+            error={onlineImportError}
+          />
         }
       >
         <DatasetCreateForm

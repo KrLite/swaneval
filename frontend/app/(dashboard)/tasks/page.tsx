@@ -228,7 +228,7 @@ export default function TasksPage() {
         />
       </SearchToolbar>
 
-      <div className="flex gap-4 min-h-0">
+      <div className="flex gap-4 min-h-0 items-start">
         <Card className={viewPanelOpen ? "flex-1 min-w-0" : "w-full"}>
           <CardContent className="p-0">
             {isLoading ? (

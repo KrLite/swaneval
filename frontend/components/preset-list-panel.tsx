@@ -5,41 +5,31 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Check, Loader2 } from "lucide-react";
+import { Search, Check, Loader2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface PresetItem {
-  /** Unique key for selection */
   key: string;
-  /** Display name */
   name: string;
-  /** Description text */
   description: string;
-  /** Comma-separated tags */
   tags?: string;
-  /** Extra label shown as outline badge (e.g. split) */
   badge?: string;
-  /** Whether this item is already imported / added */
+  /** Already imported */
   done?: boolean;
+  /** Currently importing (show progress) */
+  importing?: boolean;
 }
 
 interface PresetListPanelProps {
   title: string;
   items: PresetItem[];
-  /** Loading the list itself */
   loading?: boolean;
-  /** Multi-select mode (criteria) vs single-select (datasets) */
   multi?: boolean;
-  /** Currently selected keys */
   selected: string[];
   onSelectionChange: (keys: string[]) => void;
-  /** Called when user confirms action on selected items */
   onConfirm: (keys: string[]) => void;
-  /** Label for the confirm button */
   confirmLabel?: string;
-  /** Whether confirm action is in progress */
   confirming?: boolean;
-  /** Error message */
   error?: string;
 }
 
@@ -47,7 +37,7 @@ export function PresetListPanel({
   title,
   items,
   loading,
-  multi,
+  multi = true,
   selected,
   onSelectionChange,
   onConfirm,
@@ -67,6 +57,8 @@ export function PresetListPanel({
     : items;
 
   const toggle = (key: string) => {
+    const item = items.find((i) => i.key === key);
+    if (item?.done || item?.importing) return;
     if (multi) {
       onSelectionChange(
         selected.includes(key)
@@ -78,7 +70,9 @@ export function PresetListPanel({
     }
   };
 
-  const activeItems = items.filter((i) => selected.includes(i.key) && !i.done);
+  const activeItems = items.filter(
+    (i) => selected.includes(i.key) && !i.done && !i.importing,
+  );
 
   return (
     <Card className="w-[22vw] shadow-2xl rounded-2xl flex flex-col max-h-[70vh]">
@@ -109,25 +103,27 @@ export function PresetListPanel({
           <div className="space-y-1">
             {filtered.map((item) => {
               const isSelected = selected.includes(item.key);
+              const isDisabled = item.done || item.importing;
               return (
                 <button
                   key={item.key}
                   type="button"
-                  disabled={item.done}
+                  disabled={isDisabled}
                   onClick={() => toggle(item.key)}
                   className={cn(
                     "w-full rounded-lg px-3 py-2.5 text-left transition-all",
-                    item.done
-                      ? "opacity-40 cursor-not-allowed"
+                    isDisabled
+                      ? "opacity-50 cursor-not-allowed"
                       : isSelected
                         ? "bg-primary/[0.08] ring-1 ring-primary/30"
-                        : "hover:bg-background/60",
+                        : "hover:bg-muted/60",
                   )}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex gap-2.5">
+                    {/* Checkbox — top-aligned */}
                     <div
                       className={cn(
-                        "shrink-0 h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors",
+                        "shrink-0 mt-0.5 h-4 w-4 rounded border-2 flex items-center justify-center transition-colors",
                         isSelected
                           ? "border-primary bg-primary"
                           : "border-muted-foreground/30",
@@ -145,23 +141,32 @@ export function PresetListPanel({
                           {item.done && (
                             <Badge variant="success" className="text-[9px]">已导入</Badge>
                           )}
-                          {item.badge && (
+                          {item.badge && !item.done && (
                             <Badge variant="outline" className="text-[9px] font-normal">{item.badge}</Badge>
                           )}
                         </div>
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{item.description}</p>
+                      {/* Import progress bar */}
+                      {item.importing && (
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full bg-primary rounded-full animate-pulse w-2/3" />
+                          </div>
+                          <span className="text-[9px] text-muted-foreground shrink-0">导入中</span>
+                        </div>
+                      )}
+                      {item.tags && !item.importing && (
+                        <div className="flex items-center gap-1 mt-1.5">
+                          {item.tags.split(",").slice(0, 4).map((t) => (
+                            <Badge key={t.trim()} variant="secondary" className="text-[9px] font-normal">
+                              {t.trim()}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  {item.tags && (
-                    <div className="flex items-center gap-1 mt-1.5 pl-6">
-                      {item.tags.split(",").slice(0, 4).map((t) => (
-                        <Badge key={t.trim()} variant="secondary" className="text-[9px] font-normal">
-                          {t.trim()}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                 </button>
               );
             })}
@@ -169,29 +174,26 @@ export function PresetListPanel({
         )}
       </div>
 
-      {/* Footer action */}
-      <div className="shrink-0 px-3 pb-3 pt-1 border-t space-y-2">
+      {/* Footer action — consistent padding */}
+      <div className="shrink-0 px-3 py-3 border-t space-y-2">
         {error && (
           <div className="rounded-lg bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
             {error}
-          </div>
-        )}
-        {confirming && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            处理中...
           </div>
         )}
         <Button
           size="sm"
           className="w-full"
           disabled={activeItems.length === 0 || confirming}
-          onClick={() => onConfirm(selected.filter((k) => !items.find((i) => i.key === k)?.done))}
+          onClick={() => onConfirm(selected.filter((k) => {
+            const item = items.find((i) => i.key === k);
+            return item && !item.done && !item.importing;
+          }))}
         >
           {confirming ? (
             <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
           ) : (
-            <Check className="mr-1.5 h-3.5 w-3.5" />
+            <Download className="mr-1.5 h-3.5 w-3.5" />
           )}
           {confirmLabel}
           {activeItems.length > 0 && ` (${activeItems.length})`}

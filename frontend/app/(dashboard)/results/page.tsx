@@ -523,7 +523,7 @@ export default function ResultsPage() {
       </div>
 
       {/* Sidebar + Content */}
-      <div className="flex gap-4 min-h-0">
+      <div className="flex gap-4 min-h-0 items-start">
         {/* Sidebar */}
         <div className="w-48 shrink-0 space-y-1">
           <div className="mb-2">

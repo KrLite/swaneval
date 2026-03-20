@@ -138,7 +138,7 @@ export default function OverviewPage() {
       </div>
 
       {/* ── Main panels: abstract info + graphs ── */}
-      <div className="relative z-10 flex-1 min-h-0 grid grid-cols-12 gap-4 px-6 pb-6">
+      <div className="relative z-10 flex-1 min-h-0 grid grid-cols-12 gap-4 px-10 pb-4">
 
         {/* Left: Task health — filled accent card */}
         <div className="col-span-4 rounded-2xl bg-primary/[0.06] border border-primary/10 p-5 flex flex-col">
