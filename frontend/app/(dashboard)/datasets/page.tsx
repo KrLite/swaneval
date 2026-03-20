@@ -92,7 +92,7 @@ export default function DatasetsPage() {
   const [importFormOverride, setImportFormOverride] = useState<ImportFormState | null>(null);
   const [presetSelected, setPresetSelected] = useState<string[]>([]);
   const [onlineImportError, setOnlineImportError] = useState("");
-  const { jobs: importJobs, addJob, updateJob } = useImportJobs();
+  const { jobs: importJobs, addJob, updateJob, removeJob } = useImportJobs();
   const [shakeCancel, setShakeCancel] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement>(null);
   const [createPos, setCreatePos] = useState<{ top: number; right: number } | null>(null);
@@ -425,6 +425,16 @@ export default function DatasetsPage() {
                     tags: p.tags,
                     job_id: jobId,
                   })
+                  .then(() => {
+                    updateJob(jobId, {
+                      status: "done",
+                      progress: 1.0,
+                      phase: "完成",
+                      finishedAt: Date.now(),
+                    });
+                    // Auto-remove from store after 5s
+                    setTimeout(() => removeJob(jobId), 5000);
+                  })
                   .catch((err: unknown) => {
                     updateJob(jobId, {
                       status: "failed",
@@ -452,7 +462,10 @@ export default function DatasetsPage() {
             addJob({ id, name, source });
             return id;
           }}
-          onImportDone={(id) => updateJob(id, { status: "done", finishedAt: Date.now() })}
+          onImportDone={(id) => {
+            updateJob(id, { status: "done", progress: 1.0, phase: "完成", finishedAt: Date.now() });
+            setTimeout(() => removeJob(id), 5000);
+          }}
           onImportFail={(id, error) => updateJob(id, { status: "failed", finishedAt: Date.now(), error })}
         />
       </CreateModal>
