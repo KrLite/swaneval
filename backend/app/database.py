@@ -28,13 +28,19 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db():
     """
-    Initialize database tables.
+    Initialize database.
 
-    In development, creates tables from SQLModel metadata.
-    In production, rely on Alembic migrations instead.
+    Skips create_all when Alembic manages the schema (alembic_version table exists).
+    For fresh dev without migrations, creates tables from SQLModel metadata.
     """
+    from sqlalchemy import inspect
+
     async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+        has_alembic = await conn.run_sync(
+            lambda sync_conn: inspect(sync_conn).has_table("alembic_version")
+        )
+        if not has_alembic:
+            await conn.run_sync(SQLModel.metadata.create_all)
 
 
 # 预置数据集定义 / Preset dataset definitions
