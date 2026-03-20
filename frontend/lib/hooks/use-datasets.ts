@@ -153,7 +153,7 @@ export function subscribeImportProgress(
   onProgress: (data: { status: string; phase: string; progress: number; error: string }) => void,
 ): () => void {
   const baseUrl = api.defaults.baseURL || "";
-  const url = `${baseUrl}/datasets/import-progress/${jobId}`;
+  const url = `${baseUrl}/datasets/import-progress/${encodeURIComponent(jobId)}`;
   const eventSource = new EventSource(url);
   eventSource.onmessage = (event) => {
     try {

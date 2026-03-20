@@ -387,7 +387,7 @@ export default function DatasetsPage() {
               for (const key of keys) {
                 const p = presets.find((x) => x.hf_id === key);
                 if (!p) continue;
-                const jobId = `preset-${p.hf_id}-${Date.now()}`;
+                const jobId = `preset-${p.hf_id.replace("/", "--")}-${Date.now()}`;
                 addJob({ id: jobId, name: p.name, source: "HuggingFace 预设" });
                 // Subscribe to SSE progress
                 const unsub = subscribeImportProgress(jobId, (data) => {

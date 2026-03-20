@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PanelField } from "@/components/panel-helpers";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SegmentedControl } from "@/components/segmented-control";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Loader2,
   Check,
@@ -363,17 +369,20 @@ export function DatasetCreateForm({
         <TabsContent value="online">
           <form onSubmit={handleImport} className="space-y-3">
             <PanelField label="数据源">
-              <SegmentedControl
-                options={[
-                  { key: "huggingface" as const, label: "HuggingFace" },
-                  { key: "modelscope" as const, label: "ModelScope" },
-                ]}
+              <Select
                 value={importForm.source}
-                onChange={(v) =>
-                  setImportForm({ ...importForm, source: v })
+                onValueChange={(v) =>
+                  setImportForm({ ...importForm, source: v as "huggingface" | "modelscope" })
                 }
-                className="w-full"
-              />
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="huggingface">HuggingFace</SelectItem>
+                  <SelectItem value="modelscope">ModelScope</SelectItem>
+                </SelectContent>
+              </Select>
             </PanelField>
             <PanelField
               label={
