@@ -9,26 +9,33 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   asChild?: boolean;
 }
 
+const variantClasses: Record<string, string> = {
+  default: "bg-primary text-primary-content hover:bg-primary/85 shadow-sm",
+  destructive: "bg-error text-error-content hover:bg-error/85 shadow-sm",
+  outline: "border border-base-300 bg-transparent hover:bg-base-200 text-base-content",
+  secondary: "bg-base-200 text-base-content hover:bg-base-300",
+  ghost: "bg-transparent hover:bg-base-200 text-base-content",
+  link: "bg-transparent text-primary underline-offset-4 hover:underline",
+};
+
+const sizeClasses: Record<string, string> = {
+  default: "h-10 px-5 py-2",
+  sm: "h-8 px-4 text-xs",
+  lg: "h-11 px-8",
+  icon: "h-9 w-9",
+};
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "default", size = "default", ...props }, ref) => {
-    const v: Record<string, string> = {
-      default: "btn-primary",
-      destructive: "btn-error",
-      outline: "btn-outline",
-      secondary: "btn-secondary",
-      ghost: "btn-ghost",
-      link: "btn-link",
-    };
-    const s: Record<string, string> = {
-      default: "btn-sm h-10 min-h-0 px-5",
-      sm: "btn-xs h-8 min-h-0 px-4",
-      lg: "btn-sm h-11 min-h-0 px-8",
-      icon: "btn-sm btn-square h-9 min-h-0 w-9",
-    };
     return (
       <button
         ref={ref}
-        className={cn("btn no-animation font-medium", v[variant], s[size], className)}
+        className={cn(
+          "inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-medium transition-all duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+          variantClasses[variant],
+          sizeClasses[size],
+          className,
+        )}
         {...props}
       />
     );
