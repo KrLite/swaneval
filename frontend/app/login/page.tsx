@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/logo";
+import { useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import type { TokenResponse, User } from "@/lib/types";
 import { useUserCount } from "@/lib/hooks/use-users";
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const qc = useQueryClient();
   const { data: userCount, isLoading: countLoading } = useUserCount();
   const isFirstUser = userCount === 0;
 
@@ -79,6 +81,7 @@ export default function LoginPage() {
         ? { ...regForm, username: "admin", role: "admin" }
         : { ...regForm, role: "engineer" };
       await api.post("/auth/register", body);
+      await qc.invalidateQueries({ queryKey: ["user-count"] });
       setSuccess("账号创建成功，请在下方登录。");
       setMode("login");
       setLoginForm({
