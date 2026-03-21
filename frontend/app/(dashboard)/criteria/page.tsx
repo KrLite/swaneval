@@ -478,6 +478,7 @@ export default function CriteriaPage() {
             onClose={closePanel}
             onTest={openTestDialog}
             onDelete={setDeleteTarget}
+            readOnly={presetCriteria.some((p) => p.name === selectedCriterion.name)}
           />
         )}
       </div>

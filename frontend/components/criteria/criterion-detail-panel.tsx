@@ -43,6 +43,8 @@ interface CriterionDetailPanelProps {
   onClose: () => void;
   onTest: (id: string) => void;
   onDelete: (target: { id: string; name: string }) => void;
+  /** If true, all fields are read-only (preset criteria) */
+  readOnly?: boolean;
 }
 
 export function CriterionDetailPanel({
@@ -51,6 +53,7 @@ export function CriterionDetailPanel({
   onClose,
   onTest,
   onDelete,
+  readOnly,
 }: CriterionDetailPanelProps) {
   const update = useUpdateCriterion();
   const [error, setError] = useState("");
@@ -141,10 +144,14 @@ export function CriterionDetailPanel({
 
         <CardContent className="pt-0 space-y-4">
           {/* Name */}
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">名称</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 text-xs" />
-          </div>
+          {readOnly ? (
+            <DetailRow label="名称" value={criterion.name} />
+          ) : (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">名称</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 text-xs" />
+            </div>
+          )}
 
           {/* Type (read-only) */}
           <DetailRow
@@ -152,8 +159,31 @@ export function CriterionDetailPanel({
             value={<Badge variant="outline" className="text-xs font-normal">{typeLabel[criterion.type] ?? criterion.type}</Badge>}
           />
 
-          {/* Type-specific editable fields */}
-          {criterion.type === "preset" && (
+          {/* Type-specific fields */}
+          {readOnly && criterion.type === "preset" && (
+            <DetailRow label="指标" value={<code className="font-mono text-xs">{metric}</code>} />
+          )}
+          {readOnly && criterion.type === "regex" && (
+            <>
+              <DetailRow label="正则" value={<code className="font-mono text-xs">{pattern}</code>} />
+              <DetailRow label="匹配模式" value={matchMode === "exact" ? "完全匹配" : "包含匹配"} />
+            </>
+          )}
+          {readOnly && criterion.type === "script" && (
+            <>
+              <DetailRow label="脚本路径" value={<code className="font-mono text-xs">{scriptPath}</code>} />
+              {entrypoint && <DetailRow label="入口函数" value={<code className="font-mono text-xs">{entrypoint}</code>} />}
+            </>
+          )}
+          {readOnly && criterion.type === "llm_judge" && (
+            <>
+              {judgeModel && <DetailRow label="评判模型" value={judgeModel.name} />}
+              <DetailRow label="提示词" value={<span className="text-xs line-clamp-3">{judgePrompt}</span>} />
+            </>
+          )}
+
+          {/* Editable fields (only when not readOnly) */}
+          {!readOnly && criterion.type === "preset" && (
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">指标</Label>
               <Select value={metric} onValueChange={setMetric}>
@@ -169,7 +199,7 @@ export function CriterionDetailPanel({
             </div>
           )}
 
-          {criterion.type === "regex" && (
+          {!readOnly && criterion.type === "regex" && (
             <>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">正则表达式</Label>
@@ -190,7 +220,7 @@ export function CriterionDetailPanel({
             </>
           )}
 
-          {criterion.type === "script" && (
+          {!readOnly && criterion.type === "script" && (
             <>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">脚本路径</Label>
@@ -203,7 +233,7 @@ export function CriterionDetailPanel({
             </>
           )}
 
-          {criterion.type === "llm_judge" && (
+          {!readOnly && criterion.type === "llm_judge" && (
             <>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">评判模型</Label>
@@ -244,11 +274,13 @@ export function CriterionDetailPanel({
 
           {/* Actions */}
           <div className="flex gap-2 pt-1">
-            <Button size="sm" className="flex-1" onClick={handleSave} disabled={update.isPending}>
-              {update.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
-              保存
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => onTest(criterion.id)}>
+            {!readOnly && (
+              <Button size="sm" className="flex-1" onClick={handleSave} disabled={update.isPending}>
+                {update.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+                保存
+              </Button>
+            )}
+            <Button size="sm" variant="outline" className={readOnly ? "flex-1" : ""} onClick={() => onTest(criterion.id)}>
               <FlaskConical className="mr-1.5 h-3.5 w-3.5" />
               测试
             </Button>

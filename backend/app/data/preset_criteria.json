@@ -44,8 +44,8 @@
   {
     "name": "Pass@k (k=1)",
     "type": "preset",
-    "config_json": "{\"metric\": \"exact_match\"}",
-    "description": "代码生成 Pass@1 — 单次生成的通过率。配合重复次数 > 1 使用以计算 Pass@k"
+    "config_json": "{\"metric\": \"contains\"}",
+    "description": "代码生成 Pass@1 — 检查输出是否包含预期答案。配合重复次数 > 1 使用，结果汇总即为 Pass@k 通过率"
   },
   {
     "name": "LLM 评判 (LLM-as-a-Judge)",
