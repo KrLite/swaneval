@@ -13,6 +13,9 @@ function getBuildHash() {
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  turbopack: {
+    root: __dirname,
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
     NEXT_PUBLIC_BUILD_HASH: getBuildHash(),
