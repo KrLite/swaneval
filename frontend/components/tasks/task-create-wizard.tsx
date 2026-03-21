@@ -95,8 +95,13 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
 
   const canNext = () => {
     if (step === 0) return !!form.model_id;
-    if (step === 1)
-      return form.dataset_ids.length > 0 && form.criteria_ids.length > 0;
+    if (step === 1) {
+      if (form.dataset_ids.length === 0 || form.criteria_ids.length === 0) return false;
+      // Every dataset must have a prompt_field mapped
+      return form.dataset_ids.every(
+        (id) => !!form.field_mappings[id]?.prompt_field,
+      );
+    }
     if (step === 2) return !!form.name;
     if (step === 3) return true;
     return true;
@@ -643,9 +648,12 @@ function DatasetFieldMapping({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columns]);
 
+  const promptMissing = columns.length > 0 && !promptField;
+
   if (columns.length === 0) {
     return (
-      <div className="text-[11px] text-muted-foreground">
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" />
         {datasetName}: 加载字段中...
       </div>
     );
@@ -653,38 +661,50 @@ function DatasetFieldMapping({
 
   return (
     <div className="space-y-1.5">
-      <p className="text-[11px] font-medium">{datasetName}</p>
+      <p className="text-[11px] font-medium truncate">{datasetName}</p>
       <div className="grid grid-cols-2 gap-2">
-        <Select value={promptField} onValueChange={onPromptChange}>
-          <SelectTrigger className="h-7 text-[11px]">
-            <SelectValue placeholder="输入字段" />
-          </SelectTrigger>
-          <SelectContent>
-            {columns.map((col) => (
-              <SelectItem key={col} value={col}>
-                <span className="font-mono text-xs">{col}</span>
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">输入 (Prompt)</span>
+            <span className="text-[10px] text-destructive">*</span>
+          </div>
+          <Select value={promptField} onValueChange={onPromptChange}>
+            <SelectTrigger className={`h-7 text-[11px] font-mono ${promptMissing ? "border-destructive" : ""}`}>
+              <SelectValue placeholder="请选择" />
+            </SelectTrigger>
+            <SelectContent>
+              {columns.map((col) => (
+                <SelectItem key={col} value={col}>
+                  <span className="font-mono text-xs">{col}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {promptMissing && (
+            <p className="text-[9px] text-destructive">必须选择输入字段</p>
+          )}
+        </div>
+        <div className="space-y-0.5">
+          <span className="text-[10px] text-muted-foreground">预期输出 (Expected)</span>
+          <Select
+            value={expectedField || "__none__"}
+            onValueChange={(v) => onExpectedChange(v === "__none__" ? "" : v)}
+          >
+            <SelectTrigger className="h-7 text-[11px] font-mono">
+              <SelectValue placeholder="可选" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">
+                <span className="text-muted-foreground text-xs">无 (仅生成)</span>
               </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={expectedField || "__none__"}
-          onValueChange={(v) => onExpectedChange(v === "__none__" ? "" : v)}
-        >
-          <SelectTrigger className="h-7 text-[11px]">
-            <SelectValue placeholder="预期输出" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__">
-              <span className="text-muted-foreground text-xs">无</span>
-            </SelectItem>
-            {columns.map((col) => (
-              <SelectItem key={col} value={col}>
-                <span className="font-mono text-xs">{col}</span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              {columns.map((col) => (
+                <SelectItem key={col} value={col}>
+                  <span className="font-mono text-xs">{col}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </div>
   );
