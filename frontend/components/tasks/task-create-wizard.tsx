@@ -47,8 +47,7 @@ const emptyForm = {
   seed_strategy: "fixed",
   gpu_ids: "",
   env_vars: "",
-  prompt_field: "",
-  expected_field: "",
+  field_mappings: {} as Record<string, { prompt_field: string; expected_field: string }>,
 };
 
 interface TaskCreateWizardProps {
@@ -82,23 +81,17 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
   const selectedModelName =
     models.find((m) => m.id === form.model_id)?.name ?? "";
 
-  // Fetch preview of the first selected dataset to detect columns
-  const firstDatasetId = form.dataset_ids[0] ?? "";
-  const { data: previewData } = useDatasetPreview(firstDatasetId, !!firstDatasetId);
-  const datasetColumns = useMemo(() => {
-    if (!previewData?.rows?.length) return [];
-    return Object.keys(previewData.rows[0]);
-  }, [previewData]);
-
-  // Auto-detect field mapping when columns change
-  useEffect(() => {
-    if (datasetColumns.length === 0) return;
+  const updateFieldMapping = (
+    dsId: string, field: "prompt_field" | "expected_field", value: string,
+  ) => {
     setForm((f) => ({
       ...f,
-      prompt_field: f.prompt_field || autoDetectField(datasetColumns, PROMPT_FIELDS),
-      expected_field: f.expected_field || autoDetectField(datasetColumns, EXPECTED_FIELDS),
+      field_mappings: {
+        ...f.field_mappings,
+        [dsId]: { ...f.field_mappings[dsId], [field]: value },
+      },
     }));
-  }, [datasetColumns]);
+  };
 
   const canNext = () => {
     if (step === 0) return !!form.model_id;
@@ -115,8 +108,9 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
       max_tokens: parseInt(form.max_tokens),
     };
     if (form.limit) paramsObj.limit = parseInt(form.limit);
-    if (form.prompt_field) paramsObj.prompt_field = form.prompt_field;
-    if (form.expected_field) paramsObj.expected_field = form.expected_field;
+    if (Object.keys(form.field_mappings).length > 0) {
+      paramsObj.field_mappings = form.field_mappings;
+    }
     await createTask.mutateAsync({
       name: form.name,
       model_id: form.model_id,
@@ -246,51 +240,27 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
               </div>
             </PanelField>
 
-            {/* Field mapping — shown when datasets are selected */}
-            {form.dataset_ids.length > 0 && datasetColumns.length > 0 && (
-              <div className="rounded-lg border p-3 space-y-2.5">
+            {/* Per-dataset field mapping */}
+            {form.dataset_ids.length > 0 && (
+              <div className="rounded-lg border p-3 space-y-3">
                 <p className="text-xs font-medium text-muted-foreground">字段映射</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <PanelField label="输入字段 (Prompt)" required>
-                    <Select
-                      value={form.prompt_field}
-                      onValueChange={(v) => setForm({ ...form, prompt_field: v })}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="选择字段" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {datasetColumns.map((col) => (
-                          <SelectItem key={col} value={col}>
-                            <span className="font-mono">{col}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </PanelField>
-                  <PanelField label="预期输出字段 (Expected)">
-                    <Select
-                      value={form.expected_field || "__none__"}
-                      onValueChange={(v) => setForm({ ...form, expected_field: v === "__none__" ? "" : v })}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="选择字段（可选）" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">
-                          <span className="text-muted-foreground">无</span>
-                        </SelectItem>
-                        {datasetColumns.map((col) => (
-                          <SelectItem key={col} value={col}>
-                            <span className="font-mono">{col}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </PanelField>
-                </div>
+                {form.dataset_ids.map((dsId) => {
+                  const ds = datasets.find((d) => d.id === dsId);
+                  const mapping = form.field_mappings[dsId] ?? { prompt_field: "", expected_field: "" };
+                  return (
+                    <DatasetFieldMapping
+                      key={dsId}
+                      datasetId={dsId}
+                      datasetName={ds?.name ?? dsId}
+                      promptField={mapping.prompt_field}
+                      expectedField={mapping.expected_field}
+                      onPromptChange={(v) => updateFieldMapping(dsId, "prompt_field", v)}
+                      onExpectedChange={(v) => updateFieldMapping(dsId, "expected_field", v)}
+                    />
+                  );
+                })}
                 <p className="text-[10px] text-muted-foreground">
-                  已自动检测，可手动修改。输入字段将作为 Prompt 发送给模型，预期输出用于评分比较。
+                  每个数据集可独立配置字段映射。已自动检测，可手动修改。
                 </p>
               </div>
             )}
@@ -636,5 +606,86 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
         </div>
       </div>
     </>
+  );
+}
+
+/** Per-dataset field mapping with auto-detection */
+function DatasetFieldMapping({
+  datasetId,
+  datasetName,
+  promptField,
+  expectedField,
+  onPromptChange,
+  onExpectedChange,
+}: {
+  datasetId: string;
+  datasetName: string;
+  promptField: string;
+  expectedField: string;
+  onPromptChange: (v: string) => void;
+  onExpectedChange: (v: string) => void;
+}) {
+  const { data: preview } = useDatasetPreview(datasetId, true);
+  const columns = useMemo(() => {
+    if (!preview?.rows?.length) return [];
+    return Object.keys(preview.rows[0]);
+  }, [preview]);
+
+  // Auto-detect on first load
+  useEffect(() => {
+    if (columns.length === 0) return;
+    if (!promptField) {
+      onPromptChange(autoDetectField(columns, PROMPT_FIELDS));
+    }
+    if (!expectedField) {
+      onExpectedChange(autoDetectField(columns, EXPECTED_FIELDS));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columns]);
+
+  if (columns.length === 0) {
+    return (
+      <div className="text-[11px] text-muted-foreground">
+        {datasetName}: 加载字段中...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-medium">{datasetName}</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Select value={promptField} onValueChange={onPromptChange}>
+          <SelectTrigger className="h-7 text-[11px]">
+            <SelectValue placeholder="输入字段" />
+          </SelectTrigger>
+          <SelectContent>
+            {columns.map((col) => (
+              <SelectItem key={col} value={col}>
+                <span className="font-mono text-xs">{col}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={expectedField || "__none__"}
+          onValueChange={(v) => onExpectedChange(v === "__none__" ? "" : v)}
+        >
+          <SelectTrigger className="h-7 text-[11px]">
+            <SelectValue placeholder="预期输出" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">
+              <span className="text-muted-foreground text-xs">无</span>
+            </SelectItem>
+            {columns.map((col) => (
+              <SelectItem key={col} value={col}>
+                <span className="font-mono text-xs">{col}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
   );
 }

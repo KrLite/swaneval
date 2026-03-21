@@ -451,8 +451,10 @@ async def run_task(task_id: uuid.UUID):
                             )
                 return 0.0
 
-            prompt_key = params.get("prompt_field", "")
-            expected_key = params.get("expected_field", "")
+            # Per-dataset field mappings (new) or global fallback (legacy)
+            field_mappings: dict = params.get("field_mappings", {})
+            global_pk = params.get("prompt_field", "")
+            global_ek = params.get("expected_field", "")
             sem = asyncio.Semaphore(MAX_CRITERION_PARALLEL)
 
             async with httpx.AsyncClient(timeout=180.0) as client:
@@ -481,9 +483,15 @@ async def run_task(task_id: uuid.UUID):
                             )
                             return
 
+                        # Per-dataset or global field mapping
+                        ds_map = field_mappings.get(
+                            str(ds_id), {},
+                        )
+                        pk = ds_map.get("prompt_field") or global_pk
+                        ek = ds_map.get("expected_field") or global_ek
                         prompt = (
-                            str(row.get(prompt_key, ""))
-                            if prompt_key and prompt_key in row
+                            str(row.get(pk, ""))
+                            if pk and pk in row
                             else _extract_field(row, [
                                 "prompt", "instruction", "query",
                                 "input", "question", "text",
@@ -491,8 +499,8 @@ async def run_task(task_id: uuid.UUID):
                             ])
                         )
                         expected = (
-                            str(row.get(expected_key, ""))
-                            if expected_key and expected_key in row
+                            str(row.get(ek, ""))
+                            if ek and ek in row
                             else _extract_field(row, [
                                 "expected", "response", "output",
                                 "answer", "target", "label",
