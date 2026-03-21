@@ -42,3 +42,20 @@ def require_role(*roles: str):
         return current_user
 
     return Depends(dependency)
+
+
+def require_permission(*perms: str):
+    async def dependency(
+        current_user: User = Depends(get_current_user),
+        session: AsyncSession = Depends(get_db),
+    ):
+        from app.services.rbac import check_permission
+
+        if current_user.role == "admin":
+            return current_user
+        for p in perms:
+            if await check_permission(session, current_user, p):
+                return current_user
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Insufficient permissions")
+
+    return Depends(dependency)

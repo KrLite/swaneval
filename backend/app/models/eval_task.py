@@ -71,6 +71,11 @@ class EvalTask(SQLModel, table=True):
     env_vars: str = Field(default="")
     # 环境变量 JSON / Environment variables JSON (e.g. {"CUDA_VISIBLE_DEVICES": "0"})
 
+    cluster_id: uuid.UUID | None = Field(
+        default=None, foreign_key="compute_clusters.id",
+    )
+    # 计算集群ID / Compute cluster ID (foreign key to compute_clusters)
+
     created_by: uuid.UUID | None = Field(default=None, foreign_key="users.id")
     # 创建者ID / Creator user ID (foreign key to users)
 

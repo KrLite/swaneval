@@ -27,6 +27,8 @@ dependencies = [
     "openpyxl>=3.1.0",
     "python-docx>=1.1.0",
     "prometheus-client>=0.24.1",
+    "kubernetes>=35.0.0",
+    "cryptography>=46.0.5",
 ]
 
 [tool.ruff]

@@ -13,6 +13,7 @@ import {
   Ruler,
   LogOut,
   Users,
+  Server,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ const nav = [
   { href: "/criteria", label: "评估标准", icon: Ruler },
   { href: "/tasks", label: "评测任务", icon: PlayCircle },
   { href: "/results", label: "结果分析", icon: BarChart3 },
+  { href: "/clusters", label: "计算资源", icon: Server },
 ];
 
 const adminNav = { href: "/admin", label: "用户管理", icon: Users };

@@ -3,10 +3,12 @@ from fastapi import APIRouter
 from app.api.v1 import (
     auth,
     benchmarks,
+    clusters,
     criteria,
     datasets,
     metrics,
     models,
+    permissions,
     reports,
     results,
     tasks,
@@ -25,4 +27,6 @@ router.include_router(reports.router, prefix="/reports", tags=["reports"])
 router.include_router(benchmarks.router, prefix="/benchmarks", tags=["benchmarks"])
 router.include_router(users.router, prefix="/users", tags=["users"])
 router.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
+router.include_router(permissions.router, prefix="/permissions", tags=["permissions"])
+router.include_router(clusters.router, prefix="/clusters", tags=["clusters"])
 

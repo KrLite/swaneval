@@ -164,3 +164,49 @@ export interface TaskSummaryEntry {
   avg_latency_ms: number;
   avg_tokens: number;
 }
+
+export interface PermissionGroup {
+  id: string;
+  name: string;
+  description: string;
+  is_system: boolean;
+  permissions: string[];
+  member_count: number;
+}
+
+export interface ResourceAcl {
+  id: string;
+  resource_type: string;
+  resource_id: string;
+  grantee_type: string;
+  grantee_id: string;
+  access_level: string;
+}
+
+export interface ComputeCluster {
+  id: string;
+  name: string;
+  description: string;
+  api_server_url: string;
+  namespace: string;
+  status: string;
+  status_message: string;
+  gpu_count: number;
+  gpu_type: string;
+  gpu_available: number;
+  cpu_total_millicores: number;
+  memory_total_bytes: number;
+  node_count: number;
+  vllm_cache_ready: boolean;
+  last_probed_at: string | null;
+  created_at: string;
+}
+
+export interface ClusterNode {
+  name: string;
+  gpu_count: number;
+  gpu_type: string;
+  cpu_millicores: number;
+  memory_bytes: number;
+  status: string;
+}

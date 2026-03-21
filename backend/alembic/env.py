@@ -6,11 +6,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
+from alembic import context
 from app.config import settings
+
 # Import all models so metadata is populated
 from app.models import *  # noqa: F401, F403
 
