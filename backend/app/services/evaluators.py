@@ -1,12 +1,14 @@
 """Built-in evaluation functions for criteria types."""
 
-import importlib.util
-import inspect
 import json
 import math
+import os
 import re
+import shutil
+import subprocess
+import sys
+import tempfile
 from collections import Counter
-from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
@@ -155,44 +157,110 @@ def _extract_score_from_text(text: str) -> float:
     return max(0.0, min(1.0, score))
 
 
-def evaluate_script(config: dict, expected: str, actual: str) -> float:
-    script_path = (config.get("script_path") or "").strip()
-    entrypoint = (config.get("entrypoint") or "evaluate").strip()
-    if not script_path:
-        raise ValueError("script evaluator requires config.script_path")
+def evaluate_sandbox(config: dict, expected: str, actual: str) -> float:
+    """Dispatch to the correct sandbox mode."""
+    if not settings.SANDBOX_ALLOWED:
+        raise ValueError("Sandbox execution is disabled")
+    mode = config.get("mode", "pass_at_k")
+    if mode == "custom_script":
+        return evaluate_sandbox_custom(config, expected, actual)
+    return evaluate_sandbox_pass_at_k(expected, actual, config)
 
-    path = Path(script_path)
-    if not path.exists():
-        raise FileNotFoundError(f"script evaluator path not found: {script_path}")
 
-    module_name = f"criterion_script_{path.stem}_{abs(hash(str(path)))}"
-    spec = importlib.util.spec_from_file_location(module_name, str(path))
-    if spec is None or spec.loader is None:
-        raise ValueError(f"failed to load script module: {script_path}")
+def evaluate_sandbox_pass_at_k(
+    expected: str, actual: str, config: dict,
+) -> float:
+    """
+    Execute model-generated code with test cases in a sandboxed subprocess.
+    Returns 1.0 if all tests pass, 0.0 otherwise.
+    """
+    timeout = config.get("timeout", settings.SANDBOX_TIMEOUT_SECONDS)
+    tmp_dir = tempfile.mkdtemp(prefix="swaneval_sandbox_")
+    try:
+        # Combine model code + test cases into a runner script
+        runner = f"""\
+import sys
+sys.path.insert(0, '.')
 
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    if not hasattr(module, entrypoint):
-        raise AttributeError(f"entrypoint '{entrypoint}' not found in {script_path}")
+# ---- Model-generated code ----
+{actual}
 
-    func = getattr(module, entrypoint)
-    if not callable(func):
-        raise TypeError(f"entrypoint '{entrypoint}' is not callable")
+# ---- Test cases ----
+{expected}
+"""
+        runner_path = os.path.join(tmp_dir, "runner.py")
+        with open(runner_path, "w", encoding="utf-8") as f:
+            f.write(runner)
 
-    sig = inspect.signature(func)
-    kwargs = {}
-    if "expected" in sig.parameters:
-        kwargs["expected"] = expected
-    if "actual" in sig.parameters:
-        kwargs["actual"] = actual
-    if "config" in sig.parameters:
-        kwargs["config"] = config
+        # Execute in sandboxed subprocess
+        result = subprocess.run(
+            [sys.executable, runner_path],
+            capture_output=True,
+            timeout=timeout,
+            cwd=tmp_dir,
+            env={"PATH": os.path.dirname(sys.executable)},
+        )
+        return 1.0 if result.returncode == 0 else 0.0
+    except subprocess.TimeoutExpired:
+        return 0.0
+    except Exception:
+        return 0.0
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    if kwargs:
-        result = func(**kwargs)
-    else:
-        result = func(expected, actual)
-    return max(0.0, min(1.0, float(result)))
+
+def evaluate_sandbox_custom(
+    config: dict, expected: str, actual: str,
+) -> float:
+    """
+    Run a user-provided Python script in sandbox.
+    The script's entrypoint function receives (expected, actual)
+    and returns a float score.
+    """
+    script_path = config.get("script_path", "")
+    entrypoint = config.get("entrypoint", "evaluate")
+    timeout = config.get("timeout", settings.SANDBOX_TIMEOUT_SECONDS)
+
+    if not script_path or not os.path.exists(script_path):
+        raise ValueError(f"Sandbox script not found: {script_path}")
+
+    tmp_dir = tempfile.mkdtemp(prefix="swaneval_sandbox_")
+    try:
+        # Copy user script to sandbox
+        shutil.copy2(script_path, os.path.join(tmp_dir, "eval_script.py"))
+
+        # Write runner that calls the entrypoint
+        runner = f"""\
+import sys
+sys.path.insert(0, '.')
+from eval_script import {entrypoint}
+
+expected = {expected!r}
+actual = {actual!r}
+score = {entrypoint}(expected, actual)
+print(float(score))
+"""
+        runner_path = os.path.join(tmp_dir, "runner.py")
+        with open(runner_path, "w", encoding="utf-8") as f:
+            f.write(runner)
+
+        result = subprocess.run(
+            [sys.executable, runner_path],
+            capture_output=True,
+            timeout=timeout,
+            cwd=tmp_dir,
+            env={"PATH": os.path.dirname(sys.executable)},
+        )
+        if result.returncode != 0:
+            stderr = result.stderr.decode("utf-8", errors="replace")[:500]
+            raise ValueError(f"Script failed: {stderr}")
+
+        stdout = result.stdout.decode("utf-8", errors="replace").strip()
+        return max(0.0, min(1.0, float(stdout)))
+    except subprocess.TimeoutExpired:
+        raise ValueError(f"Script timed out after {timeout}s")
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 def evaluate_llm_judge(config: dict, expected: str, actual: str) -> float:
@@ -279,8 +347,8 @@ def run_criterion(criterion_type: str, config_json: str, expected: str, actual: 
             return 0.0
         return evaluate_regex(pattern, actual, config.get("extract_group", 0))
 
-    elif criterion_type == "script":
-        return evaluate_script(config, expected, actual)
+    elif criterion_type in ("sandbox", "script"):
+        return evaluate_sandbox(config, expected, actual)
 
     elif criterion_type == "llm_judge":
         return evaluate_llm_judge(config, expected, actual)

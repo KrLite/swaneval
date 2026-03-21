@@ -12,7 +12,7 @@ class CriterionType(str, enum.Enum):
     """评估标准类型枚举 / Evaluation criterion type enumeration"""
     preset = "preset"       # 预设指标 / Preset metric (exact_match, perplexity, bleu, rouge, etc)
     regex = "regex"         # 正则表达式匹配 / Regular expression matching
-    script = "script"       # 自定义脚本 / Custom evaluation script
+    sandbox = "sandbox"     # 沙箱执行 / Sandboxed code execution
     llm_judge = "llm_judge" # LLM作为评判者 / LLM-as-a-judge evaluation
 
 

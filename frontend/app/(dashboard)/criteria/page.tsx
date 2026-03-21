@@ -67,7 +67,7 @@ import { CriterionCreateForm } from "@/components/criteria/criterion-create-form
 const typeLabel: Record<string, string> = {
   preset: "预设指标",
   regex: "正则",
-  script: "脚本",
+  sandbox: "沙箱执行",
   llm_judge: "LLM 评判",
 };
 
@@ -76,7 +76,7 @@ function configSummary(configJson: string, type: string): string {
     const cfg = JSON.parse(configJson);
     if (type === "preset") return cfg.metric;
     if (type === "regex") return cfg.pattern;
-    if (type === "script") return cfg.script_path;
+    if (type === "sandbox") return cfg.mode === "custom_script" ? cfg.script_path : cfg.mode;
     if (type === "llm_judge") return cfg.system_prompt ? "自定义评判" : "LLM Judge";
     return configJson;
   } catch {

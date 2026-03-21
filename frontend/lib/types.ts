@@ -43,7 +43,7 @@ export interface Dataset {
 export interface Criterion {
   id: string;
   name: string;
-  type: "preset" | "regex" | "script" | "llm_judge";
+  type: "preset" | "regex" | "sandbox" | "llm_judge";
   config_json: string;
   created_at: string;
 }

@@ -20,7 +20,7 @@ import { useModels } from "@/lib/hooks/use-models";
 const typeDescriptions: Record<string, string> = {
   preset: "使用内置指标，如精确匹配、包含匹配或数值接近度。",
   regex: "使用正则表达式匹配模型输出。",
-  script: "运行服务器上的 Python 脚本评估模型输出。脚本需包含一个评估函数，接收 expected 和 actual 参数，返回 0-1 之间的浮点数。",
+  sandbox: "在安全沙箱中执行代码并验证结果。支持 Pass@k 代码评测和自定义评估脚本。",
   llm_judge: "使用另一个大语言模型评判响应质量。",
 };
 
@@ -39,9 +39,10 @@ const emptyForm = {
   type: "preset",
   metric: "exact_match",
   pattern: "",
-  script_path: "",
-  entrypoint: "",
-  script_args: "",
+  sandbox_mode: "pass_at_k",
+  sandbox_timeout: "10",
+  sandbox_script_path: "",
+  sandbox_entrypoint: "evaluate",
   judge_prompt: "",
   judge_model_id: "",
 };
@@ -72,9 +73,10 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
         type: data.type ?? f.type,
         metric: cfg.metric ?? f.metric,
         pattern: cfg.pattern ?? f.pattern,
-        script_path: cfg.script_path ?? f.script_path,
-        script_args: f.script_args,
-        entrypoint: cfg.entrypoint ?? f.entrypoint,
+        sandbox_mode: cfg.mode ?? f.sandbox_mode,
+        sandbox_timeout: String(cfg.timeout ?? f.sandbox_timeout),
+        sandbox_script_path: cfg.script_path ?? f.sandbox_script_path,
+        sandbox_entrypoint: cfg.entrypoint ?? f.sandbox_entrypoint,
         judge_prompt: cfg.system_prompt ?? f.judge_prompt,
         judge_model_id: cfg.judge_model_id ?? f.judge_model_id,
       }));
@@ -88,15 +90,14 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
     if (form.type === "preset") config = { metric: form.metric };
     else if (form.type === "regex")
       config = { pattern: form.pattern, match_mode: "contains" };
-    else if (form.type === "script") {
+    else if (form.type === "sandbox") {
       config = {
-        script_path: form.script_path,
-        entrypoint: form.entrypoint,
+        mode: form.sandbox_mode,
+        timeout: parseInt(form.sandbox_timeout) || 10,
       };
-      if (form.script_args.trim()) {
-        try {
-          config = { ...config, ...JSON.parse(form.script_args) };
-        } catch { /* ignore invalid JSON in extra args */ }
+      if (form.sandbox_mode === "custom_script") {
+        config.script_path = form.sandbox_script_path;
+        config.entrypoint = form.sandbox_entrypoint || "evaluate";
       }
     }
     else if (form.type === "llm_judge")
@@ -140,7 +141,7 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
               <SelectContent>
                 <SelectItem value="preset">预设指标</SelectItem>
                 <SelectItem value="regex">正则表达式</SelectItem>
-                <SelectItem value="script">自定义脚本</SelectItem>
+                <SelectItem value="sandbox">沙箱执行</SelectItem>
                 <SelectItem value="llm_judge">LLM 评判</SelectItem>
               </SelectContent>
             </Select>
@@ -192,62 +193,70 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
           </PanelField>
         )}
 
-        {form.type === "script" && (
+        {form.type === "sandbox" && (
           <>
-            <PanelField label="脚本路径" required>
-              <Input
-                value={form.script_path}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    script_path: e.target.value,
-                  })
-                }
-                placeholder="/path/to/eval_script.py"
-                className="font-mono"
-                required
-              />
-            </PanelField>
-            <PanelField label="入口函数">
-              <Input
-                value={form.entrypoint}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    entrypoint: e.target.value,
-                  })
-                }
-                placeholder="evaluate"
-                className="font-mono"
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                默认为 evaluate。留空使用默认值。
-              </p>
-            </PanelField>
-            <PanelField label="额外参数 (JSON)">
-              <Input
-                value={form.script_args}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    script_args: e.target.value,
-                  })
-                }
-                placeholder='{"threshold": 0.8}'
-                className="font-mono"
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                可选。将作为 config 参数传入脚本函数。
-              </p>
-            </PanelField>
-            <div className="rounded-md bg-muted p-2.5 text-[11px] font-mono text-muted-foreground space-y-0.5">
-              <p className="text-foreground/70 font-sans text-xs font-medium mb-1">
-                脚本函数签名示例
-              </p>
-              <p>def evaluate(expected, actual, config=None):</p>
-              <p>    # 返回 0.0 - 1.0 之间的浮点数</p>
-              <p>    return 1.0 if expected in actual else 0.0</p>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">执行模式</Label>
+              <div className="space-y-1.5">
+                {[
+                  { value: "pass_at_k", label: "Pass@k 代码评测", desc: "将模型生成的代码与测试用例组合执行" },
+                  { value: "custom_script", label: "自定义评估脚本", desc: "运行服务器上的 Python 脚本评估输出" },
+                ].map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setForm({ ...form, sandbox_mode: m.value })}
+                    className={`w-full rounded-md border p-2.5 text-left transition-colors ${
+                      form.sandbox_mode === m.value
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "hover:bg-muted"
+                    }`}
+                  >
+                    <p className="text-sm font-medium">{m.label}</p>
+                    <p className="text-xs text-muted-foreground">{m.desc}</p>
+                  </button>
+                ))}
+              </div>
             </div>
+            <PanelField label="超时时间 (秒)">
+              <Input
+                type="number"
+                value={form.sandbox_timeout}
+                onChange={(e) => setForm({ ...form, sandbox_timeout: e.target.value })}
+                placeholder="10"
+                className="font-mono"
+              />
+            </PanelField>
+            {form.sandbox_mode === "custom_script" && (
+              <>
+                <PanelField label="脚本路径" required>
+                  <Input
+                    value={form.sandbox_script_path}
+                    onChange={(e) => setForm({ ...form, sandbox_script_path: e.target.value })}
+                    placeholder="/path/to/eval_script.py"
+                    className="font-mono"
+                    required
+                  />
+                </PanelField>
+                <PanelField label="入口函数">
+                  <Input
+                    value={form.sandbox_entrypoint}
+                    onChange={(e) => setForm({ ...form, sandbox_entrypoint: e.target.value })}
+                    placeholder="evaluate"
+                    className="font-mono"
+                  />
+                </PanelField>
+              </>
+            )}
+            {form.sandbox_mode === "pass_at_k" && (
+              <div className="rounded-md bg-muted p-2.5 text-[11px] font-mono text-muted-foreground space-y-0.5">
+                <p className="text-foreground/70 font-sans text-xs font-medium mb-1">执行流程</p>
+                <p>1. 模型生成的代码写入 solution.py</p>
+                <p>2. 预期输出中的测试断言追加到末尾</p>
+                <p>3. 在沙箱子进程中执行</p>
+                <p>4. 退出码 0 = 通过 (1.0)，否则 = 失败 (0.0)</p>
+              </div>
+            )}
           </>
         )}
 

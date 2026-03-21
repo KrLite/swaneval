@@ -23,7 +23,7 @@ import { formatTime } from "@/lib/time";
 const typeLabel: Record<string, string> = {
   preset: "预设指标",
   regex: "正则",
-  script: "脚本",
+  sandbox: "沙箱执行",
   llm_judge: "LLM 评判",
 };
 
@@ -72,8 +72,10 @@ export function CriterionDetailPanel({
   const [metric, setMetric] = useState(String(parsedCfg.metric ?? "exact_match"));
   const [pattern, setPattern] = useState(String(parsedCfg.pattern ?? ""));
   const [matchMode, setMatchMode] = useState(String(parsedCfg.match_mode ?? "contains"));
-  const [scriptPath, setScriptPath] = useState(String(parsedCfg.script_path ?? ""));
-  const [entrypoint, setEntrypoint] = useState(String(parsedCfg.entrypoint ?? ""));
+  const [sandboxMode, setSandboxMode] = useState(String(parsedCfg.mode ?? "pass_at_k"));
+  const [sandboxTimeout, setSandboxTimeout] = useState(String(parsedCfg.timeout ?? "10"));
+  const [sandboxScriptPath, setSandboxScriptPath] = useState(String(parsedCfg.script_path ?? ""));
+  const [sandboxEntrypoint, setSandboxEntrypoint] = useState(String(parsedCfg.entrypoint ?? "evaluate"));
   const [judgePrompt, setJudgePrompt] = useState(String(parsedCfg.system_prompt ?? ""));
   const [judgeModelId, setJudgeModelId] = useState(String(parsedCfg.judge_model_id ?? ""));
 
@@ -90,8 +92,10 @@ export function CriterionDetailPanel({
     setMetric(String(cfg.metric ?? "exact_match"));
     setPattern(String(cfg.pattern ?? ""));
     setMatchMode(String(cfg.match_mode ?? "contains"));
-    setScriptPath(String(cfg.script_path ?? ""));
-    setEntrypoint(String(cfg.entrypoint ?? ""));
+    setSandboxMode(String(cfg.mode ?? "pass_at_k"));
+    setSandboxTimeout(String(cfg.timeout ?? "10"));
+    setSandboxScriptPath(String(cfg.script_path ?? ""));
+    setSandboxEntrypoint(String(cfg.entrypoint ?? "evaluate"));
     setJudgePrompt(String(cfg.system_prompt ?? ""));
     setJudgeModelId(String(cfg.judge_model_id ?? ""));
     setError("");
@@ -101,9 +105,15 @@ export function CriterionDetailPanel({
   const buildConfigJson = (): string => {
     if (criterion.type === "preset") return JSON.stringify({ metric });
     if (criterion.type === "regex") return JSON.stringify({ pattern, match_mode: matchMode });
-    if (criterion.type === "script") {
-      const cfg: Record<string, string> = { script_path: scriptPath };
-      if (entrypoint) cfg.entrypoint = entrypoint;
+    if (criterion.type === "sandbox") {
+      const cfg: Record<string, unknown> = {
+        mode: sandboxMode,
+        timeout: parseInt(sandboxTimeout) || 10,
+      };
+      if (sandboxMode === "custom_script") {
+        cfg.script_path = sandboxScriptPath;
+        if (sandboxEntrypoint) cfg.entrypoint = sandboxEntrypoint;
+      }
       return JSON.stringify(cfg);
     }
     if (criterion.type === "llm_judge") {
@@ -169,10 +179,13 @@ export function CriterionDetailPanel({
               <DetailRow label="匹配模式" value={matchMode === "exact" ? "完全匹配" : "包含匹配"} />
             </>
           )}
-          {readOnly && criterion.type === "script" && (
+          {readOnly && criterion.type === "sandbox" && (
             <>
-              <DetailRow label="脚本路径" value={<code className="font-mono text-xs">{scriptPath}</code>} />
-              {entrypoint && <DetailRow label="入口函数" value={<code className="font-mono text-xs">{entrypoint}</code>} />}
+              <DetailRow label="执行模式" value={sandboxMode === "pass_at_k" ? "Pass@k 代码评测" : "自定义脚本"} />
+              <DetailRow label="超时时间" value={<code className="font-mono text-xs">{sandboxTimeout}s</code>} />
+              {sandboxMode === "custom_script" && sandboxScriptPath && (
+                <DetailRow label="脚本路径" value={<code className="font-mono text-xs">{sandboxScriptPath}</code>} />
+              )}
             </>
           )}
           {readOnly && criterion.type === "llm_judge" && (
@@ -220,16 +233,36 @@ export function CriterionDetailPanel({
             </>
           )}
 
-          {!readOnly && criterion.type === "script" && (
+          {!readOnly && criterion.type === "sandbox" && (
             <>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">脚本路径</Label>
-                <Input value={scriptPath} onChange={(e) => setScriptPath(e.target.value)} className="h-8 text-xs font-mono" placeholder="/path/to/eval.py" />
+                <Label className="text-xs text-muted-foreground">执行模式</Label>
+                <Select value={sandboxMode} onValueChange={setSandboxMode}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pass_at_k">Pass@k 代码评测</SelectItem>
+                    <SelectItem value="custom_script">自定义评估脚本</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">入口函数</Label>
-                <Input value={entrypoint} onChange={(e) => setEntrypoint(e.target.value)} className="h-8 text-xs font-mono" placeholder="evaluate" />
+                <Label className="text-xs text-muted-foreground">超时时间 (秒)</Label>
+                <Input type="number" value={sandboxTimeout} onChange={(e) => setSandboxTimeout(e.target.value)} className="h-8 text-xs font-mono" placeholder="10" />
               </div>
+              {sandboxMode === "custom_script" && (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">脚本路径</Label>
+                    <Input value={sandboxScriptPath} onChange={(e) => setSandboxScriptPath(e.target.value)} className="h-8 text-xs font-mono" placeholder="/path/to/eval_script.py" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">入口函数</Label>
+                    <Input value={sandboxEntrypoint} onChange={(e) => setSandboxEntrypoint(e.target.value)} className="h-8 text-xs font-mono" placeholder="evaluate" />
+                  </div>
+                </>
+              )}
             </>
           )}
 

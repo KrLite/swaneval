@@ -42,12 +42,6 @@
     "description": "基于字符 n-gram 的余弦相似度，衡量文本整体相似程度"
   },
   {
-    "name": "Pass@k (k=1)",
-    "type": "preset",
-    "config_json": "{\"metric\": \"contains\"}",
-    "description": "代码生成 Pass@1 — 检查输出是否包含预期答案。配合重复次数 > 1 使用，结果汇总即为 Pass@k 通过率"
-  },
-  {
     "name": "LLM 评判 (LLM-as-a-Judge)",
     "type": "llm_judge",
     "config_json": "{\"system_prompt\": \"你是一个严格的评估专家。请根据预期答案与实际输出的匹配程度，给出 0 到 1 之间的评分。只返回一个数字。\"}",
