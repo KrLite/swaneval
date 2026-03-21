@@ -104,7 +104,8 @@ export default function TaskDetailPage() {
     }
   })();
 
-  const chartData = summary.map((s) => ({
+  const summaryArr = Array.isArray(summary) ? summary : [];
+  const chartData = summaryArr.map((s) => ({
     name: s.criterion_name,
     score: s.avg_score,
     latency: s.avg_latency_ms,
@@ -276,7 +277,7 @@ export default function TaskDetailPage() {
         </TabsList>
 
         <TabsContent value="summary" className="space-y-4">
-          {summary.length === 0 ? (
+          {summaryArr.length === 0 ? (
             <Card>
               <CardContent className="p-0">
                 {task.status === "running" || task.status === "pending" ? (
@@ -340,7 +341,7 @@ export default function TaskDetailPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {summary.map((s) => (
+                      {summaryArr.map((s) => (
                         <TableRow key={s.criterion_id}>
                           <TableCell className="font-medium">
                             {s.criterion_name}

@@ -272,13 +272,18 @@ async def _load_via_datasets_lib(
     if effective_token:
         kwargs["token"] = effective_token
 
-    ds = load_dataset(**kwargs)
+    import asyncio
+
+    def _blocking_load():
+        d = load_dataset(**kwargs)
+        lines = []
+        for item in d:
+            lines.append(json.dumps(dict(item), ensure_ascii=False, default=str))
+        return lines
+
+    lines = await asyncio.to_thread(_blocking_load)
     file_id = uuid.uuid4()
     key = f"uploads/{file_id}.jsonl"
-
-    lines = []
-    for item in ds:
-        lines.append(json.dumps(dict(item), ensure_ascii=False))
     content_bytes = "\n".join(lines).encode("utf-8")
     uri = await storage.write_file(key, content_bytes)
     return uri, len(lines), len(content_bytes)

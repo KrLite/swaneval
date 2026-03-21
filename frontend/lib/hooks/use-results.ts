@@ -31,10 +31,15 @@ export function useTaskSummary(taskId: string, refetchInterval?: number | false)
   return useQuery({
     queryKey: ["results", "summary", taskId],
     queryFn: async () => {
-      const res = await api.get<TaskSummaryEntry[]>("/results/summary", {
+      const res = await api.get<
+        { criteria: TaskSummaryEntry[]; error_count: number } | TaskSummaryEntry[]
+      >("/results/summary", {
         params: { task_id: taskId },
       });
-      return res.data;
+      // Backend returns {criteria: [...], error_count} — normalize
+      const data = res.data;
+      if (Array.isArray(data)) return data;
+      return data.criteria ?? [];
     },
     enabled: !!taskId,
     refetchInterval,
