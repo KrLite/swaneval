@@ -7,7 +7,7 @@ import os
 import random
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -309,14 +309,23 @@ async def run_task(task_id: uuid.UUID):
                 pass
 
         task.status = TaskStatus.running
-        task.started_at = datetime.utcnow()
+        task.started_at = datetime.now(timezone.utc)
         session.add(task)
         await session.commit()
+        logger.info(
+            "Task %s STARTED — model=%s, datasets=%d, criteria=%d, repeat=%d",
+            task_id, snapshot_model_id, len(snapshot_dataset_ids),
+            len(snapshot_criteria_ids), snapshot_repeat_count,
+        )
 
         try:
             model = await session.get(LLMModel, snapshot_model_id)
             if not model:
                 raise ValueError(f"Model {snapshot_model_id} not found")
+            logger.info(
+                "Task %s using model '%s' (%s @ %s)",
+                task_id, model.name, model.model_name, model.endpoint_url,
+            )
 
             dataset_ids = snapshot_dataset_ids
             criteria_ids = snapshot_criteria_ids
@@ -334,7 +343,7 @@ async def run_task(task_id: uuid.UUID):
                     params=params,
                 )
                 task.status = TaskStatus.completed
-                task.finished_at = datetime.utcnow()
+                task.finished_at = datetime.now(timezone.utc)
                 session.add(task)
                 await session.commit()
                 return
@@ -344,10 +353,13 @@ async def run_task(task_id: uuid.UUID):
             for ds_id in dataset_ids:
                 ds = await session.get(Dataset, ds_id)
                 if not ds:
+                    logger.warning("Task %s: dataset %s not found, skipping", task_id, ds_id)
                     continue
                 rows = await _load_dataset_rows(storage, ds.source_uri)
+                logger.info("Task %s: loaded %d rows from '%s'", task_id, len(rows), ds.name)
                 for row in rows:
                     all_rows.append((ds_id, row))
+            logger.info("Task %s: total %d prompt rows to evaluate", task_id, len(all_rows))
 
             # Load criteria
             criteria: list[Criterion] = []
@@ -375,6 +387,11 @@ async def run_task(task_id: uuid.UUID):
 
             if not criteria:
                 raise ValueError("No valid criteria found")
+            logger.info(
+                "Task %s: %d criteria loaded — %s",
+                task_id, len(criteria),
+                ", ".join(c.name for c in criteria),
+            )
 
             # Create subtasks
             subtasks: list[EvalSubtask] = []
@@ -389,6 +406,10 @@ async def run_task(task_id: uuid.UUID):
             await session.commit()
             for st in subtasks:
                 await session.refresh(st)
+            logger.info(
+                "Task %s: created %d subtask(s), starting evaluation",
+                task_id, len(subtasks),
+            )
 
             # Run evaluation
             async with httpx.AsyncClient() as client:
@@ -428,6 +449,14 @@ async def run_task(task_id: uuid.UUID):
                         output, latency, first_token, tokens = (
                             await _call_model(client, model, prompt, run_params)
                         )
+                        idx = subtask.last_completed_index
+                        if idx % 10 == 0 or idx == 0:
+                            logger.info(
+                                "Task %s run %d: prompt %d/%d — %.0fms, %d tokens",
+                                task_id, run_idx + 1,
+                                subtask.last_completed_index + 1, len(all_rows),
+                                latency, tokens,
+                            )
 
                         for criterion in criteria:
                             cid = str(criterion.id)
@@ -465,9 +494,18 @@ async def run_task(task_id: uuid.UUID):
                     subtask.progress_pct = 100.0
                     session.add(subtask)
                     await session.commit()
+                    logger.info(
+                        "Task %s run %d: COMPLETED (%d prompts)",
+                        task_id, run_idx + 1, len(all_rows),
+                    )
 
             task.status = TaskStatus.completed
-            task.finished_at = datetime.utcnow()
+            task.finished_at = datetime.now(timezone.utc)
+            elapsed = (task.finished_at - task.started_at).total_seconds()
+            logger.info(
+                "Task %s COMPLETED in %.1fs — %d runs × %d prompts × %d criteria",
+                task_id, elapsed, len(subtasks), len(all_rows), len(criteria),
+            )
 
         except Exception as e:
             logger.exception("Task %s failed: %s", task_id, e)

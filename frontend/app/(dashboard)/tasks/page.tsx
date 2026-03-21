@@ -39,6 +39,7 @@ import { useCriteria } from "@/lib/hooks/use-criteria";
 import type { EvalTask } from "@/lib/types";
 import { utc, extractErrorDetail } from "@/lib/utils";
 import { PageHeader, SearchToolbar } from "@/components/page-header";
+import { CopyButton } from "@/components/copy-button";
 import { FilterDropdown } from "@/components/filter-dropdown";
 import { CreateModal } from "@/components/create-modal";
 import { SelectionBar } from "@/components/selection-bar";
@@ -298,9 +299,22 @@ export default function TasksPage() {
                       <TableCell className="py-2.5">
                         <div className="flex items-center justify-end gap-0.5">
                           <div
-                            className="opacity-0 group-hover/row:opacity-100 transition-opacity"
+                            className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity"
                             onClick={(e) => e.stopPropagation()}
                           >
+                            <CopyButton
+                              text={JSON.stringify({
+                                name: row.original.name,
+                                model_id: row.original.model_id,
+                                dataset_ids: row.original.dataset_ids,
+                                criteria_ids: row.original.criteria_ids,
+                                params_json: row.original.params_json,
+                                repeat_count: row.original.repeat_count,
+                                seed_strategy: row.original.seed_strategy,
+                                gpu_ids: row.original.gpu_ids,
+                                env_vars: row.original.env_vars,
+                              }, null, 2)}
+                            />
                             <Button
                               variant="ghost"
                               size="icon"

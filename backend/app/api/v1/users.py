@@ -1,7 +1,7 @@
 """User management API (admin only)."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select
@@ -58,7 +58,7 @@ async def update_user(
                 "Cannot deactivate admin",
             )
         user.is_active = body.is_active
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     session.add(user)
     await session.commit()
     await session.refresh(user)

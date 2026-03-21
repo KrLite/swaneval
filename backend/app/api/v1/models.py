@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -91,7 +91,7 @@ async def update_model(
     if body.max_tokens is not None:
         m.max_tokens = body.max_tokens
 
-    m.updated_at = datetime.utcnow()
+    m.updated_at = datetime.now(timezone.utc)
     session.add(m)
     await session.commit()
     await session.refresh(m)

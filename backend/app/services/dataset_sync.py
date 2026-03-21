@@ -8,7 +8,7 @@ Periodically check subscribed datasets for updates and auto-download new version
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -61,7 +61,7 @@ async def check_and_sync_dataset(dataset_id) -> str:
                 latest_sha = await asyncio.to_thread(_get_hf_latest_sha, hf_id)
                 if latest_sha and latest_sha == ds.hf_last_sha:
                     ds.sync_status = "synced"
-                    ds.last_synced_at = datetime.utcnow()
+                    ds.last_synced_at = datetime.now(timezone.utc)
                     session.add(ds)
                     await session.commit()
                     return "up_to_date"
@@ -88,7 +88,7 @@ async def check_and_sync_dataset(dataset_id) -> str:
             # Check if content actually changed (compare row count + size)
             if row_count == ds.row_count and size_bytes == ds.size_bytes:
                 ds.sync_status = "synced"
-                ds.last_synced_at = datetime.utcnow()
+                ds.last_synced_at = datetime.now(timezone.utc)
                 ds.hf_last_sha = new_sha
                 session.add(ds)
                 await session.commit()
@@ -101,8 +101,8 @@ async def check_and_sync_dataset(dataset_id) -> str:
             ds.size_bytes = size_bytes
             ds.version = new_version
             ds.sync_status = "synced"
-            ds.last_synced_at = datetime.utcnow()
-            ds.updated_at = datetime.utcnow()
+            ds.last_synced_at = datetime.now(timezone.utc)
+            ds.updated_at = datetime.now(timezone.utc)
             ds.hf_last_sha = new_sha
             session.add(ds)
 
@@ -125,7 +125,7 @@ async def check_and_sync_dataset(dataset_id) -> str:
         except Exception as e:
             logger.error("Failed to sync dataset %s: %s", ds.name, e)
             ds.sync_status = "failed"
-            ds.last_synced_at = datetime.utcnow()
+            ds.last_synced_at = datetime.now(timezone.utc)
             session.add(ds)
             await session.commit()
             return f"failed:{e}"
@@ -139,7 +139,7 @@ async def run_sync_cycle():
         )
         datasets = result.all()
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for ds in datasets:
         # Skip if checked recently (within interval)
         if ds.last_synced_at:

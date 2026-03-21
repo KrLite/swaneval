@@ -1,7 +1,7 @@
 """Report generator service for SwanEVAL."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import func as sa_func
 from sqlmodel import select
@@ -63,7 +63,7 @@ async def generate_performance_report(
     return {
         "type": "performance",
         "title": f"性能评测报告 — {task.name}",
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "task_name": task.name,
         "model_name": model.name if model else "Unknown",
         "overall_score": (
@@ -126,7 +126,7 @@ async def generate_safety_report(
     return {
         "type": "safety",
         "title": f"安全评测报告 — {task.name}",
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "task_name": task.name,
         "model_name": model.name if model else "Unknown",
         "total_samples": total,
@@ -191,7 +191,7 @@ async def generate_cost_report(
     return {
         "type": "cost",
         "title": f"成本评测报告 — {task.name}",
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "task_name": task.name,
         "model_name": model.name if model else "Unknown",
         "gpu_ids": task.gpu_ids if task.gpu_ids else "未指定",
@@ -228,7 +228,7 @@ async def generate_value_report(
     return {
         "type": "value",
         "title": f"性价比评测报告 — {perf['task_name']}",
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "task_name": perf["task_name"],
         "model_name": perf["model_name"],
         "overall_score": avg_score,
