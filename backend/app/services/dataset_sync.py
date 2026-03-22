@@ -30,7 +30,8 @@ def _get_hf_latest_sha(dataset_id: str) -> str | None:
         from huggingface_hub import repo_info
         info = repo_info(dataset_id, repo_type="dataset")
         return info.sha
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to get HF SHA for %s: %s", dataset_id, e)
         return None
 
 

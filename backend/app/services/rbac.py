@@ -1,6 +1,7 @@
 """RBAC permission checking service."""
 
 import json
+import logging
 import uuid as uuid_mod
 
 from sqlmodel import select
@@ -12,6 +13,8 @@ from app.models.permission import (
     UserGroupMembership,
 )
 from app.models.user import User, UserRole
+
+logger = logging.getLogger(__name__)
 
 # All available permissions
 ALL_PERMISSIONS = [
@@ -70,8 +73,8 @@ async def get_user_permissions(session: AsyncSession, user: User) -> set[str]:
     for row in result.all():
         try:
             perms.update(json.loads(row))
-        except (json.JSONDecodeError, TypeError):
-            pass
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error("Corrupt permissions_json in group, skipping: %s", e)
     return perms
 
 

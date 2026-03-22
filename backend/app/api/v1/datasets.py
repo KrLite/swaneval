@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import logging
 import os
 import time
 import uuid
@@ -48,6 +49,8 @@ def _cleanup_preflight_cache() -> None:
     ]
     for k in expired:
         _preflight_cache.pop(k, None)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -895,8 +898,9 @@ async def preview_version(
 
     try:
         df = await _load_dataframe(storage, dv.file_path)
-    except Exception:
-        return {"rows": [], "total": 0}
+    except Exception as e:
+        logger.error("Preview failed for version %s: %s", dv.id, e)
+        raise HTTPException(500, detail=f"Failed to load dataset preview: {e}")
 
     rows = df.head(limit).fillna("").to_dict(orient="records")
     return {"rows": rows, "total": len(df)}

@@ -230,7 +230,7 @@ async def _store_downloaded_file(
 
 
 def _count_rows(content: bytes, ext: str) -> int:
-    """Count rows in downloaded data."""
+    """Count rows in downloaded data. Returns -1 if estimation fails."""
     try:
         if ext == ".parquet":
             import io
@@ -245,8 +245,9 @@ def _count_rows(content: bytes, ext: str) -> int:
             return max(0, text.count("\n") - 1)
         # .jsonl or unknown
         return sum(1 for line in text.splitlines() if line.strip())
-    except Exception:
-        return 0
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
+        logger.warning("Row count estimation failed for %s file: %s", ext, e)
+        return -1
 
 
 async def _load_via_datasets_lib(

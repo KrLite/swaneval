@@ -5,10 +5,13 @@ Removes TOCTOU anti-pattern: reads directly, handles errors.
 """
 
 import asyncio
+import logging
 from pathlib import Path
 
 from app.services.storage.base import StorageBackend
 from app.services.storage.utils import uri_to_key
+
+logger = logging.getLogger(__name__)
 
 
 async def read_bytes(
@@ -23,8 +26,11 @@ async def read_bytes(
     if key is not None:
         try:
             return await storage.read_file(key)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "Storage backend read failed for key=%s, falling back to local: %s",
+                key, e,
+            )
     p = Path(source_uri)
     try:
         return await asyncio.to_thread(p.read_bytes)
@@ -44,8 +50,11 @@ async def read_text(
     if key is not None:
         try:
             return await storage.read_text(key)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "Storage backend read failed for key=%s, falling back to local: %s",
+                key, e,
+            )
     p = Path(source_uri)
     try:
         return await asyncio.to_thread(p.read_text, encoding="utf-8")

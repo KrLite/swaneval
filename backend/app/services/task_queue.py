@@ -39,16 +39,23 @@ async def close_pool() -> None:
         _pool = None
 
 
-async def enqueue_task(task_id: str, execution_backend: str = "external_api") -> None:
+async def enqueue_task(
+    task_id: str,
+    execution_backend: str = "external_api",
+    cluster_id: str | None = None,
+) -> None:
     """Push a task onto the persistent queue."""
     r = _get_redis()
-    payload = json.dumps({
+    payload_dict: dict = {
         "task_id": task_id,
         "execution_backend": execution_backend,
         "enqueued_at": datetime.now(timezone.utc).isoformat(),
-    })
+    }
+    if cluster_id:
+        payload_dict["cluster_id"] = cluster_id
+    payload = json.dumps(payload_dict)
     await r.rpush(QUEUE_KEY, payload)
-    logger.info("Task %s enqueued (backend=%s)", task_id, execution_backend)
+    logger.info("Task %s enqueued (backend=%s, cluster=%s)", task_id, execution_backend, cluster_id)
 
 
 async def dequeue_task(timeout: int = 5) -> dict | None:

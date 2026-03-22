@@ -7,11 +7,14 @@ into EvalScope TaskConfig + run_task, while keeping the existing backend API.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from app.services.storage.base import StorageBackend
 from app.services.storage.utils import uri_to_key
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from app.models.dataset import Dataset
@@ -157,15 +160,20 @@ async def extract_primary_score(
     """Extract one representative score from EvalScope reports directory."""
     reports_prefix = f"{work_dir_key}/reports"
     files = await storage.list_files(reports_prefix, patterns=["*.json"])
+    any_valid_report = False
     for f in files:
         try:
             text = await storage.read_text(f)
             data = json.loads(text)
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to parse report file %s: %s", f, e)
             continue
+        any_valid_report = True
         score = _find_numeric_score(data)
         if score is not None:
             return float(score)
+    if not any_valid_report and files:
+        logger.error("No valid report files found in %s", work_dir_key)
     return 0.0
 
 

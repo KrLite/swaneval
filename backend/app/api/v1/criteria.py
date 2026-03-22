@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,6 +18,8 @@ from app.schemas.criterion import (
     CriterionUpdate,
 )
 from app.services.evaluators import run_criterion
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -171,8 +174,12 @@ async def test_criterion(
                     if getattr(judge_model, "api_format", "openai") == "anthropic":
                         cfg["api_format"] = "anthropic"
                     config_json = json.dumps(cfg)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error("Failed to resolve judge model credentials: %s", e)
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Failed to resolve judge model: {e}",
+            )
 
     try:
         score = run_criterion(c.type, config_json, body.expected, body.actual)

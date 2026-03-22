@@ -75,7 +75,11 @@ async def create_task(
     await session.refresh(task)
 
     # Enqueue task for worker execution
-    await enqueue_task(str(task.id))
+    await enqueue_task(
+        str(task.id),
+        execution_backend=task.execution_backend,
+        cluster_id=str(task.cluster_id) if task.cluster_id else None,
+    )
 
     return await _enrich_task(session, task)
 
@@ -165,7 +169,11 @@ async def resume_task(
     await session.commit()
     await session.refresh(task)
 
-    await enqueue_task(str(task.id))
+    await enqueue_task(
+        str(task.id),
+        execution_backend=task.execution_backend,
+        cluster_id=str(task.cluster_id) if task.cluster_id else None,
+    )
     return await _enrich_task(session, task)
 
 
@@ -225,7 +233,11 @@ async def restart_task(
     await session.commit()
     await session.refresh(task)
     # Enqueue the task again for worker execution
-    await enqueue_task(str(task.id))
+    await enqueue_task(
+        str(task.id),
+        execution_backend=task.execution_backend,
+        cluster_id=str(task.cluster_id) if task.cluster_id else None,
+    )
     return await _enrich_task(session, task)
 
 

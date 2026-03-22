@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from pathlib import Path, PurePosixPath
 
 from app.services.storage.base import StorageBackend
+
+logger = logging.getLogger(__name__)
 
 
 def _to_posix(path: str) -> str:
@@ -70,7 +73,8 @@ class LocalFileStorage(StorageBackend):
             try:
                 os.remove(path)
                 return True
-            except OSError:
+            except OSError as e:
+                logger.warning("Failed to delete %s: %s", path, e)
                 return False
 
         return await asyncio.to_thread(_delete)

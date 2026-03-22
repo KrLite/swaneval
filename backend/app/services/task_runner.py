@@ -423,8 +423,14 @@ def _validate_result(result: EvalResult) -> None:
         )
 
 
-async def run_task(task_id: uuid.UUID):
-    """Execute an evaluation task end-to-end."""
+async def run_task(task_id: uuid.UUID, endpoint_override: str | None = None):
+    """Execute an evaluation task end-to-end.
+
+    Args:
+        task_id: The evaluation task ID.
+        endpoint_override: If provided, overrides the model's endpoint_url.
+            Used by k8s_vllm backend to inject the dynamically deployed endpoint.
+    """
     storage = get_storage()
 
     async with AsyncSession(engine, expire_on_commit=False) as session:
@@ -485,10 +491,18 @@ async def run_task(task_id: uuid.UUID):
             model = await session.get(LLMModel, snapshot_model_id)
             if not model:
                 raise ValueError(f"Model {snapshot_model_id} not found")
-            logger.info(
-                "Task %s using model '%s' (%s @ %s)",
-                task_id, model.name, model.model_name, model.endpoint_url,
-            )
+            if endpoint_override:
+                logger.info(
+                    "Task %s using model '%s' (%s @ %s) [endpoint overridden to %s]",
+                    task_id, model.name, model.model_name, model.endpoint_url,
+                    endpoint_override,
+                )
+                model.endpoint_url = endpoint_override
+            else:
+                logger.info(
+                    "Task %s using model '%s' (%s @ %s)",
+                    task_id, model.name, model.model_name, model.endpoint_url,
+                )
 
             dataset_ids = snapshot_dataset_ids
             criteria_ids = snapshot_criteria_ids
