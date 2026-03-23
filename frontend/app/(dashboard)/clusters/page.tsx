@@ -248,9 +248,10 @@ function ClusterDetail({
                   GPU Operator
                 </Button>
               </div>
-              <p className="text-[10px] text-muted-foreground">
-                Device Plugin：轻量，需节点已有驱动 · GPU Operator：完整方案，需 Helm CLI
-              </p>
+              <div className="text-[10px] text-muted-foreground space-y-0.5">
+                <p><b>Device Plugin</b>：轻量方案，需要节点已安装 NVIDIA 驱动，后端需要 kubectl</p>
+                <p><b>GPU Operator</b>：完整方案，自动管理驱动和插件，后端需要 <a href="https://helm.sh/docs/intro/install/" target="_blank" rel="noopener" className="text-primary hover:underline">Helm CLI</a></p>
+              </div>
             </>
           )}
 

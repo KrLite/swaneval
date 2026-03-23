@@ -15,6 +15,13 @@ FROM python:3.12-slim AS runner
 
 WORKDIR /app
 
+# Install kubectl and helm for K8s cluster management
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
+    curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+      -o /usr/local/bin/kubectl && chmod +x /usr/local/bin/kubectl && \
+    curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash && \
+    apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system --gid 1001 appgroup && \
     adduser --system --uid 1001 appuser
 

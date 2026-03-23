@@ -78,7 +78,11 @@ async def _install_device_plugin(kubeconfig_yaml: str) -> dict:
             return {
                 "ok": False,
                 "method": "device-plugin",
-                "message": "kubectl not found. Please install kubectl.",
+                "message": "后端服务器未安装 kubectl。"
+                "安装方法：macOS 运行 brew install kubectl，"
+                "Linux 运行 curl -LO https://dl.k8s.io/release/$(curl -sL "
+                "https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl "
+                "&& chmod +x kubectl && sudo mv kubectl /usr/local/bin/",
             }
         except subprocess.TimeoutExpired:
             return {
@@ -150,7 +154,10 @@ async def _install_via_helm(kubeconfig_yaml: str) -> dict:
             return {
                 "ok": False,
                 "method": "gpu-operator",
-                "message": "helm not found. Please install Helm CLI.",
+                "message": "后端服务器未安装 Helm CLI。"
+                "安装方法：macOS 运行 brew install helm，"
+                "Linux 运行 curl https://raw.githubusercontent.com/helm/helm/"
+                "main/scripts/get-helm-3 | bash",
             }
         except subprocess.TimeoutExpired:
             return {
