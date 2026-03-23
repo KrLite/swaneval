@@ -14,8 +14,6 @@ Lifecycle:
 
 import asyncio
 import logging
-import os
-import tempfile
 import uuid
 
 import yaml
@@ -30,21 +28,14 @@ VLLM_IMAGE = "vllm/vllm-openai:latest"
 
 def _get_k8s_clients(kubeconfig_encrypted: str):
     """Create K8s API clients (CoreV1 + AppsV1) from encrypted kubeconfig."""
-    from kubernetes import client, config
+    from kubernetes import client
+    from kubernetes.config import new_client_from_config_dict
 
     kubeconfig_yaml = decrypt(kubeconfig_encrypted)
     kubeconfig_dict = yaml.safe_load(kubeconfig_yaml)
 
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".yaml", delete=False,
-    )
-    try:
-        yaml.dump(kubeconfig_dict, tmp)
-        tmp.close()
-        config.load_kube_config(config_file=tmp.name)
-        return client.CoreV1Api(), client.AppsV1Api()
-    finally:
-        os.unlink(tmp.name)
+    api_client = new_client_from_config_dict(kubeconfig_dict)
+    return client.CoreV1Api(api_client=api_client), client.AppsV1Api(api_client=api_client)
 
 
 async def prepare_namespace(
@@ -86,6 +77,7 @@ async def deploy_vllm(
     extra_args: list[str] | None = None,
     deployment_name: str | None = None,
     image: str = "",
+    service_type: str = "NodePort",
 ) -> str:
     """Deploy a vLLM server on K8s following official Helm chart patterns.
 
@@ -242,7 +234,9 @@ async def deploy_vllm(
         dep_name, namespace, effective_image, hf_model_id, gpu_count, memory_gb, dtype,
     )
 
-    # ── ClusterIP Service ──
+    # ── Service (NodePort for external access, ClusterIP for in-cluster) ──
+    allowed_types = ("NodePort", "ClusterIP", "LoadBalancer")
+    effective_svc_type = service_type if service_type in allowed_types else "NodePort"
     service = k8s_client.V1Service(
         metadata=k8s_client.V1ObjectMeta(
             name=dep_name, namespace=namespace, labels=labels,
@@ -252,7 +246,7 @@ async def deploy_vllm(
             ports=[k8s_client.V1ServicePort(
                 port=8000, target_port=8000, name="http",
             )],
-            type="ClusterIP",
+            type=effective_svc_type,
         ),
     )
 
@@ -260,7 +254,52 @@ async def deploy_vllm(
         core_v1.create_namespaced_service(namespace=namespace, body=service)
 
     await asyncio.to_thread(_create_service)
+    logger.info("Created %s service %s in %s", effective_svc_type, dep_name, namespace)
     return dep_name
+
+
+async def _resolve_node_port_endpoint(
+    core_v1,
+    namespace: str,
+    service_name: str,
+) -> str:
+    """Resolve a NodePort service to an externally reachable URL.
+
+    Returns http://<node_ip>:<node_port>.
+    """
+    def _resolve():
+        svc = core_v1.read_namespaced_service(service_name, namespace)
+        node_port = None
+        for port in (svc.spec.ports or []):
+            if port.node_port:
+                node_port = port.node_port
+                break
+        if not node_port:
+            raise RuntimeError(
+                f"Service {service_name} has no NodePort assigned"
+            )
+
+        # Find a node IP (prefer ExternalIP, fall back to InternalIP)
+        nodes = core_v1.list_node().items
+        node_ip = None
+        for node in nodes:
+            for addr in (node.status.addresses or []):
+                if addr.type == "ExternalIP" and addr.address:
+                    node_ip = addr.address
+                    break
+                if addr.type == "InternalIP" and addr.address and not node_ip:
+                    node_ip = addr.address
+            if node_ip and any(
+                a.type == "ExternalIP" for a in (node.status.addresses or [])
+            ):
+                break  # Found ExternalIP, stop looking
+
+        if not node_ip:
+            raise RuntimeError("No node IP found in cluster")
+
+        return f"http://{node_ip}:{node_port}"
+
+    return await asyncio.to_thread(_resolve)
 
 
 async def wait_vllm_ready(
@@ -269,28 +308,42 @@ async def wait_vllm_ready(
     deployment_name: str,
     timeout_seconds: int = 600,
     poll_interval: int = 10,
+    service_type: str = "NodePort",
 ) -> str:
     """Wait for vLLM deployment to become ready.
 
     Returns the OpenAI-compatible chat completions endpoint URL.
+    For NodePort services, resolves the external node IP + port.
+    For ClusterIP, returns the internal DNS endpoint.
     """
-    _, apps_v1 = await asyncio.to_thread(
+    core_v1, apps_v1 = await asyncio.to_thread(
         _get_k8s_clients, kubeconfig_encrypted,
     )
     elapsed = 0
 
     while elapsed < timeout_seconds:
         def _check():
-            dep = apps_v1.read_namespaced_deployment(deployment_name, namespace)
+            dep = apps_v1.read_namespaced_deployment(
+                deployment_name, namespace,
+            )
             ready = dep.status.ready_replicas or 0
             desired = dep.spec.replicas or 1
             return ready >= desired
 
         is_ready = await asyncio.to_thread(_check)
         if is_ready:
-            url = f"http://{deployment_name}.{namespace}.svc.cluster.local:8000"
-            logger.info("vLLM %s is ready at %s", deployment_name, url)
-            return f"{url}/v1/chat/completions"
+            if service_type == "NodePort":
+                base_url = await _resolve_node_port_endpoint(
+                    core_v1, namespace, deployment_name,
+                )
+            else:
+                base_url = (
+                    f"http://{deployment_name}.{namespace}"
+                    f".svc.cluster.local:8000"
+                )
+            endpoint = f"{base_url}/v1/chat/completions"
+            logger.info("vLLM %s is ready at %s", deployment_name, endpoint)
+            return endpoint
 
         await asyncio.sleep(poll_interval)
         elapsed += poll_interval
@@ -301,7 +354,8 @@ async def wait_vllm_ready(
             )
 
     raise TimeoutError(
-        f"vLLM deployment {deployment_name} not ready after {timeout_seconds}s"
+        f"vLLM deployment {deployment_name} not ready "
+        f"after {timeout_seconds}s"
     )
 
 
@@ -369,6 +423,7 @@ async def full_vllm_lifecycle(
     hf_token: str = "",
     extra_args: list[str] | None = None,
     image: str = "",
+    service_type: str = "NodePort",
 ) -> tuple[str, str]:
     """Complete vLLM lifecycle: prepare -> deploy -> wait -> return endpoint.
 
@@ -380,7 +435,10 @@ async def full_vllm_lifecycle(
         kubeconfig_encrypted, namespace, model_name, hf_model_id,
         gpu_count=gpu_count, gpu_type=gpu_type, memory_gb=memory_gb,
         dtype=dtype, hf_token=hf_token, extra_args=extra_args,
-        image=image,
+        image=image, service_type=service_type,
     )
-    endpoint = await wait_vllm_ready(kubeconfig_encrypted, namespace, dep_name)
+    endpoint = await wait_vllm_ready(
+        kubeconfig_encrypted, namespace, dep_name,
+        service_type=service_type,
+    )
     return endpoint, dep_name

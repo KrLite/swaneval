@@ -219,6 +219,7 @@ async def deploy_model(
     await session.commit()
 
     try:
+        hf_token = current_user.hf_token or settings.HF_TOKEN or ""
         endpoint, dep_name = await full_vllm_lifecycle(
             kubeconfig_encrypted=cluster.kubeconfig_encrypted,
             namespace=cluster.namespace,
@@ -227,6 +228,7 @@ async def deploy_model(
             gpu_count=gpu_count,
             gpu_type=cluster.gpu_type or "",
             memory_gb=memory_gb,
+            hf_token=hf_token,
             image=getattr(cluster, "vllm_image", "") or "",
         )
         m.endpoint_url = endpoint
