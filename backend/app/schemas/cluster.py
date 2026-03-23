@@ -10,6 +10,7 @@ class ClusterCreate(BaseModel):
     namespace: str = "default"
     description: str = ""
     vllm_image: str = ""  # 留空使用默认镜像
+    install_gpu_support: str = ""  # "device-plugin", "gpu-operator", or "" (skip)
 
     @field_validator("kubeconfig")
     @classmethod
@@ -49,6 +50,7 @@ class ClusterResponse(BaseModel):
     memory_total_bytes: int
     node_count: int
     vllm_image: str = ""
+    gpu_operator_installed: bool = False
     vllm_cache_ready: bool
     last_probed_at: datetime | None
     created_at: datetime

@@ -109,6 +109,29 @@ async def create_cluster(
     # Kick off resource probe in background
     background_tasks.add_task(_do_probe, cluster.id, kubeconfig_encrypted)
 
+    # Optionally install GPU support
+    if body.install_gpu_support in ("device-plugin", "gpu-operator"):
+        async def _install_gpu(cid, kc, method):
+            from app.services.gpu_operator import install_gpu_operator
+            result = await install_gpu_operator(kc, method=method)
+            if result["ok"]:
+                async for s in get_session():
+                    c = await s.get(ComputeCluster, cid)
+                    if c:
+                        c.gpu_operator_installed = True
+                        c.updated_at = datetime.now(timezone.utc)
+                        s.add(c)
+                        await s.commit()
+            logger.info(
+                "GPU support install for cluster %s: %s — %s",
+                cid, result["ok"], result["message"],
+            )
+
+        background_tasks.add_task(
+            _install_gpu, cluster.id, kubeconfig_encrypted,
+            body.install_gpu_support,
+        )
+
     return cluster
 
 
@@ -357,3 +380,53 @@ async def get_deployment_logs(
         raise
     except Exception as e:
         raise HTTPException(502, f"Failed to get logs: {e}") from e
+
+
+@router.post("/{cluster_id}/install-gpu-support")
+async def install_gpu_support(
+    cluster_id: uuid.UUID,
+    method: str = "device-plugin",
+    session: AsyncSession = Depends(get_db),
+    current_user: User = require_permission("clusters.manage"),
+):
+    """Install NVIDIA GPU support (device plugin or full GPU Operator).
+
+    Methods:
+    - "device-plugin": Lightweight, requires drivers pre-installed on nodes.
+    - "gpu-operator": Full NVIDIA GPU Operator via Helm (manages everything).
+    """
+    from app.services.gpu_operator import install_gpu_operator
+
+    cluster = await session.get(ComputeCluster, cluster_id)
+    if not cluster:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cluster not found")
+    if not cluster.kubeconfig_encrypted:
+        raise HTTPException(400, "Cluster has no kubeconfig")
+
+    result = await install_gpu_operator(cluster.kubeconfig_encrypted, method=method)
+
+    if result["ok"]:
+        cluster.gpu_operator_installed = True
+        cluster.updated_at = datetime.now(timezone.utc)
+        session.add(cluster)
+        await session.commit()
+
+    return result
+
+
+@router.get("/{cluster_id}/gpu-status")
+async def get_gpu_status(
+    cluster_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = require_permission("clusters.read"),
+):
+    """Check GPU support status on the cluster."""
+    from app.services.gpu_operator import check_gpu_operator_status
+
+    cluster = await session.get(ComputeCluster, cluster_id)
+    if not cluster:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cluster not found")
+    if not cluster.kubeconfig_encrypted:
+        raise HTTPException(400, "Cluster has no kubeconfig")
+
+    return await check_gpu_operator_status(cluster.kubeconfig_encrypted)

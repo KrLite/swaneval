@@ -155,6 +155,10 @@ function ClusterDetail({
             label="vLLM 镜像"
             value={cluster.vllm_image || "默认 (Docker Hub)"}
           />
+          <DetailField
+            label="GPU 支持"
+            value={cluster.gpu_operator_installed ? "已安装" : cluster.gpu_count > 0 ? "可用" : "未检测到"}
+          />
         </div>
 
         {cluster.status_message && (
@@ -345,6 +349,7 @@ export default function ClustersPage() {
   const [createDescription, setCreateDescription] = useState("");
   const [createVllmImageOption, setCreateVllmImageOption] = useState("__default__");
   const [createVllmImageCustom, setCreateVllmImageCustom] = useState("");
+  const [createGpuSupport, setCreateGpuSupport] = useState("__none__");
   const [createError, setCreateError] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -368,6 +373,7 @@ export default function ClustersPage() {
           : createVllmImageOption === "__default__"
             ? undefined
             : createVllmImageOption || undefined,
+        install_gpu_support: createGpuSupport === "__none__" ? undefined : createGpuSupport,
       });
       setShowCreate(false);
       setCreateName("");
@@ -376,6 +382,7 @@ export default function ClustersPage() {
       setCreateDescription("");
       setCreateVllmImageOption("__default__");
       setCreateVllmImageCustom("");
+      setCreateGpuSupport("__none__");
     } catch (err: unknown) {
       setCreateError(extractErrorDetail(err, "创建失败"));
     }
@@ -564,6 +571,26 @@ export default function ClustersPage() {
               )}
               <p className="text-[11px] text-muted-foreground">
                 国内网络建议使用阿里云或华为云镜像加速 vLLM 部署
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">GPU 支持</Label>
+              <Select value={createGpuSupport} onValueChange={setCreateGpuSupport}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">不安装（节点已配置 GPU 驱动）</SelectItem>
+                  <SelectItem value="device-plugin">安装 NVIDIA Device Plugin</SelectItem>
+                  <SelectItem value="gpu-operator">安装 NVIDIA GPU Operator (完整方案)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {createGpuSupport === "device-plugin"
+                  ? "轻量方案：仅安装设备插件 DaemonSet，需要节点已安装 NVIDIA 驱动"
+                  : createGpuSupport === "gpu-operator"
+                    ? "完整方案：通过 Helm 安装 GPU Operator，自动管理驱动和设备插件（需要 Helm CLI）"
+                    : "如果节点已有 GPU 驱动和设备插件，可跳过此步骤"}
               </p>
             </div>
             {createError && (

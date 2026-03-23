@@ -57,6 +57,9 @@ class ComputeCluster(SQLModel, table=True):
     vllm_image: str = Field(default="")
     # vLLM 镜像地址，空则使用默认 vllm/vllm-openai:latest
 
+    gpu_operator_installed: bool = Field(default=False)
+    # 是否已安装 NVIDIA GPU Operator
+
     vllm_cache_ready: bool = Field(default=False)
     last_probed_at: datetime | None = Field(
         default=None, sa_type=DateTime(timezone=True),
