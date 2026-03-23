@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime
+from sqlalchemy import BigInteger, Column, DateTime
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
 
@@ -45,7 +45,7 @@ class ComputeCluster(SQLModel, table=True):
     gpu_type: str = Field(default="")
     gpu_available: int = Field(default=0)
     cpu_total_millicores: int = Field(default=0)
-    memory_total_bytes: int = Field(default=0)
+    memory_total_bytes: int = Field(default=0, sa_type=BigInteger)
     node_count: int = Field(default=0)
     vllm_cache_ready: bool = Field(default=False)
     last_probed_at: datetime | None = Field(
