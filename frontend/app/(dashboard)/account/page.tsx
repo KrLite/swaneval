@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,13 @@ import { useUpdateProfile, useChangePassword, useUserTokens, useUpdateUserTokens
 
 export default function AccountPage() {
   const { user } = useAuthStore();
+  const router = useRouter();
+
+  // Admin should use the admin panel for account management
+  if (user?.role === "admin") {
+    router.replace(`/admin?user=${user.id}`);
+    return null;
+  }
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
   const { data: tokenStatus } = useUserTokens();

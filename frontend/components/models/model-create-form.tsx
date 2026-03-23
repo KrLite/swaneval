@@ -12,8 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Check, X as XIcon } from "lucide-react";
 import { useCreateModel } from "@/lib/hooks/use-models";
+import { useAuthStore } from "@/lib/stores/auth";
 
 const emptyForm = {
   name: "",
@@ -36,6 +37,8 @@ interface ModelCreateFormProps {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function ModelCreateForm({ onSuccess, onClose: _onClose }: ModelCreateFormProps) {
   const create = useCreateModel();
+  const user = useAuthStore((s) => s.user);
+  const accountHref = user?.role === "admin" ? `/admin?user=${user.id}` : "/account";
 
   const [form, setForm] = useState({ ...emptyForm });
 
@@ -141,9 +144,24 @@ export function ModelCreateForm({ onSuccess, onClose: _onClose }: ModelCreateFor
                 HuggingFace 模型仓库 ID，将通过 Inference API 调用
               </p>
             </PanelField>
-            <p className="text-[11px] text-muted-foreground">
-              HF Token 请在<a href="/account" className="text-primary hover:underline mx-0.5">账号设置</a>中配置
-            </p>
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              {user?.hf_token_set ? (
+                <>
+                  <Check className="h-3 w-3 text-emerald-500" />
+                  <span>HF Token 已配置</span>
+                  {user.hf_token_masked && (
+                    <span className="font-mono text-[10px]">({user.hf_token_masked})</span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <XIcon className="h-3 w-3 text-muted-foreground/50" />
+                  <span>HF Token 未配置</span>
+                </>
+              )}
+              <span>·</span>
+              <a href={accountHref} className="text-primary hover:underline">去设置</a>
+            </div>
           </>
         ) : form.model_type === "modelscope" ? (
           <>
@@ -161,9 +179,24 @@ export function ModelCreateForm({ onSuccess, onClose: _onClose }: ModelCreateFor
                 ModelScope 模型 ID，将通过 Inference API 调用
               </p>
             </PanelField>
-            <p className="text-[11px] text-muted-foreground">
-              MS Token 请在<a href="/account" className="text-primary hover:underline mx-0.5">账号设置</a>中配置
-            </p>
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              {user?.ms_token_set ? (
+                <>
+                  <Check className="h-3 w-3 text-emerald-500" />
+                  <span>MS Token 已配置</span>
+                  {user.ms_token_masked && (
+                    <span className="font-mono text-[10px]">({user.ms_token_masked})</span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <XIcon className="h-3 w-3 text-muted-foreground/50" />
+                  <span>MS Token 未配置</span>
+                </>
+              )}
+              <span>·</span>
+              <a href={accountHref} className="text-primary hover:underline">去设置</a>
+            </div>
           </>
         ) : (
           <>
