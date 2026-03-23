@@ -1,5 +1,5 @@
-import uuid
 import unittest
+import uuid
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, cast
@@ -12,10 +12,12 @@ from app.api.v1.models import (
     delete_model,
     get_model,
     list_models,
-    test_model as api_test_model,
     update_model,
 )
-from app.models.llm_model import LLMModel, ModelType
+from app.api.v1.models import (
+    test_model as api_test_model,
+)
+from app.models.llm_model import ApiFormat, LLMModel, ModelType
 from app.schemas.model import LLMModelCreate, LLMModelUpdate
 
 
@@ -65,6 +67,7 @@ def _make_model(name: str, created_at: datetime | None = None) -> LLMModel:
         endpoint_url="http://127.0.0.1:8801/v1/chat/completions",
         api_key="key",
         model_type=ModelType.api,
+        api_format=ApiFormat.openai,
         description="desc",
         model_name=f"{name}-upstream",
         max_tokens=4096,
