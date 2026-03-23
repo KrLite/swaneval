@@ -321,19 +321,18 @@ async def _resolve_node_port_endpoint(
 
         # Find a node IP (prefer ExternalIP, fall back to InternalIP)
         nodes = core_v1.list_node().items
-        node_ip = None
+        external_ip = None
+        internal_ip = None
         for node in nodes:
             for addr in (node.status.addresses or []):
                 if addr.type == "ExternalIP" and addr.address:
-                    node_ip = addr.address
-                    break
-                if addr.type == "InternalIP" and addr.address and not node_ip:
-                    node_ip = addr.address
-            if node_ip and any(
-                a.type == "ExternalIP" for a in (node.status.addresses or [])
-            ):
-                break  # Found ExternalIP, stop looking
+                    external_ip = addr.address
+                elif addr.type == "InternalIP" and addr.address and not internal_ip:
+                    internal_ip = addr.address
+            if external_ip:
+                break  # Found ExternalIP, no need to check more nodes
 
+        node_ip = external_ip or internal_ip
         if not node_ip:
             raise RuntimeError("No node IP found in cluster")
 

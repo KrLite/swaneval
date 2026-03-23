@@ -1014,12 +1014,6 @@ async def run_task(task_id: uuid.UUID):
                     await cleanup_vllm(
                         _vllm_kubeconfig, _vllm_namespace, _vllm_deployment,
                     )
-                    # Reset model deploy status
-                    model.deploy_status = "stopped"
-                    model.endpoint_url = ""
-                    model.vllm_deployment_name = ""
-                    session.add(model)
-                    await session.commit()
                     logger.info(
                         "Task %s: vLLM deployment %s cleaned up",
                         task_id, _vllm_deployment,
@@ -1028,6 +1022,19 @@ async def run_task(task_id: uuid.UUID):
                     logger.error(
                         "Task %s: vLLM cleanup failed: %s",
                         task_id, ce,
+                    )
+                # Reset model deploy status separately so DB errors
+                # don't mask cleanup errors above
+                try:
+                    model.deploy_status = "stopped"
+                    model.endpoint_url = ""
+                    model.vllm_deployment_name = ""
+                    session.add(model)
+                    await session.commit()
+                except Exception:
+                    logger.warning(
+                        "Task %s: failed to reset model status after cleanup",
+                        task_id, exc_info=True,
                     )
 
         except Exception as e:
