@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,24 +96,51 @@ function ClusterDetail({
   onClose: () => void;
   onDelete: () => void;
 }) {
+  const qc = useQueryClient();
   const probeCluster = useProbeCluster();
   const installGpu = useInstallGpuSupport();
   const { data: nodes = [], isLoading: nodesLoading } = useClusterNodes(
     cluster.id,
   );
-  const { data: gpuStatus } = useGpuStatus(cluster.id);
+  const { data: gpuStatus, refetch: refetchGpu } = useGpuStatus(cluster.id);
   const { data: allDeployments = [] } = useActiveDeployments();
   const deployments = allDeployments.filter((m) => m.cluster_id === cluster.id);
   const [probeError, setProbeError] = useState("");
   const [gpuError, setGpuError] = useState("");
   const [gpuSuccess, setGpuSuccess] = useState("");
+  const [installingMethod, setInstallingMethod] = useState("");
+
+  const refreshAll = () => {
+    qc.invalidateQueries({ queryKey: ["clusters"] });
+    qc.invalidateQueries({ queryKey: ["clusters", cluster.id, "nodes"] });
+    qc.invalidateQueries({ queryKey: ["clusters", cluster.id, "gpu-status"] });
+  };
 
   const handleProbe = async () => {
     setProbeError("");
     try {
       await probeCluster.mutateAsync(cluster.id);
+      refreshAll();
     } catch (err: unknown) {
       setProbeError(extractErrorDetail(err, "探测失败"));
+    }
+  };
+
+  const handleInstallGpu = async (method: string) => {
+    setGpuError(""); setGpuSuccess(""); setInstallingMethod(method);
+    try {
+      const r = await installGpu.mutateAsync({ cluster_id: cluster.id, method });
+      if (r.ok) {
+        setGpuSuccess(r.message);
+        // Re-check GPU status after install
+        setTimeout(() => { refreshAll(); refetchGpu(); }, 2000);
+      } else {
+        setGpuError(r.message);
+      }
+    } catch (err: unknown) {
+      setGpuError(extractErrorDetail(err, "安装失败"));
+    } finally {
+      setInstallingMethod("");
     }
   };
 
@@ -176,59 +204,54 @@ function ClusterDetail({
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium">GPU 支持</p>
             {gpuStatus?.ready ? (
-              <Badge variant="success" className="text-[10px]">可用</Badge>
-            ) : cluster.gpu_operator_installed ? (
-              <Badge variant="warning" className="text-[10px]">已安装</Badge>
+              <Badge variant="success" className="text-[10px]">GPU 可用</Badge>
+            ) : gpuStatus && (gpuStatus.has_device_plugin || gpuStatus.has_gpu_operator) ? (
+              <Badge variant="warning" className="text-[10px]">插件已安装，无 GPU</Badge>
             ) : (
-              <Badge variant="outline" className="text-[10px]">未安装</Badge>
+              <Badge variant="outline" className="text-[10px]">未配置</Badge>
             )}
           </div>
 
-          {gpuStatus && (
+          {gpuStatus ? (
             <div className="text-[11px] text-muted-foreground space-y-0.5">
-              <p>GPU 节点: {gpuStatus.gpu_node_count} 个{gpuStatus.gpu_nodes.length > 0 && ` (${gpuStatus.gpu_nodes.slice(0, 3).join(", ")})`}</p>
+              <p>GPU 节点: {gpuStatus.gpu_node_count > 0
+                ? `${gpuStatus.gpu_node_count} 个 (${gpuStatus.gpu_nodes.slice(0, 3).join(", ")})`
+                : "无"
+              }</p>
               <p>Device Plugin: {gpuStatus.has_device_plugin ? "✓ 运行中" : "✗ 未检测到"}</p>
               <p>GPU Operator: {gpuStatus.has_gpu_operator ? "✓ 运行中" : "✗ 未安装"}</p>
             </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">加载 GPU 状态中...</p>
           )}
 
-          {!gpuStatus?.ready && !cluster.gpu_operator_installed && (
-            <div className="flex gap-2">
-              <Button
-                size="sm" variant="outline" className="flex-1 text-xs h-7"
-                disabled={installGpu.isPending}
-                onClick={async () => {
-                  setGpuError(""); setGpuSuccess("");
-                  try {
-                    const r = await installGpu.mutateAsync({ cluster_id: cluster.id, method: "device-plugin" });
-                    if (r.ok) setGpuSuccess(r.message);
-                    else setGpuError(r.message);
-                  } catch (err: unknown) {
-                    setGpuError(extractErrorDetail(err, "安装失败"));
-                  }
-                }}
-              >
-                {installGpu.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                Device Plugin
-              </Button>
-              <Button
-                size="sm" variant="outline" className="flex-1 text-xs h-7"
-                disabled={installGpu.isPending}
-                onClick={async () => {
-                  setGpuError(""); setGpuSuccess("");
-                  try {
-                    const r = await installGpu.mutateAsync({ cluster_id: cluster.id, method: "gpu-operator" });
-                    if (r.ok) setGpuSuccess(r.message);
-                    else setGpuError(r.message);
-                  } catch (err: unknown) {
-                    setGpuError(extractErrorDetail(err, "安装失败"));
-                  }
-                }}
-              >
-                {installGpu.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                GPU Operator
-              </Button>
-            </div>
+          {gpuStatus && !gpuStatus.has_device_plugin && !gpuStatus.has_gpu_operator && (
+            <>
+              <p className="text-[11px] text-muted-foreground">
+                选择一种方式安装 NVIDIA GPU 支持：
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm" variant="outline" className="flex-1 text-xs h-7"
+                  disabled={!!installingMethod}
+                  onClick={() => handleInstallGpu("device-plugin")}
+                >
+                  {installingMethod === "device-plugin" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Device Plugin
+                </Button>
+                <Button
+                  size="sm" variant="outline" className="flex-1 text-xs h-7"
+                  disabled={!!installingMethod}
+                  onClick={() => handleInstallGpu("gpu-operator")}
+                >
+                  {installingMethod === "gpu-operator" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  GPU Operator
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Device Plugin：轻量，需节点已有驱动 · GPU Operator：完整方案，需 Helm CLI
+              </p>
+            </>
           )}
 
           {gpuError && (
@@ -367,9 +390,9 @@ function ClusterDetail({
             size="sm"
             className="text-xs"
             onClick={handleProbe}
-            disabled={probeCluster.isPending}
+            disabled={probeCluster.isPending || cluster.status === "connecting"}
           >
-            {probeCluster.isPending ? (
+            {probeCluster.isPending || cluster.status === "connecting" ? (
               <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             ) : (
               <RefreshCw className="h-3 w-3 mr-1" />
