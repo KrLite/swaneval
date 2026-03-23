@@ -212,7 +212,7 @@ async def _do_deploy(
                 gpu_type=cluster.gpu_type or "",
                 memory_gb=memory_gb,
                 hf_token=hf_token,
-                image=getattr(cluster, "vllm_image", "") or "",
+                image=cluster.vllm_image or "",
             )
             m.endpoint_url = endpoint
             m.deploy_status = "running"

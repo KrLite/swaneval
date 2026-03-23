@@ -493,7 +493,7 @@ async def run_task(task_id: uuid.UUID):
                 raise ValueError(f"Model {snapshot_model_id} not found")
 
             # ── K8s/vLLM deployment if needed ──
-            execution_backend = getattr(task, "execution_backend", "external_api") or "external_api"
+            execution_backend = task.execution_backend or "external_api"
             if execution_backend == "k8s_vllm":
                 from app.models.compute_cluster import ComputeCluster
 
@@ -563,7 +563,7 @@ async def run_task(task_id: uuid.UUID):
                     )
 
                     try:
-                        vllm_image = getattr(cluster, "vllm_image", "") or ""
+                        vllm_image = cluster.vllm_image or ""
                         vllm_endpoint, _vllm_deployment = await full_vllm_lifecycle(
                             kubeconfig_encrypted=cluster.kubeconfig_encrypted,
                             namespace=cluster.namespace,
@@ -1010,7 +1010,9 @@ async def run_task(task_id: uuid.UUID):
                     # Reset model deploy status
                     model.deploy_status = "stopped"
                     model.endpoint_url = ""
+                    model.vllm_deployment_name = ""
                     session.add(model)
+                    await session.commit()
                     logger.info(
                         "Task %s: vLLM deployment %s cleaned up",
                         task_id, _vllm_deployment,

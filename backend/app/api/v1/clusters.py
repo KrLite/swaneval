@@ -152,7 +152,18 @@ async def update_cluster(
         cluster.name = body.name
     if body.description is not None:
         cluster.description = body.description
-    if body.namespace is not None:
+    if body.namespace is not None and body.namespace != cluster.namespace:
+        from app.models.llm_model import LLMModel
+        active_stmt = select(LLMModel).where(
+            LLMModel.cluster_id == cluster_id,
+            LLMModel.deploy_status.in_(["deploying", "running"]),
+        )
+        active = (await session.exec(active_stmt)).all()
+        if active:
+            raise HTTPException(
+                409,
+                "无法更改命名空间：集群上有活跃的模型部署。请先停止所有部署。",
+            )
         cluster.namespace = body.namespace
     if body.vllm_image is not None:
         cluster.vllm_image = body.vllm_image

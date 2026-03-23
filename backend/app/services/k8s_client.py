@@ -4,6 +4,7 @@ Uses `new_client_from_config` to avoid mutating global K8s config state,
 making it safe for concurrent use with different kubeconfigs.
 """
 
+import base64
 import os
 import tempfile
 
@@ -56,5 +57,21 @@ def create_both(kubeconfig_encrypted: str):
 
 
 def _inline_cert_data(kubeconfig_dict: dict) -> None:
-    """Best-effort: no-op if certs are already inline or missing."""
-    pass  # cert inlining is complex; the temp-file approach is sufficient for now
+    """Inline certificate file references as base64 data to avoid temp file path issues."""
+    for cluster in kubeconfig_dict.get("clusters", []):
+        c = cluster.get("cluster", {})
+        _inline_file_field(c, "certificate-authority", "certificate-authority-data")
+    for user in kubeconfig_dict.get("users", []):
+        u = user.get("user", {})
+        _inline_file_field(u, "client-certificate", "client-certificate-data")
+        _inline_file_field(u, "client-key", "client-key-data")
+
+
+def _inline_file_field(obj: dict, file_key: str, data_key: str) -> None:
+    """If obj has a file path reference, read it and store as base64 data."""
+    if file_key in obj and data_key not in obj:
+        path = obj[file_key]
+        if os.path.isfile(path):
+            with open(path, "rb") as f:
+                obj[data_key] = base64.b64encode(f.read()).decode("ascii")
+            del obj[file_key]
