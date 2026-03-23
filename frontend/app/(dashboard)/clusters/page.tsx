@@ -51,6 +51,8 @@ import {
   useDeleteCluster,
   useProbeCluster,
   useClusterNodes,
+  useInstallGpuSupport,
+  useGpuStatus,
 } from "@/lib/hooks/use-clusters";
 import { useActiveDeployments } from "@/lib/hooks/use-models";
 import type { ComputeCluster } from "@/lib/types";
@@ -68,6 +70,7 @@ const statusBadgeVariant: Record<
   "success" | "warning" | "destructive" | "outline"
 > = {
   ready: "success",
+  connecting: "warning",
   provisioning: "warning",
   probing: "warning",
   error: "destructive",
@@ -76,6 +79,7 @@ const statusBadgeVariant: Record<
 
 const statusLabel: Record<string, string> = {
   ready: "就绪",
+  connecting: "连接中",
   provisioning: "配置中",
   probing: "探测中",
   error: "异常",
@@ -92,12 +96,16 @@ function ClusterDetail({
   onDelete: () => void;
 }) {
   const probeCluster = useProbeCluster();
+  const installGpu = useInstallGpuSupport();
   const { data: nodes = [], isLoading: nodesLoading } = useClusterNodes(
     cluster.id,
   );
+  const { data: gpuStatus } = useGpuStatus(cluster.id);
   const { data: allDeployments = [] } = useActiveDeployments();
   const deployments = allDeployments.filter((m) => m.cluster_id === cluster.id);
   const [probeError, setProbeError] = useState("");
+  const [gpuError, setGpuError] = useState("");
+  const [gpuSuccess, setGpuSuccess] = useState("");
 
   const handleProbe = async () => {
     setProbeError("");
@@ -120,11 +128,16 @@ function ClusterDetail({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold">{cluster.name}</h2>
-                <Badge
-                  variant={statusBadgeVariant[cluster.status] ?? "outline"}
-                >
-                  {statusLabel[cluster.status] ?? cluster.status}
-                </Badge>
+                {cluster.status === "connecting" || probeCluster.isPending ? (
+                  <Badge variant="warning" className="text-[10px]">
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    探测中
+                  </Badge>
+                ) : (
+                  <Badge variant={statusBadgeVariant[cluster.status] ?? "outline"}>
+                    {statusLabel[cluster.status] ?? cluster.status}
+                  </Badge>
+                )}
               </div>
               {cluster.description && (
                 <p className="text-sm text-muted-foreground mt-0.5">
@@ -156,14 +169,86 @@ function ClusterDetail({
             label="vLLM 镜像"
             value={cluster.vllm_image || "默认 (Docker Hub)"}
           />
-          <DetailField
-            label="GPU 支持"
-            value={cluster.gpu_operator_installed ? "已安装" : cluster.gpu_count > 0 ? "可用" : "未检测到"}
-          />
+        </div>
+
+        {/* GPU Support Section */}
+        <div className="mb-6 rounded-md border p-3 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium">GPU 支持</p>
+            {gpuStatus?.ready ? (
+              <Badge variant="success" className="text-[10px]">可用</Badge>
+            ) : cluster.gpu_operator_installed ? (
+              <Badge variant="warning" className="text-[10px]">已安装</Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px]">未安装</Badge>
+            )}
+          </div>
+
+          {gpuStatus && (
+            <div className="text-[11px] text-muted-foreground space-y-0.5">
+              <p>GPU 节点: {gpuStatus.gpu_node_count} 个{gpuStatus.gpu_nodes.length > 0 && ` (${gpuStatus.gpu_nodes.slice(0, 3).join(", ")})`}</p>
+              <p>Device Plugin: {gpuStatus.has_device_plugin ? "✓ 运行中" : "✗ 未检测到"}</p>
+              <p>GPU Operator: {gpuStatus.has_gpu_operator ? "✓ 运行中" : "✗ 未安装"}</p>
+            </div>
+          )}
+
+          {!gpuStatus?.ready && !cluster.gpu_operator_installed && (
+            <div className="flex gap-2">
+              <Button
+                size="sm" variant="outline" className="flex-1 text-xs h-7"
+                disabled={installGpu.isPending}
+                onClick={async () => {
+                  setGpuError(""); setGpuSuccess("");
+                  try {
+                    const r = await installGpu.mutateAsync({ cluster_id: cluster.id, method: "device-plugin" });
+                    if (r.ok) setGpuSuccess(r.message);
+                    else setGpuError(r.message);
+                  } catch (err: unknown) {
+                    setGpuError(extractErrorDetail(err, "安装失败"));
+                  }
+                }}
+              >
+                {installGpu.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                Device Plugin
+              </Button>
+              <Button
+                size="sm" variant="outline" className="flex-1 text-xs h-7"
+                disabled={installGpu.isPending}
+                onClick={async () => {
+                  setGpuError(""); setGpuSuccess("");
+                  try {
+                    const r = await installGpu.mutateAsync({ cluster_id: cluster.id, method: "gpu-operator" });
+                    if (r.ok) setGpuSuccess(r.message);
+                    else setGpuError(r.message);
+                  } catch (err: unknown) {
+                    setGpuError(extractErrorDetail(err, "安装失败"));
+                  }
+                }}
+              >
+                {installGpu.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                GPU Operator
+              </Button>
+            </div>
+          )}
+
+          {gpuError && (
+            <div className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
+              {gpuError}
+            </div>
+          )}
+          {gpuSuccess && (
+            <div className="rounded-md bg-emerald-500/10 px-2.5 py-1.5 text-[11px] text-emerald-600">
+              {gpuSuccess}
+            </div>
+          )}
         </div>
 
         {cluster.status_message && (
-          <div className="mb-6 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <div className={`mb-6 rounded-md px-3 py-2 text-xs ${
+            cluster.status === "error"
+              ? "bg-destructive/10 text-destructive"
+              : "bg-muted text-muted-foreground"
+          }`}>
             {cluster.status_message}
           </div>
         )}
@@ -278,26 +363,28 @@ function ClusterDetail({
         {/* Action buttons */}
         <div className="flex items-center gap-2 pt-4 border-t">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
+            className="text-xs"
             onClick={handleProbe}
             disabled={probeCluster.isPending}
           >
             {probeCluster.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             ) : (
-              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              <RefreshCw className="h-3 w-3 mr-1" />
             )}
-            探测集群
+            刷新资源
           </Button>
+          <div className="flex-1" />
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+            className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
             onClick={onDelete}
           >
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-            删除集群
+            <Trash2 className="h-3 w-3 mr-1" />
+            删除
           </Button>
         </div>
       </CardContent>
@@ -350,7 +437,6 @@ export default function ClustersPage() {
   const [createDescription, setCreateDescription] = useState("");
   const [createVllmImageOption, setCreateVllmImageOption] = useState("__default__");
   const [createVllmImageCustom, setCreateVllmImageCustom] = useState("");
-  const [createGpuSupport, setCreateGpuSupport] = useState("__none__");
   const [createError, setCreateError] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -374,7 +460,6 @@ export default function ClustersPage() {
           : createVllmImageOption === "__default__"
             ? undefined
             : createVllmImageOption || undefined,
-        install_gpu_support: createGpuSupport === "__none__" ? undefined : createGpuSupport,
       });
       setShowCreate(false);
       setCreateName("");
@@ -383,7 +468,6 @@ export default function ClustersPage() {
       setCreateDescription("");
       setCreateVllmImageOption("__default__");
       setCreateVllmImageCustom("");
-      setCreateGpuSupport("__none__");
     } catch (err: unknown) {
       setCreateError(extractErrorDetail(err, "创建失败"));
     }
@@ -573,26 +657,6 @@ export default function ClustersPage() {
               )}
               <p className="text-[11px] text-muted-foreground">
                 国内网络建议使用阿里云或华为云镜像加速 vLLM 部署
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">GPU 支持</Label>
-              <Select value={createGpuSupport} onValueChange={setCreateGpuSupport}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">不安装（节点已配置 GPU 驱动）</SelectItem>
-                  <SelectItem value="device-plugin">安装 NVIDIA Device Plugin</SelectItem>
-                  <SelectItem value="gpu-operator">安装 NVIDIA GPU Operator (完整方案)</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">
-                {createGpuSupport === "device-plugin"
-                  ? "轻量方案：仅安装设备插件 DaemonSet，需要节点已安装 NVIDIA 驱动"
-                  : createGpuSupport === "gpu-operator"
-                    ? "完整方案：通过 Helm 安装 GPU Operator，自动管理驱动和设备插件（需要 Helm CLI）"
-                    : "如果节点已有 GPU 驱动和设备插件，可跳过此步骤"}
               </p>
             </div>
             {createError && (

@@ -109,29 +109,6 @@ async def create_cluster(
     # Kick off resource probe in background
     background_tasks.add_task(_do_probe, cluster.id, kubeconfig_encrypted)
 
-    # Optionally install GPU support
-    if body.install_gpu_support in ("device-plugin", "gpu-operator"):
-        async def _install_gpu(cid, kc, method):
-            from app.services.gpu_operator import install_gpu_operator
-            result = await install_gpu_operator(kc, method=method)
-            if result["ok"]:
-                async for s in get_session():
-                    c = await s.get(ComputeCluster, cid)
-                    if c:
-                        c.gpu_operator_installed = True
-                        c.updated_at = datetime.now(timezone.utc)
-                        s.add(c)
-                        await s.commit()
-            logger.info(
-                "GPU support install for cluster %s: %s — %s",
-                cid, result["ok"], result["message"],
-            )
-
-        background_tasks.add_task(
-            _install_gpu, cluster.id, kubeconfig_encrypted,
-            body.install_gpu_support,
-        )
-
     return cluster
 
 

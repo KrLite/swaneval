@@ -28,7 +28,7 @@ export function useCluster(id: string) {
 export function useCreateCluster() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { name: string; kubeconfig: string; namespace?: string; description?: string; vllm_image?: string; install_gpu_support?: string }) => {
+    mutationFn: async (data: { name: string; kubeconfig: string; namespace?: string; description?: string; vllm_image?: string }) => {
       const res = await api.post<ComputeCluster>("/clusters", data);
       return res.data;
     },
@@ -64,5 +64,38 @@ export function useClusterNodes(id: string) {
     },
     enabled: !!id,
     staleTime: 10_000,
+  });
+}
+
+export function useInstallGpuSupport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { cluster_id: string; method: string }) => {
+      const res = await api.post<{ ok: boolean; method: string; message: string }>(
+        `/clusters/${data.cluster_id}/install-gpu-support`,
+        null,
+        { params: { method: data.method } },
+      );
+      return res.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["clusters"] }),
+  });
+}
+
+export function useGpuStatus(id: string) {
+  return useQuery({
+    queryKey: ["clusters", id, "gpu-status"],
+    queryFn: async () => {
+      const res = await api.get<{
+        gpu_nodes: string[];
+        gpu_node_count: number;
+        has_device_plugin: boolean;
+        has_gpu_operator: boolean;
+        ready: boolean;
+      }>(`/clusters/${id}/gpu-status`);
+      return res.data;
+    },
+    enabled: !!id,
+    staleTime: 30_000,
   });
 }
