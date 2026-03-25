@@ -367,14 +367,7 @@ async def undeploy_model(
         raise HTTPException(404, "Cluster not found")
 
     dep_name = m.vllm_deployment_name
-    if not dep_name:
-        # Fallback: try extracting from endpoint URL
-        try:
-            from urllib.parse import urlparse
-            host = urlparse(m.endpoint_url).hostname or ""
-            dep_name = host.split(".")[0]
-        except Exception:
-            pass
+    # No URL-parsing fallback — only clean up if we have the actual deployment name
 
     cleanup_ok = False
     if dep_name:
@@ -384,7 +377,16 @@ async def undeploy_model(
             )
             cleanup_ok = True
         except Exception as e:
-            logger.warning("Cleanup failed: %s", e)
+            err_str = str(e).lower()
+            if "not found" in err_str or "404" in err_str:
+                # Already gone — that's fine
+                cleanup_ok = True
+                logger.info("Deployment %s already removed", dep_name)
+            else:
+                logger.warning("Cleanup failed: %s", e)
+    else:
+        # No deployment to clean — just reset the model status
+        cleanup_ok = True
 
     if cleanup_ok or not dep_name:
         m.deploy_status = "stopped"

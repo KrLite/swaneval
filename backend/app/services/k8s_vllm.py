@@ -514,6 +514,9 @@ async def cleanup_vllm(
         _get_k8s_clients, kubeconfig_encrypted,
     )
 
+    def _is_not_found(exc: Exception) -> bool:
+        return "not found" in str(exc).lower() or "404" in str(exc)
+
     def _delete():
         import time
 
@@ -526,23 +529,34 @@ async def cleanup_vllm(
             apps_v1.delete_namespaced_deployment(deployment_name, namespace)
             dep_ok = True
         except Exception as e:
-            dep_err = str(e)
-            logger.warning("Failed to delete deployment %s: %s", deployment_name, e)
+            if _is_not_found(e):
+                dep_ok = True  # Already gone — fine
+                logger.info("Deployment %s already removed", deployment_name)
+            else:
+                dep_err = str(e)
+                logger.warning("Failed to delete deployment %s: %s", deployment_name, e)
 
         try:
             core_v1.delete_namespaced_service(deployment_name, namespace)
             svc_ok = True
         except Exception as e:
-            svc_err = str(e)
-            logger.warning("Failed to delete service %s: %s", deployment_name, e)
+            if _is_not_found(e):
+                svc_ok = True  # Already gone — fine
+                logger.info("Service %s already removed", deployment_name)
+            else:
+                svc_err = str(e)
+                logger.warning("Failed to delete service %s: %s", deployment_name, e)
 
         # Wait briefly for pods to terminate (max 30s)
         if dep_ok:
             for _ in range(6):
-                pods = core_v1.list_namespaced_pod(
-                    namespace, label_selector=f"app={deployment_name}",
-                )
-                if not pods.items:
+                try:
+                    pods = core_v1.list_namespaced_pod(
+                        namespace, label_selector=f"app={deployment_name}",
+                    )
+                    if not pods.items:
+                        break
+                except Exception:
                     break
                 time.sleep(5)
 
