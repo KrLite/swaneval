@@ -15,6 +15,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useUserPermissions } from "@/lib/hooks/use-user-permissions";
 import { useDatasets } from "@/lib/hooks/use-datasets";
 import { useModels } from "@/lib/hooks/use-models";
 import { useTasks } from "@/lib/hooks/use-tasks";
@@ -41,6 +42,7 @@ const COLORS = {
 };
 
 export default function OverviewPage() {
+  const { can } = useUserPermissions();
   const datasets = useDatasets();
   const models = useModels();
   const { data: criteria = [] } = useCriteria();
@@ -89,12 +91,12 @@ export default function OverviewPage() {
         {/* Resource counters */}
         <div className="grid grid-cols-5 gap-3">
           {[
-            { icon: Cpu, label: "模型", value: modelCount, href: "/models" },
-            { icon: Database, label: "数据集", value: datasetCount, href: "/datasets" },
-            { icon: Ruler, label: "评测标准", value: criteria.length, href: "/criteria" },
-            { icon: Activity, label: "任务", value: totalTasks, href: "/tasks" },
-            { icon: BarChart3, label: "评测记录", value: lat.total_evaluations, href: "/results" },
-          ].map((m) => (
+            { icon: Cpu, label: "模型", value: modelCount, href: "/models", perm: "models.read" },
+            { icon: Database, label: "数据集", value: datasetCount, href: "/datasets", perm: "datasets.read" },
+            { icon: Ruler, label: "评测标准", value: criteria.length, href: "/criteria", perm: "criteria.read" },
+            { icon: Activity, label: "任务", value: totalTasks, href: "/tasks", perm: "tasks.read" },
+            { icon: BarChart3, label: "评测记录", value: lat.total_evaluations, href: "/results", perm: "results.read" },
+          ].filter((m) => can(m.perm)).map((m) => (
             <Link key={m.label} href={m.href}>
               <Card className="hover:border-primary/30 transition-colors bg-card/60 backdrop-blur-sm">
                 <CardContent className="flex items-center gap-3 p-4">

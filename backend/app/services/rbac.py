@@ -56,10 +56,20 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
 
 
 async def get_user_permissions(session: AsyncSession, user: User) -> set[str]:
-    """Get the union of all permissions from the user's groups."""
+    """Get the user's effective permissions.
+
+    Priority:
+    1. Admin role → all permissions (short-circuit)
+    2. Explicit group memberships → union of all group permissions
+    3. Fallback to ROLE_PERMISSIONS[user.role] → default permissions for the role
+
+    This ensures users have sensible permissions out-of-the-box based on their
+    role, even without explicit permission group assignments.
+    """
     if user.role == UserRole.admin:
         return set(ALL_PERMISSIONS)
 
+    # Check explicit group memberships
     stmt = (
         select(PermissionGroup.permissions_json)
         .join(UserGroupMembership, UserGroupMembership.group_id == PermissionGroup.id)
@@ -72,6 +82,12 @@ async def get_user_permissions(session: AsyncSession, user: User) -> set[str]:
             perms.update(json.loads(row))
         except (json.JSONDecodeError, TypeError):
             pass
+
+    # Fallback: if user has no group permissions, use role defaults
+    if not perms:
+        role_defaults = ROLE_PERMISSIONS.get(user.role, [])
+        perms = set(role_defaults)
+
     return perms
 
 
