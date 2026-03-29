@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,7 +80,46 @@ export default function PermissionsPage() {
   const updateGroup = useUpdatePermissionGroup();
   const deleteGroup = useDeletePermissionGroup();
 
-  const [selected, setSelected] = useState<SelectedItem | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [selected, setSelectedRaw] = useState<SelectedItem | null>(null);
+
+  const setSelected = useCallback((item: SelectedItem | null) => {
+    setSelectedRaw(item);
+    const params = new URLSearchParams(window.location.search);
+    if (item) {
+      if (item.type === "role") {
+        params.set("type", "role");
+        params.set("name", item.data.name);
+        params.delete("id");
+      } else {
+        params.set("type", "group");
+        params.set("id", (item.data as PermissionGroup).id);
+        params.delete("name");
+      }
+    } else {
+      params.delete("type");
+      params.delete("name");
+      params.delete("id");
+    }
+    const qs = params.toString();
+    router.replace(`/admin/permissions${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [router]);
+
+  // Restore selection from URL on mount
+  useEffect(() => {
+    if (selected) return; // already selected
+    const type = searchParams.get("type");
+    if (type === "role") {
+      const name = searchParams.get("name");
+      const role = roleConfigs.find((r) => r.name === name);
+      if (role) setSelectedRaw({ type: "role", data: role });
+    } else if (type === "group") {
+      const id = searchParams.get("id");
+      const group = permGroups.find((g) => g.id === id);
+      if (group) setSelectedRaw({ type: "group", data: group });
+    }
+  }, [searchParams, selected, roleConfigs, permGroups]);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
