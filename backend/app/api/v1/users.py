@@ -17,7 +17,7 @@ router = APIRouter()
 
 def _require_admin(current_user: User = Depends(get_current_user)):
     if current_user.role != UserRole.admin:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin only")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "仅管理员可访问")
     return current_user
 
 
@@ -69,7 +69,7 @@ async def update_user(
 ):
     user = await session.get(User, user_id)
     if not user:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "用户未找到")
     if body.nickname is not None and user.username != "admin":
         user.nickname = body.nickname
     if body.email is not None:
@@ -78,14 +78,14 @@ async def update_user(
         if user.username == "admin":
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                "Cannot change admin role",
+                "无法修改内置管理员的角色",
             )
         user.role = body.role
     if body.is_active is not None:
         if user.username == "admin":
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                "Cannot deactivate admin",
+                "无法停用内置管理员账户",
             )
         user.is_active = body.is_active
     user.updated_at = datetime.now(timezone.utc)
@@ -103,11 +103,11 @@ async def delete_user(
 ):
     user = await session.get(User, user_id)
     if not user:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "用户未找到")
     if user.username == "admin":
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "Cannot delete admin account",
+            "无法删除内置管理员账户",
         )
     await session.delete(user)
     await session.commit()

@@ -132,7 +132,7 @@ async def get_cluster(
     """Get details for a single compute cluster."""
     cluster = await session.get(ComputeCluster, cluster_id)
     if not cluster:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cluster not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "集群未找到")
     return cluster
 
 
@@ -146,7 +146,7 @@ async def update_cluster(
     """Update cluster name, description, or namespace."""
     cluster = await session.get(ComputeCluster, cluster_id)
     if not cluster:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cluster not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "集群未找到")
 
     if body.name is not None:
         cluster.name = body.name
@@ -161,8 +161,8 @@ async def update_cluster(
         active = (await session.exec(active_stmt)).all()
         if active:
             raise HTTPException(
-                409,
-                "无法更改命名空间：集群上有活跃的模型部署。请先停止所有部署。",
+                status.HTTP_409_CONFLICT,
+                "无法更改命名空间：集群上有活跃的模型部署，请先停止所有部署",
             )
         cluster.namespace = body.namespace
     if body.vllm_image is not None:
@@ -184,7 +184,7 @@ async def delete_cluster(
     """Delete a compute cluster."""
     cluster = await session.get(ComputeCluster, cluster_id)
     if not cluster:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cluster not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "集群未找到")
 
     # Check for active deployments
     from app.models.llm_model import LLMModel
@@ -214,10 +214,10 @@ async def probe_cluster(
     """Force a resource probe on the cluster."""
     cluster = await session.get(ComputeCluster, cluster_id)
     if not cluster:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cluster not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "集群未找到")
     if not cluster.kubeconfig_encrypted:
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "Cluster has no kubeconfig",
+            status.HTTP_400_BAD_REQUEST, "集群缺少 Kubeconfig",
         )
 
     cluster.status = ClusterStatus.connecting
@@ -242,10 +242,10 @@ async def list_cluster_nodes(
     """List nodes in the cluster with resource details."""
     cluster = await session.get(ComputeCluster, cluster_id)
     if not cluster:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cluster not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "集群未找到")
     if not cluster.kubeconfig_encrypted:
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "Cluster has no kubeconfig",
+            status.HTTP_400_BAD_REQUEST, "集群缺少 Kubeconfig",
         )
 
     try:
@@ -255,7 +255,7 @@ async def list_cluster_nodes(
     except Exception as exc:
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY,
-            f"Failed to fetch nodes: {exc}",
+            f"获取节点列表失败: {exc}",
         ) from exc
 
     return nodes
@@ -270,9 +270,9 @@ async def list_cluster_deployments(
     """List vLLM deployments in the cluster namespace."""
     cluster = await session.get(ComputeCluster, cluster_id)
     if not cluster:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cluster not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "集群未找到")
     if not cluster.kubeconfig_encrypted:
-        raise HTTPException(400, "Cluster has no kubeconfig")
+        raise HTTPException(400, "集群缺少 Kubeconfig")
 
     from app.services.k8s_client import create_apps_v1
 
@@ -301,7 +301,7 @@ async def list_cluster_deployments(
 
         return await asyncio.to_thread(_list)
     except Exception as e:
-        raise HTTPException(502, f"Failed to list deployments: {e}") from e
+        raise HTTPException(502, f"获取部署列表失败: {e}") from e
 
 
 @router.get("/{cluster_id}/deployments/{deployment_name}/logs")
@@ -315,9 +315,9 @@ async def get_deployment_logs(
     """Get logs from the first pod of a vLLM deployment."""
     cluster = await session.get(ComputeCluster, cluster_id)
     if not cluster:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cluster not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "集群未找到")
     if not cluster.kubeconfig_encrypted:
-        raise HTTPException(400, "Cluster has no kubeconfig")
+        raise HTTPException(400, "集群缺少 Kubeconfig")
 
     from app.services.k8s_client import create_core_v1
 
@@ -356,7 +356,7 @@ async def get_deployment_logs(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(502, f"Failed to get logs: {e}") from e
+        raise HTTPException(502, f"获取日志失败: {e}") from e
 
 
 @router.post("/{cluster_id}/install-gpu-support")
@@ -376,9 +376,9 @@ async def install_gpu_support(
 
     cluster = await session.get(ComputeCluster, cluster_id)
     if not cluster:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cluster not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "集群未找到")
     if not cluster.kubeconfig_encrypted:
-        raise HTTPException(400, "Cluster has no kubeconfig")
+        raise HTTPException(400, "集群缺少 Kubeconfig")
 
     result = await install_gpu_operator(cluster.kubeconfig_encrypted, method=method)
 
@@ -402,8 +402,8 @@ async def get_gpu_status(
 
     cluster = await session.get(ComputeCluster, cluster_id)
     if not cluster:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cluster not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "集群未找到")
     if not cluster.kubeconfig_encrypted:
-        raise HTTPException(400, "Cluster has no kubeconfig")
+        raise HTTPException(400, "集群缺少 Kubeconfig")
 
     return await check_gpu_operator_status(cluster.kubeconfig_encrypted)

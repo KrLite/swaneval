@@ -152,8 +152,16 @@ export function Topbar() {
             >
               <div className="text-right">
                 <p className="text-sm font-medium leading-none">{user.nickname || user.username}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{user.role}</p>
               </div>
+              <span className={cn(
+                "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                user.role === "admin" ? "bg-primary/15 text-primary" :
+                user.role === "data_admin" ? "bg-amber-500/15 text-amber-700 dark:text-amber-400" :
+                user.role === "engineer" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" :
+                "bg-muted text-muted-foreground"
+              )}>
+                {{ admin: "管理员", data_admin: "数据管理员", engineer: "工程师", viewer: "观察者" }[user.role] || user.role}
+              </span>
             </button>
             <ThemeToggle />
             <button

@@ -143,7 +143,7 @@ async def pull_benchmarks_from_platform(
         entries = await pull_benchmarks(source, model_filter, limit)
     except Exception as e:
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, f"Pull failed: {e}"
+            status.HTTP_400_BAD_REQUEST, f"拉取失败: {e}"
         ) from e
 
     if not auto_import:
@@ -179,7 +179,7 @@ async def delete_benchmark(
     entry = await session.get(ExternalBenchmark, benchmark_id)
     if not entry:
         raise HTTPException(
-            status.HTTP_404_NOT_FOUND, "Benchmark entry not found"
+            status.HTTP_404_NOT_FOUND, "基准数据未找到"
         )
     await session.delete(entry)
     await session.commit()

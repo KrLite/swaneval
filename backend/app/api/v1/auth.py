@@ -44,7 +44,7 @@ async def register(body: RegisterRequest, session: AsyncSession = Depends(get_db
     )
     existing = (await session.exec(stmt)).first()
     if existing:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Username or email already taken")
+        raise HTTPException(status.HTTP_409_CONFLICT, "用户名或邮箱已被使用")
 
     user = User(
         username="admin" if is_first else body.username,
@@ -64,11 +64,11 @@ async def login(body: LoginRequest, session: AsyncSession = Depends(get_db)):
     stmt = select(User).where(User.username == body.username)
     user = (await session.exec(stmt)).first()
     if not user:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户未找到")
     if not verify_password(body.password, user.hashed_password):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户名或密码错误")
     if not user.is_active:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Account disabled")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "账户已停用")
 
     token = create_access_token(str(user.id))
     return TokenResponse(access_token=token)

@@ -102,7 +102,7 @@ async def get_criterion(
 ):
     c = await session.get(Criterion, criterion_id)
     if not c:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Criterion not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "评测标准未找到")
     return c
 
 
@@ -115,7 +115,7 @@ async def update_criterion(
 ):
     c = await session.get(Criterion, criterion_id)
     if not c:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Criterion not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "评测标准未找到")
     if body.name is not None:
         c.name = body.name
     if body.config_json is not None:
@@ -134,7 +134,7 @@ async def delete_criterion(
 ):
     c = await session.get(Criterion, criterion_id)
     if not c:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Criterion not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "评测标准未找到")
 
     # Delete eval_results referencing this criterion
     stmt = select(EvalResult).where(EvalResult.criterion_id == criterion_id)
@@ -154,7 +154,7 @@ async def test_criterion(
 ):
     c = await session.get(Criterion, body.criterion_id)
     if not c:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Criterion not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "评测标准未找到")
 
     # For llm_judge, resolve judge_model_id to actual credentials
     config_json = c.config_json

@@ -176,9 +176,9 @@ async def stability_stats(
 
     task = await session.get(EvalTask, task_id)
     if not task:
-        raise HTTPException(404, "Task not found")
+        raise HTTPException(404, "任务未找到")
     if task.repeat_count <= 1:
-        raise HTTPException(400, "Stability stats require repeat_count > 1")
+        raise HTTPException(400, "稳定性统计需要重复次数 > 1")
 
     # Get all subtasks for this task
     sub_stmt = select(EvalSubtask).where(

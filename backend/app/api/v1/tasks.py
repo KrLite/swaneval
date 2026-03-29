@@ -112,7 +112,7 @@ async def get_task(
 ):
     task = await session.get(EvalTask, task_id)
     if not task:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "任务未找到")
     return await _enrich_task(session, task)
 
 
@@ -139,9 +139,9 @@ async def pause_task(
 ):
     task = await session.get(EvalTask, task_id)
     if not task:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "任务未找到")
     if task.status != TaskStatus.running:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Task is not running")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "任务未在运行")
     task.status = TaskStatus.paused
     session.add(task)
     await session.commit()
@@ -157,9 +157,9 @@ async def resume_task(
 ):
     task = await session.get(EvalTask, task_id)
     if not task:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "任务未找到")
     if task.status not in (TaskStatus.paused, TaskStatus.failed):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Task cannot be resumed")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "任务无法恢复")
     task.status = TaskStatus.pending
     session.add(task)
     await session.commit()
@@ -177,7 +177,7 @@ async def cancel_task(
 ):
     task = await session.get(EvalTask, task_id)
     if not task:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "任务未找到")
     task.status = TaskStatus.cancelled
     session.add(task)
     # Also cancel running subtasks
@@ -203,7 +203,7 @@ async def restart_task(
     """Restart a failed/cancelled task from scratch — clears all results."""
     task = await session.get(EvalTask, task_id)
     if not task:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "任务未找到")
     if task.status not in (TaskStatus.failed, TaskStatus.cancelled):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -237,7 +237,7 @@ async def delete_task(
 ):
     task = await session.get(EvalTask, task_id)
     if not task:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "任务未找到")
 
     # Delete results referencing this task
     stmt = select(EvalResult).where(EvalResult.task_id == task_id)

@@ -85,7 +85,7 @@ async def get_model(
 ):
     m = await session.get(LLMModel, model_id)
     if not m:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "模型未找到")
     return m
 
 
@@ -98,7 +98,7 @@ async def update_model(
 ):
     m = await session.get(LLMModel, model_id)
     if not m:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "模型未找到")
     if body.name is not None:
         m.name = body.name
     if body.endpoint_url is not None:
@@ -129,7 +129,7 @@ async def test_model(
 ):
     m = await session.get(LLMModel, model_id)
     if not m:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "模型未找到")
 
     model_name = m.model_name or m.name or settings.DEFAULT_MODEL_NAME
     endpoint_url = m.endpoint_url or settings.DEFAULT_MODEL_ENDPOINT_URL
@@ -160,7 +160,7 @@ async def delete_model(
 ):
     m = await session.get(LLMModel, model_id)
     if not m:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "模型未找到")
     try:
         await session.delete(m)
         await session.commit()
@@ -182,7 +182,7 @@ async def playground(
     """Send a prompt to a model and get the response."""
     m = await session.get(LLMModel, model_id)
     if not m:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "模型未找到")
 
     params = {"temperature": body.temperature, "max_tokens": body.max_tokens}
 
@@ -190,7 +190,7 @@ async def playground(
         result: ModelCallResult = await _call_model(client, m, body.prompt, params)
 
     if result.error:
-        raise HTTPException(400, f"Model call failed: {result.error.detail}")
+        raise HTTPException(400, f"模型调用失败: {result.error.detail}")
 
     return PlaygroundResponse(
         output=result.output,
@@ -296,10 +296,10 @@ async def deploy_model(
 
     m = await session.get(LLMModel, model_id)
     if not m:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "模型未找到")
 
     if m.deploy_status in ("deploying", "running"):
-        raise HTTPException(409, "模型正在部署或已部署")
+        raise HTTPException(status.HTTP_409_CONFLICT, "模型正在部署或已部署")
 
     cid = cluster_id or m.cluster_id
     if not cid:
@@ -348,7 +348,7 @@ async def undeploy_model(
 
     m = await session.get(LLMModel, model_id)
     if not m:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "模型未找到")
 
     if not m.cluster_id and not m.vllm_deployment_name:
         # Nothing to undeploy — just reset status
@@ -360,11 +360,11 @@ async def undeploy_model(
         return {"status": "reset"}
 
     if not m.cluster_id:
-        raise HTTPException(400, "Model is not deployed to any cluster")
+        raise HTTPException(400, "模型未部署到任何集群")
 
     cluster = await session.get(ComputeCluster, m.cluster_id)
     if not cluster or not cluster.kubeconfig_encrypted:
-        raise HTTPException(404, "Cluster not found")
+        raise HTTPException(404, "集群未找到")
 
     dep_name = m.vllm_deployment_name
     # No URL-parsing fallback — only clean up if we have the actual deployment name
@@ -413,7 +413,7 @@ async def check_deploy_health(
     """
     m = await session.get(LLMModel, model_id)
     if not m:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Model not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "模型未找到")
 
     if m.deploy_status not in ("running", "deploying"):
         return {"status": m.deploy_status, "healthy": False, "reason": "not deployed"}

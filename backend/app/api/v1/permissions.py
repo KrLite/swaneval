@@ -97,7 +97,7 @@ async def get_group(
     """Get group detail with member count."""
     group = await session.get(PermissionGroup, group_id)
     if not group:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Group not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "权限组未找到")
 
     count_stmt = select(func.count()).where(
         UserGroupMembership.group_id == group.id
@@ -127,7 +127,7 @@ async def update_group(
     """Update a permission group."""
     group = await session.get(PermissionGroup, group_id)
     if not group:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Group not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "权限组未找到")
 
     if body.name is not None:
         group.name = body.name
@@ -167,19 +167,30 @@ async def delete_group(
     """Delete a non-system permission group."""
     group = await session.get(PermissionGroup, group_id)
     if not group:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Group not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "权限组未找到")
     if group.is_system:
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "Cannot delete system group"
+            status.HTTP_400_BAD_REQUEST, "无法删除系统权限组",
         )
 
-    # Remove memberships first
+    # Check for active members
     mem_stmt = select(UserGroupMembership).where(
         UserGroupMembership.group_id == group_id
     )
     memberships = (await session.exec(mem_stmt)).all()
-    for m in memberships:
-        await session.delete(m)
+    if memberships:
+        member_names = []
+        for m in memberships[:3]:
+            u = await session.get(User, m.user_id)
+            if u:
+                member_names.append(u.username)
+        names_str = "、".join(member_names)
+        if len(memberships) > 3:
+            names_str += f" 等共 {len(memberships)} 人"
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"该权限组仍有成员（{names_str}），请先移除所有成员后再删除",
+        )
 
     await session.delete(group)
     await session.commit()
@@ -198,7 +209,7 @@ async def add_members(
     """Add users to a group."""
     group = await session.get(PermissionGroup, group_id)
     if not group:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Group not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "权限组未找到")
 
     added = 0
     for user_id in body.user_ids:
@@ -236,7 +247,7 @@ async def remove_member(
     )
     membership = (await session.exec(stmt)).first()
     if not membership:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Membership not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "成员关系未找到")
     await session.delete(membership)
     await session.commit()
 
@@ -352,7 +363,7 @@ async def delete_acl(
     """Delete a resource ACL."""
     acl = await session.get(ResourceAcl, acl_id)
     if not acl:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "ACL not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "访问控制项未找到")
     await session.delete(acl)
     await session.commit()
 
@@ -458,4 +469,4 @@ async def seed_default_groups(
             session.add(group)
 
     await session.commit()
-    return {"status": "ok", "message": "Default permission groups synced"}
+    return {"status": "ok", "message": "默认权限组已同步"}

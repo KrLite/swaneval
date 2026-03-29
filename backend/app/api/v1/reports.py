@@ -44,7 +44,7 @@ async def create_report(
     """Generate and persist a report."""
     generator = REPORT_GENERATORS.get(report_type)
     if not generator:
-        raise HTTPException(400, f"Invalid report type: {report_type}")
+        raise HTTPException(400, f"无效的报告类型: {report_type}")
 
     rt = ReportType(report_type)
     report = Report(
@@ -139,7 +139,7 @@ async def get_report(
     """Fetch a persisted report with full content."""
     report = await session.get(Report, report_id)
     if not report:
-        raise HTTPException(404, "Report not found")
+        raise HTTPException(404, "报告未找到")
 
     # Visibility access check
     if (
@@ -179,7 +179,7 @@ async def generate_report(
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail=(
-                "Invalid report type. Choose from: "
+                "无效的报告类型，可选: "
                 f"{list(REPORT_GENERATORS.keys())}"
             ),
         )
@@ -300,7 +300,7 @@ async def _get_report(task_id, report_type, session):
     if not generator:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            detail="Invalid report type",
+            detail="无效的报告类型",
         )
     try:
         return await generator(task_id, session)

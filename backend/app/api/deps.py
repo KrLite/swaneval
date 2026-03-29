@@ -23,22 +23,22 @@ async def get_current_user(
     token = credentials.credentials
     user_id_str = decode_access_token(token)
     if not user_id_str:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "令牌无效或已过期")
     try:
         user_id = uuid.UUID(user_id_str)
     except ValueError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token payload")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "令牌内容无效")
 
     user = await session.get(User, user_id)
     if not user or not user.is_active:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found or inactive")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户不存在或已停用")
     return user
 
 
 def require_role(*roles: str):
     async def dependency(current_user: User = Depends(get_current_user)):
         if current_user.role not in roles:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Insufficient permissions")
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "权限不足")
         return current_user
 
     return Depends(dependency)
@@ -56,6 +56,6 @@ def require_permission(*perms: str):
         for p in perms:
             if await check_permission(session, current_user, p):
                 return current_user
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Insufficient permissions")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "权限不足")
 
     return Depends(dependency)

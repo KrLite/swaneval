@@ -52,7 +52,8 @@ const permModules: { label: string; perms: string[] }[] = [
   { label: "模型", perms: ["models.read", "models.write"] },
   { label: "评测标准", perms: ["criteria.read", "criteria.write"] },
   { label: "评测任务", perms: ["tasks.read", "tasks.create", "tasks.manage"] },
-  { label: "结果与报告", perms: ["results.read", "reports.read", "reports.generate", "reports.export"] },
+  { label: "评测结果", perms: ["results.read"] },
+  { label: "评测报告", perms: ["reports.read", "reports.generate", "reports.export"] },
   { label: "计算资源", perms: ["clusters.read", "clusters.manage"] },
   { label: "系统管理", perms: ["admin.users", "admin.groups", "admin.acl"] },
 ];
@@ -83,6 +84,7 @@ export default function PermissionsPage() {
   const [newPerms, setNewPerms] = useState<Set<string>>(new Set());
   const [createError, setCreateError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const handleCreate = async () => {
     setCreateError("");
@@ -154,12 +156,12 @@ export default function PermissionsPage() {
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-2 mb-1">
                 自定义权限组
               </p>
-              {permGroups.length === 0 ? (
+              {permGroups.filter(g => !g.is_system).length === 0 ? (
                 <p className="text-[11px] text-muted-foreground px-2.5 py-3">
                   暂无权限组
                 </p>
               ) : (
-                permGroups.map((g) => (
+                permGroups.filter(g => !g.is_system).map((g) => (
                   <button
                     key={g.id}
                     type="button"
@@ -172,7 +174,6 @@ export default function PermissionsPage() {
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium flex-1 truncate">{g.name}</span>
-                      {g.is_system && <Badge variant="outline" className="text-[9px]">系统</Badge>}
                       <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
                         {g.member_count} 人
                       </span>
@@ -375,16 +376,22 @@ export default function PermissionsPage() {
         open={!!deleteTarget}
         title="删除权限组"
         name={deleteTarget?.name ?? ""}
+        error={deleteError}
         isPending={deleteGroup.isPending}
         onConfirm={async () => {
           if (!deleteTarget) return;
-          await deleteGroup.mutateAsync(deleteTarget.id);
-          if (selected?.type === "group" && (selected.data as PermissionGroup).id === deleteTarget.id) {
-            setSelected(null);
+          setDeleteError("");
+          try {
+            await deleteGroup.mutateAsync(deleteTarget.id);
+            if (selected?.type === "group" && (selected.data as PermissionGroup).id === deleteTarget.id) {
+              setSelected(null);
+            }
+            setDeleteTarget(null);
+          } catch (err: unknown) {
+            setDeleteError(extractErrorDetail(err, "删除失败"));
           }
-          setDeleteTarget(null);
         }}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={() => { setDeleteTarget(null); setDeleteError(""); }}
       />
     </div>
   );

@@ -204,7 +204,7 @@ async def import_dataset(
     from app.services.import_progress import create_job, update_job
 
     if body.source not in ("huggingface", "modelscope"):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "source must be huggingface or modelscope")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "source 必须为 huggingface 或 modelscope")
 
     source_type = (
         SourceType.huggingface if body.source == "huggingface" else SourceType.modelscope
@@ -296,7 +296,7 @@ async def mount_dataset(
     # Mount always operates on local filesystem paths
     if not os.path.exists(body.server_path):
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "Server path does not exist"
+            status.HTTP_400_BAD_REQUEST, "服务器路径不存在"
         )
 
     row_count = await _count_rows(storage, body.server_path)
@@ -408,10 +408,10 @@ async def download_preset_content(
 
     ds = await session.get(Dataset, dataset_id)
     if not ds:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Dataset not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "数据集未找到")
 
     if ds.row_count > 0 and ds.size_bytes > 0:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Dataset already has content")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "数据集已有内容")
 
     # Resolve HF ID and subset — for presets, look up in PRESET_DATASETS
     hf_id = ""
@@ -427,7 +427,7 @@ async def download_preset_content(
         if not hf_id:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                f"Preset '{ds.name}' not found in catalog",
+                f"预设数据集 '{ds.name}' 未在目录中找到",
             )
     elif ds.source_type == SourceType.huggingface:
         # Use stored HF dataset ID, not source_uri (which is local path after import)
@@ -437,7 +437,7 @@ async def download_preset_content(
     else:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "Only preset and HuggingFace datasets can be downloaded",
+            "仅支持预设和 HuggingFace 数据集的下载",
         )
 
     try:
@@ -446,7 +446,7 @@ async def download_preset_content(
             hf_token=current_user.hf_token or None,
         )
     except Exception as e:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Download failed: {e}") from e
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"下载失败: {e}") from e
 
     ds.source_uri = source_uri
     # After downloading, mark as huggingface (no longer a placeholder)
@@ -483,7 +483,7 @@ async def get_dataset(
 ):
     ds = await session.get(Dataset, dataset_id)
     if not ds:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Dataset not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "数据集未找到")
     return ds
 
 
@@ -497,7 +497,7 @@ async def preview_dataset(
 ):
     ds = await session.get(Dataset, dataset_id)
     if not ds:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Dataset not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "数据集未找到")
 
     import pandas as pd
 
@@ -558,7 +558,7 @@ async def subscribe_dataset(
     """Enable auto-update subscription for a dataset."""
     ds = await session.get(Dataset, dataset_id)
     if not ds:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Dataset not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "数据集未找到")
 
     ds.auto_update = True
     ds.hf_dataset_id = body.hf_dataset_id
@@ -580,7 +580,7 @@ async def unsubscribe_dataset(
     """Disable auto-update subscription for a dataset."""
     ds = await session.get(Dataset, dataset_id)
     if not ds:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Dataset not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "数据集未找到")
 
     ds.auto_update = False
     ds.sync_status = ""
@@ -601,14 +601,14 @@ async def sync_dataset_now(
 
     ds = await session.get(Dataset, dataset_id)
     if not ds:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Dataset not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "数据集未找到")
 
     if not ds.hf_dataset_id and ds.source_type not in (
         SourceType.huggingface, SourceType.preset
     ):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "Only HuggingFace/preset datasets can be synced",
+            "仅支持 HuggingFace/预设数据集的同步",
         )
 
     result = await check_and_sync_dataset(dataset_id, triggered_by="manual")
@@ -628,7 +628,7 @@ async def delete_dataset(
 ):
     ds = await session.get(Dataset, dataset_id)
     if not ds:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Dataset not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "数据集未找到")
 
     # Delete eval_results referencing this dataset
     stmt = select(EvalResult).where(EvalResult.dataset_id == dataset_id)
@@ -672,7 +672,7 @@ async def preflight_import(
     """
     _cleanup_preflight_cache()
     if len(_preflight_cache) >= _PREFLIGHT_MAX_SIZE:
-        raise HTTPException(429, "Too many pending preflight operations")
+        raise HTTPException(429, "预检操作过多，请稍后再试")
 
     from app.services.dataset_stats import _infer_dtype, _load_dataframe
 
@@ -695,7 +695,7 @@ async def preflight_import(
     elif server_path:
         # Server path source
         if not os.path.exists(server_path):
-            raise HTTPException(400, f"Server path not found: {server_path}")
+            raise HTTPException(400, f"服务器路径不存在: {server_path}")
         source_uri = server_path
         ext = os.path.splitext(server_path)[1].lower()
         fmt = ext.lstrip(".") or "jsonl"
@@ -718,18 +718,18 @@ async def preflight_import(
                     ms_token=current_user.ms_token or None,
                 )
         except Exception as e:
-            raise HTTPException(400, f"Preflight download failed: {e}") from e
+            raise HTTPException(400, f"预检下载失败: {e}") from e
         ext = os.path.splitext(source_uri)[1].lower()
         fmt = ext.lstrip(".") or "jsonl"
         source_type = source
     else:
-        raise HTTPException(400, "Provide a file, server_path, or source+dataset_id")
+        raise HTTPException(400, "请提供文件、服务器路径或数据源 ID")
 
     # Load sample data
     try:
         df = await _load_dataframe(storage, source_uri)
     except Exception as e:
-        raise HTTPException(400, f"Cannot parse file: {e}") from e
+        raise HTTPException(400, f"文件解析失败: {e}") from e
 
     row_count = len(df)
     columns = list(df.columns)
@@ -789,11 +789,11 @@ async def confirm_import(
     """Stage 2: Confirm preflight and commit dataset to database."""
     cached = _preflight_cache.pop(body.preflight_token, None)
     if not cached:
-        raise HTTPException(400, "Invalid or expired preflight token")
+        raise HTTPException(400, "预检令牌无效或已过期")
 
     # Check expiry (30 minutes)
     if time.time() - cached["created_at"] > 1800:
-        raise HTTPException(400, "Preflight token expired (30 min limit)")
+        raise HTTPException(400, "预检令牌已过期（30 分钟有效期）")
 
     source_type_map = {
         "upload": SourceType.upload,
@@ -857,7 +857,7 @@ async def list_versions(
     """List all versions of a dataset, newest first."""
     ds = await session.get(Dataset, dataset_id)
     if not ds:
-        raise HTTPException(404, "Dataset not found")
+        raise HTTPException(404, "数据集未找到")
     stmt = (
         select(DatasetVersion)
         .where(DatasetVersion.dataset_id == dataset_id)
@@ -888,7 +888,7 @@ async def preview_version(
     )
     dv = (await session.exec(stmt)).first()
     if not dv:
-        raise HTTPException(404, "Version not found")
+        raise HTTPException(404, "版本未找到")
 
     # Reuse the same preview logic but with the version's file_path
     from app.services.dataset_stats import _load_dataframe
@@ -918,7 +918,7 @@ async def dataset_stats(
 
     ds = await session.get(Dataset, dataset_id)
     if not ds:
-        raise HTTPException(404, "Dataset not found")
+        raise HTTPException(404, "数据集未找到")
 
     source_uri = ds.source_uri
     size_bytes = ds.size_bytes
@@ -931,12 +931,12 @@ async def dataset_stats(
         )
         dv = (await session.exec(stmt)).first()
         if not dv:
-            raise HTTPException(404, f"Version {version} not found")
+            raise HTTPException(404, f"版本 {version} 未找到")
         source_uri = dv.file_path
         size_bytes = dv.size_bytes or ds.size_bytes
 
     if not source_uri:
-        raise HTTPException(400, "Dataset has no content")
+        raise HTTPException(400, "数据集无内容")
 
     try:
         stats = await compute_dataset_stats(storage, source_uri, size_bytes)
