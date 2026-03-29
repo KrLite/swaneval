@@ -106,19 +106,27 @@ export default function PermissionsPage() {
     router.replace(`/admin/permissions${qs ? `?${qs}` : ""}`, { scroll: false });
   }, [router]);
 
-  // Restore selection from URL on mount, AND keep selected data fresh when query cache updates
+  // Restore selection from URL, and keep selected data fresh when query cache updates
   useEffect(() => {
     const type = searchParams.get("type");
     if (type === "role") {
       const name = searchParams.get("name");
       const role = roleConfigs.find((r) => r.name === name);
-      if (role) setSelectedRaw({ type: "role", data: role });
+      if (role) setSelectedRaw((prev) => {
+        if (prev?.type === "role" && prev.data.name === role.name
+            && JSON.stringify(prev.data.permissions) === JSON.stringify(role.permissions)) return prev;
+        return { type: "role", data: role };
+      });
     } else if (type === "group") {
       const id = searchParams.get("id");
       const group = permGroups.find((g) => g.id === id);
-      if (group) setSelectedRaw({ type: "group", data: group });
+      if (group) setSelectedRaw((prev) => {
+        if (prev?.type === "group" && (prev.data as PermissionGroup).id === group.id
+            && JSON.stringify((prev.data as PermissionGroup).permissions) === JSON.stringify(group.permissions)) return prev;
+        return { type: "group", data: group };
+      });
     }
-  }, [searchParams, selected, roleConfigs, permGroups]);
+  }, [searchParams, roleConfigs, permGroups]);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
