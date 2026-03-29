@@ -294,12 +294,12 @@ export function ModelDetailPanel({
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" className="flex-1 text-xs h-7"
+                    <Button size="sm" variant="ghost" className="flex-1 text-xs"
                       onClick={() => checkHealth.mutate(model.id)} disabled={checkHealth.isPending}>
                       {checkHealth.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                       检查状态
                     </Button>
-                    <Button size="sm" variant="outline" className="flex-1 text-xs h-7"
+                    <Button size="sm" variant="outline" className="flex-1 text-xs"
                       onClick={() => undeploy.mutate(model.id)} disabled={undeploy.isPending}>
                       {undeploy.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                       停止部署
@@ -312,7 +312,7 @@ export function ModelDetailPanel({
                     <Loader2 className="h-3 w-3 animate-spin" />
                     正在部署（首次可能需要数分钟）...
                   </div>
-                  <Button size="sm" variant="outline" className="w-full text-xs h-7 text-destructive hover:text-destructive"
+                  <Button size="sm" variant="outline" className="w-full text-xs text-destructive hover:text-destructive"
                     onClick={() => undeploy.mutate(model.id)} disabled={undeploy.isPending}>
                     {undeploy.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                     取消部署
@@ -324,7 +324,7 @@ export function ModelDetailPanel({
                     <XIcon className="h-3 w-3" />
                     {model.deploy_status === DEPLOY_STATUS.CLEANUP_FAILED ? "清理失败" : "部署失败"}
                   </div>
-                  <Button size="sm" variant="outline" className="w-full text-xs h-7"
+                  <Button size="sm" variant="outline" className="w-full text-xs"
                     onClick={() => undeploy.mutate(model.id)} disabled={undeploy.isPending}>
                     {undeploy.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                     清理资源
