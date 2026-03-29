@@ -27,7 +27,7 @@ import {
   X as XIcon,
 } from "lucide-react";
 import { useUpdateModel, useTestModel, usePlayground, useDeployModel, useUndeployModel, useCheckDeployHealth } from "@/lib/hooks/use-models";
-import { useClusters } from "@/lib/hooks/use-clusters";
+import { ClusterSelect } from "@/components/models/cluster-select";
 import type { LLMModel } from "@/lib/types";
 import { cn, utc } from "@/lib/utils";
 import { formatTime } from "@/lib/time";
@@ -63,7 +63,6 @@ export function ModelDetailPanel({
   const undeploy = useUndeployModel();
   const checkHealth = useCheckDeployHealth();
 
-  const { data: clusters } = useClusters();
   const [redeployClusterId, setRedeployClusterId] = useState(model.cluster_id || "");
 
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -329,16 +328,7 @@ export function ModelDetailPanel({
                     <XIcon className="h-3 w-3" />
                     {model.deploy_status === DEPLOY_STATUS.CLEANUP_FAILED ? "清理失败" : "部署失败"}
                   </div>
-                  <Select value={redeployClusterId} onValueChange={setRedeployClusterId}>
-                    <SelectTrigger className="h-7 text-xs">
-                      <SelectValue placeholder="选择集群" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clusters?.filter(c => c.status === "ready").map(c => (
-                        <SelectItem key={c.id} value={c.id} className="text-xs">{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <ClusterSelect value={redeployClusterId} onValueChange={setRedeployClusterId} />
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" className="flex-1 text-xs"
                       onClick={() => deploy.mutate({ model_id: model.id, cluster_id: redeployClusterId })}
@@ -359,16 +349,7 @@ export function ModelDetailPanel({
                     <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
                     已停止
                   </div>
-                  <Select value={redeployClusterId} onValueChange={setRedeployClusterId}>
-                    <SelectTrigger className="h-7 text-xs">
-                      <SelectValue placeholder="选择集群" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clusters?.filter(c => c.status === "ready").map(c => (
-                        <SelectItem key={c.id} value={c.id} className="text-xs">{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <ClusterSelect value={redeployClusterId} onValueChange={setRedeployClusterId} />
                   <Button size="sm" variant="outline" className="w-full text-xs"
                     onClick={() => deploy.mutate({ model_id: model.id, cluster_id: redeployClusterId })}
                     disabled={deploy.isPending || !redeployClusterId}>

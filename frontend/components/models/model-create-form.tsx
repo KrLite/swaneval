@@ -22,7 +22,7 @@ import { Plus, Loader2, Check, X as XIcon, Globe, Server } from "lucide-react";
 import { useCreateModel, useDeployModel } from "@/lib/hooks/use-models";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useUserTokens } from "@/lib/hooks/use-users";
-import { useClusters } from "@/lib/hooks/use-clusters";
+import { ClusterSelect } from "@/components/models/cluster-select";
 
 interface ModelCreateFormProps {
   onSuccess: () => void;
@@ -35,7 +35,7 @@ export function ModelCreateForm({ onSuccess, onClose: _onClose }: ModelCreateFor
   const deploy = useDeployModel();
   const user = useAuthStore((s) => s.user);
   const { data: tokenStatus } = useUserTokens();
-  const { data: clusters = [] } = useClusters();
+
   const accountHref = user?.role === "admin" ? `/admin?user=${user.id}` : "/account";
 
   const [mode, setMode] = useState<"api" | "selfhosted">("api");
@@ -292,24 +292,7 @@ export function ModelCreateForm({ onSuccess, onClose: _onClose }: ModelCreateFor
             <div className="rounded-md border p-3 space-y-3">
               <p className="text-xs font-medium">集群部署</p>
               <PanelField label="计算集群" required>
-                <Select value={shForm.cluster_id} onValueChange={(v) => setShForm({ ...shForm, cluster_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="选择集群" /></SelectTrigger>
-                  <SelectContent>
-                    {clusters.length === 0 ? (
-                      <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-                        暂无集群，<a href="/clusters" className="text-primary hover:underline">去添加</a>
-                      </div>
-                    ) : clusters.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                        <span className="text-muted-foreground ml-1">
-                          {c.gpu_count > 0 ? `${c.gpu_count} GPU` : "CPU"}
-                          {c.gpu_type ? ` (${c.gpu_type})` : ""}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <ClusterSelect value={shForm.cluster_id} onValueChange={(v) => setShForm({ ...shForm, cluster_id: v })} />
               </PanelField>
               <div className="grid grid-cols-2 gap-2">
                 <PanelField label="GPU 数量">
