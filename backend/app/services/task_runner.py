@@ -1029,8 +1029,7 @@ async def run_task(task_id: uuid.UUID):
                         "Task %s: vLLM cleanup failed: %s",
                         task_id, ce,
                     )
-                # Reset model deploy status separately so DB errors
-                # don't mask cleanup errors above
+                # Reset model deploy status (separate try to avoid masking cleanup errors)
                 try:
                     model.deploy_status = "stopped"
                     model.endpoint_url = ""
@@ -1039,7 +1038,7 @@ async def run_task(task_id: uuid.UUID):
                     await session.commit()
                 except Exception:
                     logger.warning(
-                        "Task %s: failed to reset model status after cleanup",
+                        "Task %s: failed to update model status after cleanup",
                         task_id, exc_info=True,
                     )
 
