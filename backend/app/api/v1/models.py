@@ -238,6 +238,14 @@ async def _do_deploy(
         async with AsyncSession(engine) as session:
             m = await session.get(LLMModel, model_id)
             if m:
+                # Check if undeploy was called while we were deploying
+                if m.deploy_status != "deploying":
+                    logger.info(
+                        "Deploy for %s completed but status is '%s' (cancelled?), cleaning up",
+                        model_id, m.deploy_status,
+                    )
+                    await cleanup_vllm(kubeconfig, namespace, dep_name)
+                    return
                 m.endpoint_url = endpoint
                 m.deploy_status = "running"
                 m.vllm_deployment_name = dep_name
@@ -273,7 +281,7 @@ async def _do_deploy(
         try:
             async with AsyncSession(engine) as session:
                 m = await session.get(LLMModel, model_id)
-                if m:
+                if m and m.deploy_status == "deploying":
                     m.deploy_status = "failed"
                     session.add(m)
                     await session.commit()

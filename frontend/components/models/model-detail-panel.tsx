@@ -294,24 +294,14 @@ export function ModelDetailPanel({
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="flex-1 text-xs h-7"
-                      onClick={() => checkHealth.mutate(model.id)}
-                      disabled={checkHealth.isPending}
-                    >
-                      {checkHealth.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                    <Button size="sm" variant="ghost" className="flex-1 text-xs h-7"
+                      onClick={() => checkHealth.mutate(model.id)} disabled={checkHealth.isPending}>
+                      {checkHealth.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                       检查状态
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 text-xs h-7"
-                      onClick={() => undeploy.mutate(model.id)}
-                      disabled={undeploy.isPending}
-                    >
-                      {undeploy.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                    <Button size="sm" variant="outline" className="flex-1 text-xs h-7"
+                      onClick={() => undeploy.mutate(model.id)} disabled={undeploy.isPending}>
+                      {undeploy.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                       停止部署
                     </Button>
                   </div>
@@ -320,15 +310,11 @@ export function ModelDetailPanel({
                 <div className="space-y-2">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    正在部署（首次可能需要数分钟下载模型）...
+                    正在部署（首次可能需要数分钟）...
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full text-xs h-7 text-destructive hover:text-destructive"
-                    onClick={() => undeploy.mutate(model.id)}
-                    disabled={undeploy.isPending}
-                  >
+                  <Button size="sm" variant="outline" className="w-full text-xs h-7 text-destructive hover:text-destructive"
+                    onClick={() => undeploy.mutate(model.id)} disabled={undeploy.isPending}>
+                    {undeploy.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                     取消部署
                   </Button>
                 </div>
@@ -338,13 +324,9 @@ export function ModelDetailPanel({
                     <XIcon className="h-3 w-3" />
                     {model.deploy_status === DEPLOY_STATUS.CLEANUP_FAILED ? "清理失败" : "部署失败"}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full text-xs h-7"
-                    onClick={() => undeploy.mutate(model.id)}
-                    disabled={undeploy.isPending}
-                  >
+                  <Button size="sm" variant="outline" className="w-full text-xs h-7"
+                    onClick={() => undeploy.mutate(model.id)} disabled={undeploy.isPending}>
+                    {undeploy.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                     清理资源
                   </Button>
                 </div>

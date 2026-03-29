@@ -206,7 +206,13 @@ export default function ModelsPage() {
                 <Badge variant="success" className="text-[10px] shrink-0">运行中</Badge>
               )}
               {m.deploy_status === DEPLOY_STATUS.FAILED && (
-                <Badge variant="destructive" className="text-[10px] shrink-0">部署失败</Badge>
+                <Badge variant="destructive" className="text-[10px] shrink-0">失败</Badge>
+              )}
+              {m.deploy_status === DEPLOY_STATUS.CLEANUP_FAILED && (
+                <Badge variant="destructive" className="text-[10px] shrink-0">清理失败</Badge>
+              )}
+              {m.deploy_status === DEPLOY_STATUS.STOPPED && (
+                <Badge variant="outline" className="text-[10px] shrink-0">已停止</Badge>
               )}
             </div>
           );
