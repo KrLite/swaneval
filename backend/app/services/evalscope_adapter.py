@@ -157,16 +157,26 @@ async def extract_primary_score(
     """Extract one representative score from EvalScope reports directory."""
     reports_prefix = f"{work_dir_key}/reports"
     files = await storage.list_files(reports_prefix, patterns=["*.json"])
+    if not files:
+        return 0.0  # No report files yet — task may still be running
+    read_errors: list[str] = []
     for f in files:
         try:
             text = await storage.read_text(f)
             data = json.loads(text)
-        except Exception:
+        except Exception as e:
+            read_errors.append(f"{f}: {e}")
             continue
         score = _find_numeric_score(data)
         if score is not None:
             return float(score)
-    return 0.0
+    if read_errors and len(read_errors) == len(files):
+        from app.errors import ResultIngestionError
+        raise ResultIngestionError(
+            f"All {len(files)} report file(s) failed to read/parse: "
+            + "; ".join(read_errors)
+        )
+    return 0.0  # Files exist but no numeric score found
 
 
 def _find_numeric_score(node: Any) -> float | None:

@@ -584,14 +584,15 @@ def _html_value(r: dict) -> str:
 
 
 def _html_to_pdf(html: str) -> bytes:
-    """Convert HTML to PDF. Uses weasyprint if available, falls back to basic."""
+    """Convert HTML to PDF. Requires weasyprint."""
     try:
         from weasyprint import HTML
         return HTML(string=html).write_pdf()
     except ImportError:
-        # Fallback: return HTML wrapped as "PDF" (user can print to PDF)
-        # In production, install weasyprint for real PDF generation
-        return html.encode("utf-8")
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="PDF 导出需要安装 weasyprint 依赖。请运行: pip install weasyprint",
+        )
 
 
 # ── DOCX helper ─────────────────────────────────────────

@@ -421,7 +421,7 @@ async def wait_vllm_ready(
                                 last_line = logs.strip().split("\n")[-1][:120]
                                 pod_info += f" | {last_line}"
                         except Exception:
-                            pass
+                            logger.debug("Failed to read pod log", exc_info=True)
                 else:
                     pod_info = "no pods yet"
             except Exception:
@@ -557,6 +557,7 @@ async def cleanup_vllm(
                     if not pods.items:
                         break
                 except Exception:
+                    logger.warning("Failed to list pods during cleanup wait", exc_info=True)
                     break
                 time.sleep(5)
 

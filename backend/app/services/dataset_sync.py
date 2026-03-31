@@ -25,13 +25,21 @@ _sync_task: asyncio.Task | None = None
 
 
 def _get_hf_latest_sha(dataset_id: str) -> str | None:
-    """Get the latest commit SHA for a HuggingFace dataset repo."""
+    """Get the latest commit SHA for a HuggingFace dataset repo.
+
+    Returns None only when the repo genuinely doesn't exist (404).
+    Raises on network/auth/unexpected errors so callers don't confuse
+    'no updates' with 'failed to check'.
+    """
     try:
         from huggingface_hub import repo_info
         info = repo_info(dataset_id, repo_type="dataset")
         return info.sha
-    except Exception:
-        return None
+    except Exception as e:
+        err_str = str(e).lower()
+        if "404" in err_str or "not found" in err_str:
+            return None
+        raise
 
 
 async def check_and_sync_dataset(

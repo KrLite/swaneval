@@ -219,21 +219,24 @@ async def check_gpu_operator_status(kubeconfig_encrypted: str) -> dict:
         # Check for device plugin or gpu-operator pods
         has_device_plugin = False
         has_gpu_operator = False
+        detection_errors: list[str] = []
         try:
             pods = v1.list_pod_for_all_namespaces(
                 label_selector="app=nvidia-device-plugin-daemonset",
             ).items
             has_device_plugin = len(pods) > 0
-        except Exception:
-            pass
+        except Exception as e:
+            detection_errors.append(f"device-plugin probe failed: {e}")
+            logger.warning("GPU device-plugin detection failed: %s", e)
         try:
             pods = v1.list_namespaced_pod(
                 "gpu-operator",
                 label_selector="app=gpu-operator",
             ).items
             has_gpu_operator = len(pods) > 0
-        except Exception:
-            pass
+        except Exception as e:
+            detection_errors.append(f"gpu-operator probe failed: {e}")
+            logger.warning("GPU operator detection failed: %s", e)
 
         return {
             "gpu_nodes": gpu_nodes,
@@ -241,6 +244,7 @@ async def check_gpu_operator_status(kubeconfig_encrypted: str) -> dict:
             "has_device_plugin": has_device_plugin,
             "has_gpu_operator": has_gpu_operator,
             "ready": len(gpu_nodes) > 0,
+            "detection_errors": detection_errors,
         }
 
     return await asyncio.to_thread(_check)

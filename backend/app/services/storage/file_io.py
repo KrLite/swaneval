@@ -16,15 +16,16 @@ async def read_bytes(
 ) -> bytes:
     """Read a file as bytes from storage or local filesystem.
 
+    If the URI maps to a storage key, reads from the storage backend and
+    lets exceptions propagate (no silent fallback to local filesystem).
+    Only reads from the local filesystem when the URI is not storage-managed.
+
     Raises FileNotFoundError if the file doesn't exist.
     """
     if key is None:
         key = uri_to_key(source_uri)
     if key is not None:
-        try:
-            return await storage.read_file(key)
-        except Exception:
-            pass
+        return await storage.read_file(key)
     p = Path(source_uri)
     try:
         return await asyncio.to_thread(p.read_bytes)
@@ -37,15 +38,16 @@ async def read_text(
 ) -> str:
     """Read a file as UTF-8 text from storage or local filesystem.
 
+    If the URI maps to a storage key, reads from the storage backend and
+    lets exceptions propagate (no silent fallback to local filesystem).
+    Only reads from the local filesystem when the URI is not storage-managed.
+
     Raises FileNotFoundError if the file doesn't exist.
     """
     if key is None:
         key = uri_to_key(source_uri)
     if key is not None:
-        try:
-            return await storage.read_text(key)
-        except Exception:
-            pass
+        return await storage.read_text(key)
     p = Path(source_uri)
     try:
         return await asyncio.to_thread(p.read_text, encoding="utf-8")

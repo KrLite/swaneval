@@ -115,6 +115,7 @@ async def embedded_worker_loop() -> None:
     Runs as an asyncio task inside the API process. Dequeues tasks from
     Redis and executes them without needing a separate worker process.
     """
+    import asyncio
     import uuid as _uuid
 
     from app.services.task_runner import run_task
@@ -123,14 +124,28 @@ async def embedded_worker_loop() -> None:
     await register_worker(worker_id)
     logger.info("Embedded worker %s started", worker_id)
 
+    redis_fail_count = 0
+    _MAX_REDIS_FAILURES = 10
+
     try:
         while True:
             await update_worker_status(worker_id, "idle")
             try:
                 job = await dequeue_task(timeout=3)
+                redis_fail_count = 0  # Reset on success
             except Exception:
-                # Redis connection error — wait and retry
-                import asyncio
+                redis_fail_count += 1
+                if redis_fail_count >= _MAX_REDIS_FAILURES:
+                    logger.error(
+                        "Embedded worker %s: Redis unreachable for %d consecutive attempts",
+                        worker_id, redis_fail_count,
+                    )
+                    await update_worker_status(worker_id, "redis_unhealthy")
+                else:
+                    logger.warning(
+                        "Embedded worker %s: Redis connection error (attempt %d)",
+                        worker_id, redis_fail_count,
+                    )
                 await asyncio.sleep(5)
                 continue
 
@@ -144,12 +159,36 @@ async def embedded_worker_loop() -> None:
 
             try:
                 await run_task(_uuid.UUID(task_id))
+                await mark_done(task_id)
             except Exception:
                 logger.exception("Embedded worker: task %s failed", task_id)
-            finally:
                 await mark_done(task_id)
-    except Exception:
-        pass  # CancelledError on shutdown
+                await _ensure_task_failed_in_db(task_id)
+    except asyncio.CancelledError:
+        pass  # Normal shutdown
     finally:
         await unregister_worker(worker_id)
         logger.info("Embedded worker %s stopped", worker_id)
+
+
+async def _ensure_task_failed_in_db(task_id: str) -> None:
+    """Defensive: ensure task status is 'failed' in DB if not already terminal."""
+    try:
+        import uuid as _uuid
+        from datetime import datetime, timezone
+
+        from sqlmodel.ext.asyncio.session import AsyncSession
+
+        from app.database import engine
+        from app.models.eval_task import EvalTask, TaskStatus
+
+        async with AsyncSession(engine) as session:
+            task = await session.get(EvalTask, _uuid.UUID(task_id))
+            if task and task.status not in (TaskStatus.failed, TaskStatus.completed):
+                task.status = TaskStatus.failed
+                task.finished_at = datetime.now(timezone.utc)
+                session.add(task)
+                await session.commit()
+                logger.info("Task %s defensively marked as FAILED in DB", task_id)
+    except Exception:
+        logger.exception("Failed to defensively update task %s status", task_id)

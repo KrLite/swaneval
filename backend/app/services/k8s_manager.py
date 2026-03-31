@@ -84,8 +84,13 @@ def probe_cluster_resources(kubeconfig_encrypted: str) -> dict:
             for container in (pod.spec.containers or []):
                 reqs = (container.resources.requests or {}) if container.resources else {}
                 gpu_in_use += int(reqs.get("nvidia.com/gpu", 0))
-    except Exception:
-        pass  # If pod listing fails, report all GPUs as available
+    except Exception as e:
+        from app.errors import ResourceError
+        raise ResourceError(
+            f"Failed to probe GPU usage (pod listing): {e}. "
+            "Cannot determine GPU availability — refusing to report "
+            "all GPUs as available."
+        ) from e
 
     gpu_available = max(0, total_gpu - gpu_in_use)
 

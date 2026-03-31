@@ -90,10 +90,12 @@ async def _iter_json_rows(
     results: list[dict[str, Any]] = []
     parse_errors = 0
     if file_key.endswith(".jsonl"):
+        total_lines = 0
         for i, line in enumerate(text.splitlines()):
             line = line.strip()
             if not line:
                 continue
+            total_lines += 1
             try:
                 node = json.loads(line)
             except Exception:
@@ -101,9 +103,16 @@ async def _iter_json_rows(
                 continue
             results.extend(_walk_dict_nodes(node))
         if parse_errors > 0:
+            error_rate = parse_errors / max(total_lines, 1)
+            if error_rate > 0.5:
+                raise ResultIngestionError(
+                    f"Too many parse errors in {file_key}: "
+                    f"{parse_errors}/{total_lines} lines failed ({error_rate:.0%}). "
+                    "Data is likely corrupted."
+                )
             logger.warning(
-                "Ingestor: %d/%d lines failed to parse in %s",
-                parse_errors, parse_errors + len(results), file_key,
+                "Ingestor: %d/%d lines failed to parse in %s (%.0f%% error rate)",
+                parse_errors, total_lines, file_key, error_rate * 100,
             )
         return results
 
