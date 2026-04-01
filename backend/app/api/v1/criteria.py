@@ -171,7 +171,7 @@ async def test_criterion(
                     if getattr(judge_model, "api_format", "openai") == "anthropic":
                         cfg["api_format"] = "anthropic"
                     config_json = json.dumps(cfg)
-        except Exception as e:
+        except (json.JSONDecodeError, ValueError, TypeError, KeyError) as e:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 f"LLM Judge 配置解析失败: {e}",

@@ -109,15 +109,12 @@ async def unregister_worker(worker_id: str) -> None:
     await r.hdel(WORKER_KEY, worker_id)
 
 
-async def _safe_update_worker_status(worker_id: str, status: str) -> None:
-    """update_worker_status wrapper that tolerates Redis failures."""
+async def _safe_redis(coro, description: str) -> None:
+    """Await a Redis coroutine, swallowing errors so the worker loop survives."""
     try:
-        await update_worker_status(worker_id, status)
+        await coro
     except Exception:
-        logger.debug(
-            "Could not update worker %s status to '%s' (Redis unavailable)",
-            worker_id, status,
-        )
+        logger.debug("Redis unavailable during %s", description)
 
 
 async def embedded_worker_loop() -> None:
@@ -140,7 +137,10 @@ async def embedded_worker_loop() -> None:
 
     try:
         while True:
-            await _safe_update_worker_status(worker_id, "idle")
+            await _safe_redis(
+                update_worker_status(worker_id, "idle"),
+                "update worker idle",
+            )
             try:
                 job = await dequeue_task(timeout=3)
                 redis_fail_count = 0  # Reset on success
@@ -151,7 +151,10 @@ async def embedded_worker_loop() -> None:
                         "Embedded worker %s: Redis unreachable for %d consecutive attempts",
                         worker_id, redis_fail_count,
                     )
-                    await _safe_update_worker_status(worker_id, "redis_unhealthy")
+                    await _safe_redis(
+                        update_worker_status(worker_id, "redis_unhealthy"),
+                        "update worker redis_unhealthy",
+                    )
                 else:
                     logger.warning(
                         "Embedded worker %s: Redis connection error (attempt %d)",
@@ -165,8 +168,14 @@ async def embedded_worker_loop() -> None:
 
             task_id = job["task_id"]
             logger.info("Embedded worker picked up task %s", task_id)
-            await _safe_update_worker_status(worker_id, "busy")
-            await mark_running(task_id, worker_id)
+            await _safe_redis(
+                update_worker_status(worker_id, "busy"),
+                "update worker busy",
+            )
+            await _safe_redis(
+                mark_running(task_id, worker_id),
+                f"mark_running {task_id}",
+            )
 
             try:
                 await run_task(_uuid.UUID(task_id))
@@ -174,7 +183,10 @@ async def embedded_worker_loop() -> None:
                 logger.exception("Embedded worker: task %s failed", task_id)
                 await ensure_task_failed_in_db(task_id)
             finally:
-                await mark_done(task_id)
+                await _safe_redis(
+                    mark_done(task_id),
+                    f"mark_done {task_id}",
+                )
     except asyncio.CancelledError:
         pass  # Normal shutdown
     finally:
