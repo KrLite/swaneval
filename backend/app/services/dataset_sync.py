@@ -33,13 +33,11 @@ def _get_hf_latest_sha(dataset_id: str) -> str | None:
     """
     try:
         from huggingface_hub import repo_info
+        from huggingface_hub.utils import RepositoryNotFoundError
         info = repo_info(dataset_id, repo_type="dataset")
         return info.sha
-    except Exception as e:
-        err_str = str(e).lower()
-        if "404" in err_str or "not found" in err_str:
-            return None
-        raise
+    except RepositoryNotFoundError:
+        return None
 
 
 async def check_and_sync_dataset(

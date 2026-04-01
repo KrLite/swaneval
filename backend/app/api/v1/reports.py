@@ -283,8 +283,13 @@ async def export_pdf(
     report = await _get_report(task_id, report_type, session)
     html = _report_to_html(report)
 
-    # Convert HTML to PDF using simple approach
-    pdf_bytes = _html_to_pdf(html)
+    try:
+        pdf_bytes = _html_to_pdf(html)
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="PDF 导出需要安装 weasyprint 依赖。请运行: pip install weasyprint",
+        )
 
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
@@ -584,15 +589,12 @@ def _html_value(r: dict) -> str:
 
 
 def _html_to_pdf(html: str) -> bytes:
-    """Convert HTML to PDF. Requires weasyprint."""
-    try:
-        from weasyprint import HTML
-        return HTML(string=html).write_pdf()
-    except ImportError:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="PDF 导出需要安装 weasyprint 依赖。请运行: pip install weasyprint",
-        )
+    """Convert HTML to PDF. Requires weasyprint.
+
+    Raises ImportError if weasyprint is not installed.
+    """
+    from weasyprint import HTML
+    return HTML(string=html).write_pdf()
 
 
 # ── DOCX helper ─────────────────────────────────────────
