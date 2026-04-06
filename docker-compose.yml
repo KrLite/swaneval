@@ -93,13 +93,21 @@ services:
     restart: unless-stopped
 
   evalscope-sandbox:
-    image: modelscope/ms-enclave:latest
+    build:
+      context: ./sandbox
+      dockerfile: Dockerfile
     container_name: swaneval-sandbox
     ports:
-      - "${SANDBOX_PORT:-5000}:5000"
-    command: ["ms-enclave", "server", "--host", "0.0.0.0", "--port", "5000"]
+      - "${SANDBOX_PORT:-8000}:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     profiles:
       - sandbox
     restart: unless-stopped

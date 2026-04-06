@@ -89,8 +89,8 @@ class Settings(BaseSettings):
     # 单次评测最大超时(秒) / Max timeout per evaluation invoke
     EVALSCOPE_POLL_INTERVAL: int = 5
     # 进度轮询间隔(秒) / Progress polling interval
-    EVALSCOPE_SANDBOX_URL: str = ""
-    # 远程沙箱地址 / Remote sandbox URL (ms-enclave or VolcEngine)
+    EVALSCOPE_SANDBOX_URL: str = "http://localhost:8000"
+    # 远程沙箱地址 / Remote sandbox URL (ms-enclave service)
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

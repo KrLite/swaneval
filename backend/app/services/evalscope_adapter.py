@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from app.config import settings
 from app.services.storage.base import StorageBackend
 from app.services.storage.utils import uri_to_key
 
@@ -103,19 +104,28 @@ def build_evalscope_http_payload(
     repeat_count: int,
     work_dir: str,
     evalscope_input_root: str,
+    dataset_stems: dict | None = None,
 ) -> dict[str, Any]:
     """Build the JSON payload for ``POST /api/v1/eval/invoke``.
 
     Supports multiple datasets and criteria.  Each dataset is converted
     to a general_qa subset; criteria are mapped to EvalScope metric_list
     and judge config.
+
+    ``dataset_stems`` maps dataset ID → unique stem name used for the
+    converted JSONL files.  Falls back to ``Path(source_uri).stem``.
     """
-    api_key = (model.api_key or "").strip() or "EMPTY"
+    api_key = (
+        model.api_key or settings.DEFAULT_MODEL_API_KEY or ""
+    ).strip() or "EMPTY"
 
     # Dataset args — each dataset becomes a subset under general_qa
     subset_list = []
     for ds in datasets:
-        subset_name = Path(ds.source_uri).stem
+        if dataset_stems and ds.id in dataset_stems:
+            subset_name = dataset_stems[ds.id]
+        else:
+            subset_name = Path(ds.source_uri).stem
         subset_list.append(subset_name)
 
     dataset_args: dict[str, Any] = {
@@ -260,6 +270,7 @@ def map_criteria_to_evalscope(
         elif c.type == "sandbox":
             mode = cfg.get("mode", "pass_at_k")
             if mode == "pass_at_k":
+                metric_list.append("pass_at_k")
                 sandbox_config = {
                     "image": "python:3.11-slim",
                     "network_enabled": False,

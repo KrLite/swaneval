@@ -254,8 +254,10 @@ async def _run_task_via_evalscope_service(
 
     # 1. Load datasets and convert to general_qa JSONL
     datasets: list[Dataset] = []
+    dataset_stems: dict[uuid.UUID, str] = {}  # ds.id → unique stem
     work_dir_key = f"evalscope_outputs/{task_id}"
     total_converted = 0
+    seen_stems: set[str] = set()
 
     for ds_id in dataset_ids:
         ds = await session.get(Dataset, ds_id)
@@ -263,7 +265,13 @@ async def _run_task_via_evalscope_service(
             raise DatasetNotFoundError(f"Dataset {ds_id} not found")
         datasets.append(ds)
 
+        # Generate unique stem to prevent filename collisions
         stem = Path(ds.source_uri).stem
+        if stem in seen_stems:
+            stem = f"{stem}_{str(ds.id)[:8]}"
+        seen_stems.add(stem)
+        dataset_stems[ds.id] = stem
+
         input_key = f"{work_dir_key}/input/general_qa/{stem}.jsonl"
         count = await convert_dataset_to_general_qa_jsonl(
             storage, ds.source_uri, input_key,
@@ -296,6 +304,7 @@ async def _run_task_via_evalscope_service(
         repeat_count=repeat_count,
         work_dir=storage.resolve_uri(work_dir_key),
         evalscope_input_root=storage.resolve_uri(input_dir_key),
+        dataset_stems=dataset_stems,
     )
 
     # 4. Progress callback — updates DB
@@ -328,9 +337,11 @@ async def _run_task_via_evalscope_service(
     )
 
     # 6. Build prompt → dataset_id mapping for correct attribution
+    #    Use first-seen semantics: if the same query appears in multiple
+    #    datasets, the first dataset wins (no silent overwrite).
     prompt_to_dataset: dict[str, uuid.UUID] = {}
     for ds in datasets:
-        stem = Path(ds.source_uri).stem
+        stem = dataset_stems[ds.id]
         ds_input_key = f"{work_dir_key}/input/general_qa/{stem}.jsonl"
         try:
             text = await storage.read_text(ds_input_key)
@@ -339,7 +350,7 @@ async def _run_task_via_evalscope_service(
                 if line:
                     row_data = json.loads(line)
                     q = row_data.get("query", "")
-                    if q:
+                    if q and q not in prompt_to_dataset:
                         prompt_to_dataset[q] = ds.id
         except Exception:
             pass  # Mapping failure is non-fatal; will use default
@@ -356,7 +367,7 @@ async def _run_task_via_evalscope_service(
     # Fallback: per-dataset input JSONL if no artifacts found
     if not ingested_results:
         for ds in datasets:
-            stem = Path(ds.source_uri).stem
+            stem = dataset_stems[ds.id]
             ds_input_key = f"{work_dir_key}/input/general_qa/{stem}.jsonl"
             ds_rows = await ingest_evalscope_results(
                 storage=storage,
@@ -832,6 +843,27 @@ async def run_task(task_id: uuid.UUID):
                 and c not in custom_script_criteria
             ]
 
+            # Enrich llm_judge criteria: resolve judge_model_id → credentials
+            for c in all_criteria:
+                if c.type == "llm_judge":
+                    cfg = json.loads(c.config_json) if c.config_json else {}
+                    judge_model_id = cfg.get("judge_model_id")
+                    if judge_model_id and not cfg.get("endpoint_url"):
+                        judge_model = await session.get(
+                            LLMModel, uuid.UUID(judge_model_id)
+                        )
+                        if not judge_model:
+                            raise EvaluatorConfigError(
+                                f"Judge model {judge_model_id} for "
+                                f"criterion '{c.name}' not found"
+                            )
+                        cfg["endpoint_url"] = judge_model.endpoint_url
+                        cfg["api_key"] = judge_model.api_key
+                        cfg["model_name"] = (
+                            judge_model.model_name or judge_model.name
+                        )
+                        c.config_json = json.dumps(cfg)
+
             # Route: EvalScope service (default) or legacy fallback
             use_evalscope = (
                 await _should_use_evalscope_service(params)
@@ -857,6 +889,7 @@ async def run_task(task_id: uuid.UUID):
                 )
 
                 # Run perplexity criteria locally (not supported by EvalScope)
+                partial_errors: list[str] = []
                 if perplexity_criteria:
                     logger.info(
                         "Task %s: running %d perplexity criteria locally",
@@ -890,19 +923,37 @@ async def run_task(task_id: uuid.UUID):
                         )
                         ppl_subtask.status = TaskStatus.failed
                         ppl_subtask.error_log = str(e)
+                        partial_errors.append(f"perplexity failed: {e}")
                     session.add(ppl_subtask)
                     await session.commit()
 
                 # Warn about unsupported criteria
                 if custom_script_criteria:
-                    logger.warning(
-                        "Task %s: %d custom_script criteria skipped — "
-                        "not yet supported alongside EvalScope service",
-                        task_id, len(custom_script_criteria),
+                    msg = (
+                        f"{len(custom_script_criteria)} custom_script "
+                        f"criteria skipped — not yet supported "
+                        f"alongside EvalScope service"
                     )
+                    logger.warning("Task %s: %s", task_id, msg)
+                    partial_errors.append(msg)
 
-                task.status = TaskStatus.completed
                 task.finished_at = datetime.now(timezone.utc)
+                if partial_errors:
+                    task.status = TaskStatus.completed
+                    task.error_summary = (
+                        "Partial: " + "; ".join(partial_errors)
+                    )
+                else:
+                    task.status = TaskStatus.completed
+
+                # Record Prometheus metrics
+                elapsed = (
+                    task.finished_at - task.started_at
+                ).total_seconds()
+                tasks_total.labels(status="completed").inc()
+                tasks_running.dec()
+                task_duration_seconds.observe(elapsed)
+
                 session.add(task)
                 await session.commit()
                 return
