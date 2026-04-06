@@ -151,8 +151,12 @@ def build_evalscope_http_payload(
     if "seed" in params:
         generation_config["seed"] = params["seed"]
 
+    model_name = (model.model_name or model.name or "").strip()
+    if not model_name:
+        raise ValueError("Model must have a valid model_name or name")
+
     payload: dict[str, Any] = {
-        "model": model.model_name or model.name,
+        "model": model_name,
         "api_url": model.endpoint_url,
         "api_key": api_key,
         "datasets": ["general_qa"],
@@ -239,8 +243,15 @@ def map_criteria_to_evalscope(
                     "will be used",
                     c.id,
                 )
+            pattern = cfg.get("pattern", "").strip()
+            if not pattern:
+                logger.warning(
+                    "Criterion %s: empty regex pattern, skipping",
+                    c.id,
+                )
+                continue
             metric_list.append("regex_match")
-            extra_params["pattern"] = cfg.get("pattern", "")
+            extra_params["pattern"] = pattern
             if cfg.get("match_mode"):
                 extra_params["match_mode"] = cfg["match_mode"]
             if cfg.get("flags"):
@@ -302,6 +313,7 @@ async def extract_primary_score(
             text = await storage.read_text(f)
             data = json.loads(text)
         except Exception:
+            logger.debug("Failed to read/parse report file %s", f, exc_info=True)
             continue
         score = _find_numeric_score(data)
         if score is not None:

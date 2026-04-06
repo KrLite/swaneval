@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 class EvalScopeClient:
     """Async wrapper around the EvalScope HTTP service."""
 
+    async def __aenter__(self) -> "EvalScopeClient":
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await self.close()
+
     def __init__(
         self,
         base_url: str | None = None,
@@ -96,11 +102,11 @@ class EvalScopeClient:
                     )
                 )
             except Exception as e:
-                error_holder.append(
-                    EvalScopeServiceError(
-                        f"EvalScope invocation failed: {e}"
-                    )
+                err = EvalScopeServiceError(
+                    f"EvalScope invocation failed: {e}"
                 )
+                err.__cause__ = e
+                error_holder.append(err)
             finally:
                 done.set()
 

@@ -460,7 +460,9 @@ async def _run_perplexity_criteria(
         logger.warning("Task %s: no texts found for perplexity computation", task.id)
         return
 
-    api_key = (model.api_key or "").strip() or "EMPTY"
+    api_key = (
+        model.api_key or settings.DEFAULT_MODEL_API_KEY or ""
+    ).strip() or "EMPTY"
     model_name = model.model_name or model.name
 
     ppls = await compute_perplexity_batch(
