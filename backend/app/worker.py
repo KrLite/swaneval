@@ -30,6 +30,7 @@ def _handle_signal(sig, frame):
 
 async def run_worker():
     """Main worker loop: dequeue tasks and execute them."""
+    from app.services.task_failures import ensure_task_failed_in_db
     from app.services.task_queue import (
         dequeue_task,
         mark_done,
@@ -65,6 +66,7 @@ async def run_worker():
                 logger.info("Task %s completed", task_id)
             except Exception:
                 logger.exception("Task %s failed with exception", task_id)
+                await ensure_task_failed_in_db(task_id)
             finally:
                 await mark_done(task_id)
 

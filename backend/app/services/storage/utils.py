@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import os
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def uri_to_key(source_uri: str) -> str | None:
@@ -45,8 +48,8 @@ def uri_to_key(source_uri: str) -> str | None:
         resolved_root = str(Path(root).resolve()).replace("\\", "/")
         if normalized.startswith(resolved_root + "/"):
             return normalized[len(resolved_root) + 1 :]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to resolve STORAGE_ROOT '%s': %s", root, e)
 
     # Also try os.sep-native comparison for Windows paths like C:\foo\bar
     if os.sep == "\\":

@@ -246,19 +246,21 @@ class TestEvalscopeAdapter(unittest.IsolatedAsyncioTestCase):
             self.assertAlmostEqual(score, 0.875, places=6)
 
     async def test_extract_primary_score_no_reports(self):
+        from app.errors import ResultIngestionError
         with tempfile.TemporaryDirectory() as tmpdir:
             storage = LocalFileStorage(root=tmpdir)
-            score = await extract_primary_score(storage, "empty_work")
-            self.assertEqual(score, 0.0)
+            with self.assertRaises(ResultIngestionError):
+                await extract_primary_score(storage, "empty_work")
 
     async def test_extract_primary_score_invalid_json(self):
+        from app.errors import ResultIngestionError
         with tempfile.TemporaryDirectory() as tmpdir:
             storage = LocalFileStorage(root=tmpdir)
             await storage.write_file(
                 "work/reports/broken.json", b"{not-json"
             )
-            score = await extract_primary_score(storage, "work")
-            self.assertEqual(score, 0.0)
+            with self.assertRaises(ResultIngestionError):
+                await extract_primary_score(storage, "work")
 
     def test_find_numeric_score_variants(self):
         self.assertEqual(_find_numeric_score({"score": 0.1}), 0.1)

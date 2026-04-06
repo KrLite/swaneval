@@ -20,6 +20,7 @@ from app.config import settings
 from app.database import engine
 from app.errors import (
     ConfigError,
+    DataError,
     DatasetEmptyError,
     DatasetNotFoundError,
     DatasetParseError,
@@ -997,11 +998,24 @@ async def run_task(task_id: uuid.UUID):
                     f"No rows loaded from any dataset — cannot proceed: {error_summary}"
                 )
             if dataset_errors:
+                if not params.get("allow_partial_datasets", False):
+                    raise DataError(
+                        f"{len(dataset_errors)} dataset(s) failed to load: "
+                        + "; ".join(dataset_errors)
+                    )
+                # Explicit degradation: user opted in via allow_partial_datasets
                 logger.warning(
-                    "Task %s: %d dataset(s) failed but continuing with %d rows: %s",
+                    "Task %s: %d dataset(s) failed but continuing "
+                    "(allow_partial_datasets=True) with %d rows: %s",
                     task_id, len(dataset_errors), len(all_rows),
                     "; ".join(dataset_errors),
                 )
+                task.error_summary = (
+                    f"partial_datasets: {'; '.join(dataset_errors)}"
+                )
+                session.add(task)
+                await session.commit()
+                await session.commit()
             logger.info("Task %s: total %d prompt rows to evaluate", task_id, len(all_rows))
 
             # Load criteria
