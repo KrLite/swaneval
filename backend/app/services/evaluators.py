@@ -1,4 +1,12 @@
-"""Built-in evaluation functions for criteria types."""
+"""Built-in evaluation functions for criteria types.
+
+.. deprecated::
+    This module is retained as a **fallback** for when the EvalScope
+    service is unavailable.  The primary evaluation engine is now
+    EvalScope HTTP (see ``evalscope_client.py``).  New metric
+    implementations should be added to the EvalScope container's
+    ``custom_metrics/`` package, not here.
+"""
 
 import json
 import logging
@@ -53,8 +61,8 @@ def evaluate_bleu(expected: str, actual: str) -> float:
     # Compute modified precision for n-grams 1..4
     scores = []
     for n in range(1, 5):
-        ref_ngrams = Counter(tuple(ref_tokens[i:i + n]) for i in range(len(ref_tokens) - n + 1))
-        hyp_ngrams = Counter(tuple(hyp_tokens[i:i + n]) for i in range(len(hyp_tokens) - n + 1))
+        ref_ngrams = Counter(tuple(ref_tokens[i : i + n]) for i in range(len(ref_tokens) - n + 1))
+        hyp_ngrams = Counter(tuple(hyp_tokens[i : i + n]) for i in range(len(hyp_tokens) - n + 1))
         if not hyp_ngrams:
             scores.append(0.0)
             continue
@@ -117,7 +125,7 @@ def evaluate_cosine_similarity(expected: str, actual: str) -> float:
 
     def char_ngrams(text: str, n: int = 3) -> Counter:
         t = text.strip().lower()
-        return Counter(t[i:i + n] for i in range(max(0, len(t) - n + 1)))
+        return Counter(t[i : i + n] for i in range(max(0, len(t) - n + 1)))
 
     vec_a = char_ngrams(expected)
     vec_b = char_ngrams(actual)
@@ -181,7 +189,7 @@ def _strip_code_fences(text: str) -> str:
         # Remove opening fence (with optional language tag)
         first_newline = text.find("\n")
         if first_newline != -1:
-            text = text[first_newline + 1:]
+            text = text[first_newline + 1 :]
     if text.endswith("```"):
         text = text[:-3]
     return text.strip()
@@ -198,7 +206,9 @@ def evaluate_sandbox(config: dict, expected: str, actual: str) -> float:
 
 
 def evaluate_sandbox_pass_at_k(
-    expected: str, actual: str, config: dict,
+    expected: str,
+    actual: str,
+    config: dict,
 ) -> float:
     """
     Execute model-generated code with test cases in a sandboxed subprocess.
@@ -234,7 +244,9 @@ sys.path.insert(0, '.')
         )
         logger.info(
             "Sandbox pass_at_k: returncode=%d, timeout=%ds, code_len=%d",
-            result.returncode, timeout, len(code),
+            result.returncode,
+            timeout,
+            len(code),
         )
         return 1.0 if result.returncode == 0 else 0.0
     except subprocess.TimeoutExpired:
@@ -250,7 +262,9 @@ sys.path.insert(0, '.')
 
 
 def evaluate_sandbox_custom(
-    config: dict, expected: str, actual: str,
+    config: dict,
+    expected: str,
+    actual: str,
 ) -> float:
     """
     Run a user-provided Python script in sandbox.
@@ -294,7 +308,10 @@ print(float(score))
         stdout = result.stdout.decode("utf-8", errors="replace").strip()
         logger.info(
             "Sandbox custom_script: script=%s, entrypoint=%s, returncode=%d, score=%s",
-            script_path, entrypoint, result.returncode, stdout,
+            script_path,
+            entrypoint,
+            result.returncode,
+            stdout,
         )
         if result.returncode != 0:
             stderr = result.stderr.decode("utf-8", errors="replace")[:500]
@@ -373,7 +390,9 @@ def run_criterion(criterion_type: str, config_json: str, expected: str, actual: 
             "exact_match": lambda: evaluate_exact_match(expected, actual),
             "contains": lambda: evaluate_contains(expected, actual),
             "numeric": lambda: evaluate_numeric_closeness(
-                expected, actual, config.get("tolerance", 0.01),
+                expected,
+                actual,
+                config.get("tolerance", 0.01),
             ),
             "bleu": lambda: evaluate_bleu(expected, actual),
             "rouge_l": lambda: evaluate_rouge_l(expected, actual),

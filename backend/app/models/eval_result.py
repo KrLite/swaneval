@@ -12,6 +12,7 @@ class EvalResult(SQLModel, table=True):
     存储每次评估的详细结果，包括 prompt、输出和评分。
     Stores detailed evaluation results including prompt, output, and scores.
     """
+
     __tablename__ = "eval_results"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)

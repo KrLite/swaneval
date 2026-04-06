@@ -51,9 +51,12 @@ async def install_gpu_operator(
 
 async def _install_device_plugin(kubeconfig_yaml: str) -> dict:
     """Install just the NVIDIA device plugin DaemonSet."""
+
     def _run():
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False,
+            mode="w",
+            suffix=".yaml",
+            delete=False,
         ) as tmp:
             tmp.write(kubeconfig_yaml)
             tmp.flush()
@@ -63,11 +66,16 @@ async def _install_device_plugin(kubeconfig_yaml: str) -> dict:
             logger.info("Installing NVIDIA Device Plugin via kubectl apply...")
             result = subprocess.run(
                 [
-                    "kubectl", "apply",
-                    "-f", DEVICE_PLUGIN_URL,
-                    "--kubeconfig", kubeconfig_path,
+                    "kubectl",
+                    "apply",
+                    "-f",
+                    DEVICE_PLUGIN_URL,
+                    "--kubeconfig",
+                    kubeconfig_path,
                 ],
-                capture_output=True, text=True, timeout=60,
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
             stdout = result.stdout.strip()
             stderr = result.stderr.strip()
@@ -110,9 +118,12 @@ async def _install_device_plugin(kubeconfig_yaml: str) -> dict:
 
 async def _install_via_helm(kubeconfig_yaml: str) -> dict:
     """Install NVIDIA GPU Operator via Helm chart."""
+
     def _run():
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False,
+            mode="w",
+            suffix=".yaml",
+            delete=False,
         ) as tmp:
             tmp.write(kubeconfig_yaml)
             tmp.flush()
@@ -123,15 +134,27 @@ async def _install_via_helm(kubeconfig_yaml: str) -> dict:
         try:
             # Add NVIDIA Helm repo
             repo_add = subprocess.run(
-                ["helm", "repo", "add", "nvidia",
-                 "https://helm.ngc.nvidia.com/nvidia", "--force-update"],
-                capture_output=True, text=True, timeout=30, env=env,
+                [
+                    "helm",
+                    "repo",
+                    "add",
+                    "nvidia",
+                    "https://helm.ngc.nvidia.com/nvidia",
+                    "--force-update",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=env,
             )
             logger.info("helm repo add: %s", repo_add.stdout.strip() or repo_add.stderr.strip())
 
             repo_update = subprocess.run(
                 ["helm", "repo", "update"],
-                capture_output=True, text=True, timeout=60, env=env,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=env,
             )
             logger.info(
                 "helm repo update: %s",
@@ -141,12 +164,18 @@ async def _install_via_helm(kubeconfig_yaml: str) -> dict:
             # Install GPU Operator (no --wait, return immediately)
             result = subprocess.run(
                 [
-                    "helm", "install", "gpu-operator",
+                    "helm",
+                    "install",
+                    "gpu-operator",
                     "nvidia/gpu-operator",
-                    "--namespace", "gpu-operator",
+                    "--namespace",
+                    "gpu-operator",
                     "--create-namespace",
                 ],
-                capture_output=True, text=True, timeout=120, env=env,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env=env,
             )
             stdout = result.stdout.strip()
             stderr = result.stderr.strip()

@@ -25,21 +25,35 @@ SYSTEM_GROUPS = {
     "Administrators": (
         "Full system access",
         [
-            "datasets.read", "datasets.write", "datasets.download",
-            "tasks.read", "tasks.create", "tasks.manage",
+            "datasets.read",
+            "datasets.write",
+            "datasets.download",
+            "tasks.read",
+            "tasks.create",
+            "tasks.manage",
             "results.read",
-            "reports.read", "reports.generate", "reports.export",
-            "models.read", "models.write",
-            "criteria.read", "criteria.write",
-            "clusters.read", "clusters.manage",
-            "admin.users", "admin.groups", "admin.acl",
+            "reports.read",
+            "reports.generate",
+            "reports.export",
+            "models.read",
+            "models.write",
+            "criteria.read",
+            "criteria.write",
+            "clusters.read",
+            "clusters.manage",
+            "admin.users",
+            "admin.groups",
+            "admin.acl",
         ],
     ),
     "Data Administrators": (
         "Manage datasets and criteria, view all results",
         [
-            "datasets.read", "datasets.write", "datasets.download",
-            "criteria.read", "criteria.write",
+            "datasets.read",
+            "datasets.write",
+            "datasets.download",
+            "criteria.read",
+            "criteria.write",
             "tasks.read",
             "results.read",
             "reports.read",
@@ -49,8 +63,10 @@ SYSTEM_GROUPS = {
     "Engineers": (
         "Run evaluation tasks, view permitted data",
         [
-            "datasets.read", "datasets.download",
-            "tasks.read", "tasks.create",
+            "datasets.read",
+            "datasets.download",
+            "tasks.read",
+            "tasks.create",
             "results.read",
             "reports.read",
             "models.read",
@@ -81,13 +97,19 @@ ROLE_TO_GROUP = {
 
 def upgrade() -> None:
     # ── Create accesslevel enum (idempotent) ────────────────────────────
-    op.execute(sa.text(
-        "DO $$ BEGIN CREATE TYPE accesslevel AS ENUM "
-        "('view', 'evaluate', 'download', 'edit', 'admin'); "
-        "EXCEPTION WHEN duplicate_object THEN null; END $$;"
-    ))
+    op.execute(
+        sa.text(
+            "DO $$ BEGIN CREATE TYPE accesslevel AS ENUM "
+            "('view', 'evaluate', 'download', 'edit', 'admin'); "
+            "EXCEPTION WHEN duplicate_object THEN null; END $$;"
+        )
+    )
     accesslevel = postgresql.ENUM(
-        "view", "evaluate", "download", "edit", "admin",
+        "view",
+        "evaluate",
+        "download",
+        "edit",
+        "admin",
         name="accesslevel",
         create_type=False,
     )
@@ -102,12 +124,16 @@ def upgrade() -> None:
         sa.Column("permissions_json", sa.String(), nullable=False, server_default="[]"),
         sa.Column("created_by", sa.Uuid(), sa.ForeignKey("users.id"), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True),
-            nullable=False, server_default=sa.text("now()"),
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True),
-            nullable=False, server_default=sa.text("now()"),
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
         ),
     )
 
@@ -117,12 +143,16 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id"), nullable=False),
         sa.Column(
-            "group_id", sa.Uuid(),
-            sa.ForeignKey("permission_groups.id"), nullable=False,
+            "group_id",
+            sa.Uuid(),
+            sa.ForeignKey("permission_groups.id"),
+            nullable=False,
         ),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True),
-            nullable=False, server_default=sa.text("now()"),
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
         ),
         sa.UniqueConstraint("user_id", "group_id"),
     )
@@ -137,16 +167,23 @@ def upgrade() -> None:
         sa.Column("grantee_id", sa.Uuid(), nullable=False),
         sa.Column("access_level", accesslevel, nullable=False),
         sa.Column(
-            "created_by", sa.Uuid(),
-            sa.ForeignKey("users.id"), nullable=True,
+            "created_by",
+            sa.Uuid(),
+            sa.ForeignKey("users.id"),
+            nullable=True,
         ),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True),
-            nullable=False, server_default=sa.text("now()"),
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
         ),
         sa.UniqueConstraint(
-            "resource_type", "resource_id",
-            "grantee_type", "grantee_id", "access_level",
+            "resource_type",
+            "resource_id",
+            "grantee_type",
+            "grantee_id",
+            "access_level",
         ),
     )
 

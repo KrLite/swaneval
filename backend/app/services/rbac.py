@@ -15,34 +15,57 @@ from app.models.user import User, UserRole
 
 # All available permissions
 ALL_PERMISSIONS = [
-    "datasets.read", "datasets.write", "datasets.download",
-    "tasks.read", "tasks.create", "tasks.manage",
+    "datasets.read",
+    "datasets.write",
+    "datasets.download",
+    "tasks.read",
+    "tasks.create",
+    "tasks.manage",
     "results.read",
-    "reports.read", "reports.generate", "reports.export",
-    "models.read", "models.write",
-    "criteria.read", "criteria.write",
-    "clusters.read", "clusters.manage",
-    "admin.users", "admin.groups", "admin.acl",
+    "reports.read",
+    "reports.generate",
+    "reports.export",
+    "models.read",
+    "models.write",
+    "criteria.read",
+    "criteria.write",
+    "clusters.read",
+    "clusters.manage",
+    "admin.users",
+    "admin.groups",
+    "admin.acl",
 ]
 
 # Default permission sets per role (used for seeding system groups)
 ROLE_PERMISSIONS: dict[str, list[str]] = {
     "admin": ALL_PERMISSIONS,  # Full access
     "data_admin": [
-        "datasets.read", "datasets.write", "datasets.download",
-        "criteria.read", "criteria.write",
-        "models.read", "models.write",
-        "tasks.read", "tasks.create",
+        "datasets.read",
+        "datasets.write",
+        "datasets.download",
+        "criteria.read",
+        "criteria.write",
+        "models.read",
+        "models.write",
+        "tasks.read",
+        "tasks.create",
         "results.read",
-        "reports.read", "reports.generate", "reports.export",
+        "reports.read",
+        "reports.generate",
+        "reports.export",
     ],
     "engineer": [
-        "datasets.read", "datasets.download",
+        "datasets.read",
+        "datasets.download",
         "criteria.read",
         "models.read",
-        "tasks.read", "tasks.create", "tasks.manage",
+        "tasks.read",
+        "tasks.create",
+        "tasks.manage",
         "results.read",
-        "reports.read", "reports.generate", "reports.export",
+        "reports.read",
+        "reports.generate",
+        "reports.export",
     ],
     "viewer": [
         "datasets.read",
@@ -89,7 +112,9 @@ async def get_user_permissions(session: AsyncSession, user: User) -> set[str]:
 
 
 async def check_permission(
-    session: AsyncSession, user: User, permission: str,
+    session: AsyncSession,
+    user: User,
+    permission: str,
 ) -> bool:
     if user.role == UserRole.admin:
         return True
@@ -127,9 +152,7 @@ async def check_resource_access(
                 return True
 
     # Check group ACLs
-    group_stmt = select(UserGroupMembership.group_id).where(
-        UserGroupMembership.user_id == user.id
-    )
+    group_stmt = select(UserGroupMembership.group_id).where(UserGroupMembership.user_id == user.id)
     user_groups = set((await session.exec(group_stmt)).all())
     for acl in acls:
         if acl.grantee_type == "group" and acl.grantee_id in user_groups:

@@ -10,6 +10,7 @@ from sqlmodel import Field, SQLModel
 # 模型类型枚举 / Model type enumeration
 class ModelType(str, enum.Enum):
     """模型类型枚举 / Model type enumeration"""
+
     api = "api"
     local = "local"
     huggingface = "huggingface"
@@ -18,6 +19,7 @@ class ModelType(str, enum.Enum):
 
 class ApiFormat(str, enum.Enum):
     """API 协议格式 / API protocol format"""
+
     openai = "openai"
     anthropic = "anthropic"
 
@@ -29,6 +31,7 @@ class LLMModel(SQLModel, table=True):
     存储已注册的LLM模型信息，用于评估任务。
     Stores registered LLM model information for evaluation tasks.
     """
+
     __tablename__ = "llm_models"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)

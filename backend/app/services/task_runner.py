@@ -49,10 +49,9 @@ from app.models.eval_result import EvalResult
 from app.models.eval_task import EvalSubtask, EvalTask, TaskStatus
 from app.models.llm_model import LLMModel
 from app.services.evalscope_adapter import (
-    build_evalscope_task_config,
+    build_evalscope_http_payload,
     convert_dataset_to_general_qa_jsonl,
     extract_primary_score,
-    run_evalscope_task,
 )
 from app.services.evalscope_result_ingestor import ingest_evalscope_results
 from app.services.evaluators import run_criterion
@@ -71,6 +70,7 @@ class ModelCallResult:
     first_token_ms: float
     tokens_generated: int
     error: ModelCallError | None = None
+
 
 logger = logging.getLogger(__name__)
 
@@ -100,9 +100,7 @@ def _extract_model_text(data: dict, anthropic_mode: bool) -> tuple[str, int]:
         for block in blocks:
             if not isinstance(block, dict):
                 continue
-            if block.get("type") == "text" and isinstance(
-                block.get("text"), str
-            ):
+            if block.get("type") == "text" and isinstance(block.get("text"), str):
                 text_parts.append(block["text"])
     if text_parts:
         output = "\n".join(part for part in text_parts if part)
@@ -112,16 +110,40 @@ def _extract_model_text(data: dict, anthropic_mode: bool) -> tuple[str, int]:
     return output, tokens
 
 
-def _should_use_evalscope(params: dict) -> bool:
-    """Enable EvalScope runner only when explicitly requested in task params."""
-    return bool(
-        params.get("use_evalscope") or params.get("runner") == "evalscope"
-    )
+async def _should_use_evalscope_service(params: dict) -> bool:
+    """EvalScope service is the default engine unless disabled or unavailable."""
+    if params.get("runner") == "legacy" or params.get("use_legacy_evaluator"):
+        return False
+    if not settings.EVALSCOPE_ENABLED:
+        return False
+    from app.services.evalscope_client import EvalScopeClient
+
+    client = EvalScopeClient()
+    try:
+        healthy = await client.health_check()
+        if not healthy:
+            logger.warning("EvalScope service unhealthy, falling back to legacy")
+        return healthy
+    except Exception:
+        logger.warning("EvalScope service unreachable, falling back to legacy")
+        return False
+    finally:
+        await client.close()
 
 
-async def _load_dataset_rows(
-    storage: StorageBackend, source_uri: str
-) -> list[dict]:
+def _get_criterion_metric(criterion: Criterion) -> str:
+    """Extract the metric name from a preset criterion's config_json."""
+    cfg = json.loads(criterion.config_json) if criterion.config_json else {}
+    return cfg.get("metric", "")
+
+
+def _get_criterion_mode(criterion: Criterion) -> str:
+    """Extract the mode from a sandbox criterion's config_json."""
+    cfg = json.loads(criterion.config_json) if criterion.config_json else {}
+    return cfg.get("mode", "")
+
+
+async def _load_dataset_rows(storage: StorageBackend, source_uri: str) -> list[dict]:
     """Load dataset rows from any supported format (Parquet, JSON, JSONL, CSV).
 
     Raises DatasetNotFoundError if the file doesn't exist,
@@ -204,30 +226,62 @@ async def _read_text(
         raise DatasetNotFoundError(f"Dataset file not found: {source_uri}")
 
 
-async def _run_task_with_evalscope(
+async def _run_task_via_evalscope_service(
     session: AsyncSession,
     storage: StorageBackend,
     task_id: uuid.UUID,
+    task: EvalTask,
     repeat_count: int,
     model: LLMModel,
     dataset_ids: list[uuid.UUID],
-    criteria_ids: list[uuid.UUID],
+    criteria: list[Criterion],
     params: dict,
 ):
-    """Minimal EvalScope integration for single-dataset task execution."""
+    """Run evaluation via the EvalScope HTTP service.
+
+    Supports multiple datasets and criteria.  Converts datasets to
+    general_qa JSONL, builds an HTTP payload, calls the EvalScope service,
+    polls progress, and ingests results into the database.
+    """
+    from app.services.evalscope_client import EvalScopeClient
+
     if not dataset_ids:
-        raise ValueError("No datasets selected for task")
-    if not criteria_ids:
-        raise ValueError("No criteria selected for task")
+        raise ConfigError("No datasets selected for task")
+    if not criteria:
+        raise ConfigError("No criteria selected for task")
 
-    dataset = await session.get(Dataset, dataset_ids[0])
-    if not dataset:
-        raise ValueError(f"Dataset {dataset_ids[0]} not found")
+    # 1. Load datasets and convert to general_qa JSONL
+    datasets: list[Dataset] = []
+    dataset_stems: dict[uuid.UUID, str] = {}  # ds.id → unique stem
+    work_dir_key = f"evalscope_outputs/{task_id}"
+    total_converted = 0
+    seen_stems: set[str] = set()
 
-    criterion = await session.get(Criterion, criteria_ids[0])
-    if not criterion:
-        raise ValueError(f"Criterion {criteria_ids[0]} not found")
+    for ds_id in dataset_ids:
+        ds = await session.get(Dataset, ds_id)
+        if not ds:
+            raise DatasetNotFoundError(f"Dataset {ds_id} not found")
+        datasets.append(ds)
 
+        # Generate unique stem to prevent filename collisions
+        stem = Path(ds.source_uri).stem
+        if stem in seen_stems:
+            stem = f"{stem}_{str(ds.id)[:8]}"
+        seen_stems.add(stem)
+        dataset_stems[ds.id] = stem
+
+        input_key = f"{work_dir_key}/input/general_qa/{stem}.jsonl"
+        count = await convert_dataset_to_general_qa_jsonl(
+            storage,
+            ds.source_uri,
+            input_key,
+        )
+        total_converted += count
+
+    if total_converted == 0:
+        raise DatasetEmptyError("No valid rows after converting datasets to EvalScope format")
+
+    # 2. Create subtask
     subtask = EvalSubtask(
         task_id=task_id,
         run_index=0,
@@ -238,62 +292,221 @@ async def _run_task_with_evalscope(
     await session.commit()
     await session.refresh(subtask)
 
-    # Build storage keys for work directory
-    work_dir_key = f"evalscope_outputs/{task_id}"
-    stem = Path(dataset.source_uri).stem
-    input_key = f"{work_dir_key}/input/general_qa/{stem}.jsonl"
-
-    converted_count = await convert_dataset_to_general_qa_jsonl(
-        storage, dataset.source_uri, input_key
-    )
-    if converted_count == 0:
-        raise ValueError(
-            "No valid rows after converting dataset to EvalScope format"
-        )
-
-    # Resolve URIs — local paths or s3:// URIs
+    # 3. Build HTTP payload
     input_dir_key = f"{work_dir_key}/input/general_qa"
-    task_cfg = build_evalscope_task_config(
+    payload = build_evalscope_http_payload(
         model=model,
-        dataset=dataset,
-        evalscope_input_root=storage.resolve_uri(input_dir_key),
+        datasets=datasets,
+        criteria=criteria,
         params=params,
         repeat_count=repeat_count,
         work_dir=storage.resolve_uri(work_dir_key),
+        evalscope_input_root=storage.resolve_uri(input_dir_key),
+        dataset_stems=dataset_stems,
     )
 
-    await asyncio.to_thread(run_evalscope_task, task_cfg)
+    # 4. Progress callback — updates DB
+    async def _on_progress(progress: dict):
+        pct = progress.get("percent", progress.get("processed_count", 0))
+        total = progress.get("total_count")
+        processed = progress.get("processed_count")
+        if isinstance(pct, int | float) and pct > 0:
+            subtask.progress_pct = min(float(pct), 99.0)
+        if isinstance(total, int) and total > 0:
+            task.total_prompts = total
+        if isinstance(processed, int):
+            task.completed_prompts = processed
+        session.add(subtask)
+        session.add(task)
+        await session.commit()
 
+    # 5. Invoke EvalScope service (blocking call + concurrent progress poll)
+    client = EvalScopeClient()
+    try:
+        await client.invoke_eval(
+            config=payload,
+            on_progress=_on_progress,
+        )
+    finally:
+        await client.close()
+
+    logger.info(
+        "Task %s: EvalScope evaluation completed, ingesting results",
+        task_id,
+    )
+
+    # 6. Build prompt → dataset_id mapping for correct attribution
+    #    Use first-seen semantics: if the same query appears in multiple
+    #    datasets, the first dataset wins (no silent overwrite).
+    prompt_to_dataset: dict[str, uuid.UUID] = {}
+    for ds in datasets:
+        stem = dataset_stems[ds.id]
+        ds_input_key = f"{work_dir_key}/input/general_qa/{stem}.jsonl"
+        try:
+            text = await storage.read_text(ds_input_key)
+            for line in text.splitlines():
+                line = line.strip()
+                if line:
+                    row_data = json.loads(line)
+                    q = row_data.get("query", "")
+                    if q and q not in prompt_to_dataset:
+                        prompt_to_dataset[q] = ds.id
+        except Exception:
+            pass  # Mapping failure is non-fatal; will use default
+
+    # 7. Ingest results from EvalScope output artifacts
     score = await extract_primary_score(storage, work_dir_key)
     ingested_results = await ingest_evalscope_results(
         storage=storage,
         work_dir_key=work_dir_key,
-        input_jsonl_key=input_key,
+        input_jsonl_key=None,
         default_score=score,
     )
-    for row in ingested_results:
-        result = EvalResult(
-            task_id=task_id,
-            subtask_id=subtask.id,
-            dataset_id=dataset.id,
-            criterion_id=criterion.id,
-            prompt_text=row["prompt_text"],
-            expected_output=row["expected_output"],
-            model_output=row["model_output"],
-            score=row["score"],
-            latency_ms=row["latency_ms"],
-            tokens_generated=row["tokens_generated"],
-            first_token_ms=row["first_token_ms"],
-        )
-        session.add(result)
 
-    subtask.last_completed_index = (
-        len(ingested_results) if ingested_results else converted_count
-    )
+    # Fallback: per-dataset input JSONL if no artifacts found
+    if not ingested_results:
+        for ds in datasets:
+            stem = dataset_stems[ds.id]
+            ds_input_key = f"{work_dir_key}/input/general_qa/{stem}.jsonl"
+            ds_rows = await ingest_evalscope_results(
+                storage=storage,
+                work_dir_key=work_dir_key,
+                input_jsonl_key=ds_input_key,
+                default_score=score,
+            )
+            ingested_results.extend(ds_rows)
+
+    if len(criteria) > 1:
+        logger.warning(
+            "Task %s: %d criteria in single EvalScope run — "
+            "per-criterion scoring not yet supported, sharing scores",
+            task_id,
+            len(criteria),
+        )
+
+    # 8. Create EvalResult entries with correct dataset/criterion attribution
+    default_dataset_id = datasets[0].id
+    total_results = 0
+    fallback_count = 0
+    for row in ingested_results:
+        dataset_id = prompt_to_dataset.get(row["prompt_text"])
+        if dataset_id is None:
+            dataset_id = default_dataset_id
+            fallback_count += 1
+        for criterion in criteria:
+            result = EvalResult(
+                task_id=task_id,
+                subtask_id=subtask.id,
+                dataset_id=dataset_id,
+                criterion_id=criterion.id,
+                prompt_text=row["prompt_text"],
+                expected_output=row["expected_output"],
+                model_output=row["model_output"],
+                score=row["score"],
+                latency_ms=row["latency_ms"],
+                tokens_generated=row["tokens_generated"],
+                first_token_ms=row["first_token_ms"],
+            )
+            session.add(result)
+            total_results += 1
+
+    if fallback_count:
+        logger.debug(
+            "Task %s: %d/%d results used default dataset attribution",
+            task_id,
+            fallback_count,
+            len(ingested_results),
+        )
+
+    subtask.last_completed_index = len(ingested_results) if ingested_results else total_converted
     subtask.progress_pct = 100.0
     subtask.status = TaskStatus.completed
+    task.total_prompts = max(task.total_prompts, total_converted)
+    task.completed_prompts = task.total_prompts
     session.add(subtask)
+    session.add(task)
     await session.commit()
+
+    logger.info(
+        "Task %s: EvalScope path completed — %d results ingested (%d datasets, %d criteria)",
+        task_id,
+        total_results,
+        len(datasets),
+        len(criteria),
+    )
+
+
+async def _run_perplexity_criteria(
+    session: AsyncSession,
+    storage: StorageBackend,
+    task: EvalTask,
+    subtask: EvalSubtask,
+    model: LLMModel,
+    dataset_ids: list[uuid.UUID],
+    criteria: list[Criterion],
+):
+    """Run perplexity evaluation locally via vLLM logprobs API."""
+    from app.services.perplexity import compute_perplexity_batch, ppl_to_score
+
+    all_texts: list[tuple[uuid.UUID, str]] = []
+    for ds_id in dataset_ids:
+        ds = await session.get(Dataset, ds_id)
+        if not ds:
+            continue
+        try:
+            rows = await _load_dataset_rows(storage, ds.source_uri)
+        except Exception as e:
+            logger.warning("Perplexity: failed to load dataset %s: %s", ds_id, e)
+            continue
+        for row in rows:
+            text = (
+                row.get("query")
+                or row.get("prompt")
+                or row.get("input")
+                or row.get("question")
+                or ""
+            )
+            if text:
+                all_texts.append((ds_id, str(text)))
+
+    if not all_texts:
+        logger.warning("Task %s: no texts found for perplexity computation", task.id)
+        return
+
+    api_key = (model.api_key or settings.DEFAULT_MODEL_API_KEY or "").strip() or "EMPTY"
+    model_name = model.model_name or model.name
+
+    ppls = await compute_perplexity_batch(
+        endpoint_url=model.endpoint_url,
+        model_name=model_name,
+        api_key=api_key,
+        texts=[t for _, t in all_texts],
+    )
+
+    for criterion in criteria:
+        for (ds_id, text), ppl in zip(all_texts, ppls):
+            result = EvalResult(
+                task_id=task.id,
+                subtask_id=subtask.id,
+                dataset_id=ds_id,
+                criterion_id=criterion.id,
+                prompt_text=text,
+                expected_output="",
+                model_output=f"ppl={ppl:.4f}",
+                score=ppl_to_score(ppl),
+                latency_ms=0.0,
+                tokens_generated=0,
+                first_token_ms=0.0,
+            )
+            session.add(result)
+
+    await session.commit()
+    logger.info(
+        "Task %s: perplexity computed for %d texts across %d criteria",
+        task.id,
+        len(all_texts),
+        len(criteria),
+    )
 
 
 async def _call_model(
@@ -315,9 +528,7 @@ async def _call_model(
         and getattr(model, "vllm_deployment_name", "")
     )
     if not api_key and not is_vllm_deploy:
-        raise ConfigError(
-            "Missing api_key: set model.api_key or DEFAULT_MODEL_API_KEY"
-        )
+        raise ConfigError("Missing api_key: set model.api_key or DEFAULT_MODEL_API_KEY")
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
@@ -336,26 +547,18 @@ async def _call_model(
 
     model_name = model.model_name or model.name or settings.DEFAULT_MODEL_NAME
     if not model_name:
-        raise ConfigError(
-            "Missing model_name: set model.model_name/name or DEFAULT_MODEL_NAME"
-        )
+        raise ConfigError("Missing model_name: set model.model_name/name or DEFAULT_MODEL_NAME")
 
     body = {
         "model": model_name,
         "messages": [{"role": "user", "content": prompt}],
-        **{
-            k: v
-            for k, v in params.items()
-            if k in ("temperature", "max_tokens", "top_p", "seed")
-        },
+        **{k: v for k, v in params.items() if k in ("temperature", "max_tokens", "top_p", "seed")},
     }
 
     t0 = time.perf_counter()
     first_token_ms = 0.0
     try:
-        resp = await client.post(
-            endpoint_url, json=body, headers=headers, timeout=120.0
-        )
+        resp = await client.post(endpoint_url, json=body, headers=headers, timeout=120.0)
         latency_ms = (time.perf_counter() - t0) * 1000
         resp.raise_for_status()
         data = resp.json()
@@ -390,8 +593,11 @@ async def _call_model(
             error = ModelCallError(f"Model call failed: {e}")
 
         return ModelCallResult(
-            output="", latency_ms=latency_ms,
-            first_token_ms=0.0, tokens_generated=0, error=error,
+            output="",
+            latency_ms=latency_ms,
+            first_token_ms=0.0,
+            tokens_generated=0,
+            error=error,
         )
 
 
@@ -417,17 +623,12 @@ def _validate_result(result: EvalResult) -> None:
 
     if result.model_output.startswith("[ERROR]"):
         raise ResultIngestionError(
-            f"Refusing dirty result: model_output contains error string: "
-            f"{result.model_output[:80]}"
+            f"Refusing dirty result: model_output contains error string: {result.model_output[:80]}"
         )
     if not (0.0 <= result.score <= 1.0):
-        raise ResultIngestionError(
-            f"Score out of range [0, 1]: {result.score}"
-        )
+        raise ResultIngestionError(f"Score out of range [0, 1]: {result.score}")
     if not result.is_valid and result.error_category is None:
-        raise ResultIngestionError(
-            "Invalid result must have an error_category"
-        )
+        raise ResultIngestionError("Invalid result must have an error_category")
 
 
 async def run_task(task_id: uuid.UUID):
@@ -441,25 +642,21 @@ async def run_task(task_id: uuid.UUID):
             return
 
         snapshot_model_id = task.model_id
-        snapshot_dataset_ids = [
-            uuid.UUID(d) for d in task.dataset_ids.split(",") if d
-        ]
-        snapshot_criteria_ids = [
-            uuid.UUID(c) for c in task.criteria_ids.split(",") if c
-        ]
+        snapshot_dataset_ids = [uuid.UUID(d) for d in task.dataset_ids.split(",") if d]
+        snapshot_criteria_ids = [uuid.UUID(c) for c in task.criteria_ids.split(",") if c]
         snapshot_params = json.loads(task.params_json or "{}")
         snapshot_repeat_count = task.repeat_count
 
         # Apply GPU and environment variable settings (scoped)
         _ENV_ALLOWLIST = {
-            "CUDA_VISIBLE_DEVICES", "OMP_NUM_THREADS",
-            "TOKENIZERS_PARALLELISM", "CUDA_LAUNCH_BLOCKING",
+            "CUDA_VISIBLE_DEVICES",
+            "OMP_NUM_THREADS",
+            "TOKENIZERS_PARALLELISM",
+            "CUDA_LAUNCH_BLOCKING",
         }
         saved_env: dict[str, str | None] = {}
         if task.gpu_ids:
-            saved_env["CUDA_VISIBLE_DEVICES"] = os.environ.get(
-                "CUDA_VISIBLE_DEVICES"
-            )
+            saved_env["CUDA_VISIBLE_DEVICES"] = os.environ.get("CUDA_VISIBLE_DEVICES")
             os.environ["CUDA_VISIBLE_DEVICES"] = task.gpu_ids
         if task.env_vars:
             try:
@@ -473,9 +670,7 @@ async def run_task(task_id: uuid.UUID):
                         saved_env[str(k)] = os.environ.get(str(k))
                         os.environ[str(k)] = str(v)
             except (json.JSONDecodeError, TypeError) as e:
-                raise InvalidEnvVarsError(
-                    f"Invalid env_vars JSON: {e}"
-                ) from e
+                raise InvalidEnvVarsError(f"Invalid env_vars JSON: {e}") from e
 
         task.status = TaskStatus.running
         task.started_at = datetime.now(timezone.utc)
@@ -490,8 +685,11 @@ async def run_task(task_id: uuid.UUID):
 
         logger.info(
             "Task %s STARTED — model=%s, datasets=%d, criteria=%d, repeat=%d",
-            task_id, snapshot_model_id, len(snapshot_dataset_ids),
-            len(snapshot_criteria_ids), snapshot_repeat_count,
+            task_id,
+            snapshot_model_id,
+            len(snapshot_dataset_ids),
+            len(snapshot_criteria_ids),
+            snapshot_repeat_count,
         )
 
         try:
@@ -506,20 +704,18 @@ async def run_task(task_id: uuid.UUID):
 
                 cluster_id = task.cluster_id or model.cluster_id
                 if not cluster_id:
-                    raise ConfigError(
-                        "k8s_vllm backend requires cluster_id on task or model"
-                    )
+                    raise ConfigError("k8s_vllm backend requires cluster_id on task or model")
                 cluster = await session.get(ComputeCluster, cluster_id)
                 if not cluster or not cluster.kubeconfig_encrypted:
-                    raise ConfigError(
-                        f"Cluster {cluster_id} not found or has no kubeconfig"
-                    )
+                    raise ConfigError(f"Cluster {cluster_id} not found or has no kubeconfig")
 
                 # Skip deployment if model is already running on a cluster
                 if model.deploy_status == "running" and model.endpoint_url:
                     logger.info(
                         "Task %s: model '%s' already deployed at %s, reusing",
-                        task_id, model.name, model.endpoint_url,
+                        task_id,
+                        model.name,
+                        model.endpoint_url,
                     )
                     # Don't cleanup pre-existing deployment
                     _vllm_deployment = None
@@ -528,11 +724,7 @@ async def run_task(task_id: uuid.UUID):
                     from app.services.k8s_vllm import full_vllm_lifecycle
 
                     # Determine HF model ID to deploy
-                    hf_model_id = (
-                        model.source_model_id
-                        or model.model_name
-                        or model.name
-                    )
+                    hf_model_id = model.source_model_id or model.model_name or model.name
                     if not hf_model_id:
                         raise ConfigError(
                             "Model must have source_model_id or model_name for vLLM deployment"
@@ -551,10 +743,13 @@ async def run_task(task_id: uuid.UUID):
                     memory_gb = res_cfg.get("memory_gb", 40)
 
                     logger.info(
-                        "Task %s: deploying vLLM for '%s' on cluster '%s' "
-                        "(%d GPU, %s, %dGB)",
-                        task_id, hf_model_id, cluster.name,
-                        gpu_count, gpu_type, memory_gb,
+                        "Task %s: deploying vLLM for '%s' on cluster '%s' (%d GPU, %s, %dGB)",
+                        task_id,
+                        hf_model_id,
+                        cluster.name,
+                        gpu_count,
+                        gpu_type,
+                        memory_gb,
                     )
 
                     # Update model deploy status
@@ -569,6 +764,7 @@ async def run_task(task_id: uuid.UUID):
                         hf_token = model.api_key
                     if not hf_token and hasattr(task, "created_by") and task.created_by:
                         from app.models.user import User
+
                         creator = await session.get(User, task.created_by)
                         if creator and creator.hf_token:
                             hf_token = creator.hf_token
@@ -595,9 +791,7 @@ async def run_task(task_id: uuid.UUID):
                         model.deploy_status = "failed"
                         session.add(model)
                         await session.commit()
-                        raise ConfigError(
-                            f"vLLM deployment failed: {e}"
-                        ) from e
+                        raise ConfigError(f"vLLM deployment failed: {e}") from e
 
                     # Override model endpoint with the deployed vLLM endpoint
                     model.endpoint_url = vllm_endpoint
@@ -608,35 +802,160 @@ async def run_task(task_id: uuid.UUID):
 
                     logger.info(
                         "Task %s: vLLM deployed at %s (deployment=%s)",
-                        task_id, vllm_endpoint, _vllm_deployment,
+                        task_id,
+                        vllm_endpoint,
+                        _vllm_deployment,
                     )
 
             logger.info(
                 "Task %s using model '%s' (%s @ %s) [backend=%s]",
-                task_id, model.name, model.model_name,
-                model.endpoint_url, execution_backend,
+                task_id,
+                model.name,
+                model.model_name,
+                model.endpoint_url,
+                execution_backend,
             )
 
             dataset_ids = snapshot_dataset_ids
             criteria_ids = snapshot_criteria_ids
             params = snapshot_params
 
-            if _should_use_evalscope(params):
-                await _run_task_with_evalscope(
+            # ── Pre-load criteria for routing decision ──
+            all_criteria: list[Criterion] = []
+            for c_id in criteria_ids:
+                c = await session.get(Criterion, c_id)
+                if c:
+                    all_criteria.append(c)
+
+            # Classify criteria by execution path
+            perplexity_criteria = [
+                c
+                for c in all_criteria
+                if c.type == "preset" and _get_criterion_metric(c) == "perplexity"
+            ]
+            custom_script_criteria = [
+                c
+                for c in all_criteria
+                if c.type == "sandbox" and _get_criterion_mode(c) == "custom_script"
+            ]
+            evalscope_criteria = [
+                c
+                for c in all_criteria
+                if c not in perplexity_criteria and c not in custom_script_criteria
+            ]
+
+            # Enrich llm_judge criteria: resolve judge_model_id → credentials
+            for c in all_criteria:
+                if c.type == "llm_judge":
+                    cfg = json.loads(c.config_json) if c.config_json else {}
+                    judge_model_id = cfg.get("judge_model_id")
+                    if judge_model_id and not cfg.get("endpoint_url"):
+                        judge_model = await session.get(LLMModel, uuid.UUID(judge_model_id))
+                        if not judge_model:
+                            raise EvaluatorConfigError(
+                                f"Judge model {judge_model_id} for criterion '{c.name}' not found"
+                            )
+                        cfg["endpoint_url"] = judge_model.endpoint_url
+                        cfg["api_key"] = judge_model.api_key
+                        cfg["model_name"] = judge_model.model_name or judge_model.name
+                        c.config_json = json.dumps(cfg)
+
+            # Route: EvalScope service (default) or legacy fallback
+            use_evalscope = (
+                await _should_use_evalscope_service(params) if evalscope_criteria else False
+            )
+
+            if use_evalscope:
+                logger.info(
+                    "Task %s: routing %d criteria to EvalScope service",
+                    task_id,
+                    len(evalscope_criteria),
+                )
+                await _run_task_via_evalscope_service(
                     session=session,
                     storage=storage,
                     task_id=task_id,
+                    task=task,
                     repeat_count=snapshot_repeat_count,
                     model=model,
                     dataset_ids=dataset_ids,
-                    criteria_ids=criteria_ids,
+                    criteria=evalscope_criteria,
                     params=params,
                 )
-                task.status = TaskStatus.completed
+
+                # Run perplexity criteria locally (not supported by EvalScope)
+                partial_errors: list[str] = []
+                if perplexity_criteria:
+                    logger.info(
+                        "Task %s: running %d perplexity criteria locally",
+                        task_id,
+                        len(perplexity_criteria),
+                    )
+                    ppl_subtask = EvalSubtask(
+                        task_id=task_id,
+                        run_index=1,
+                        status=TaskStatus.running,
+                        progress_pct=0.0,
+                    )
+                    session.add(ppl_subtask)
+                    await session.commit()
+                    await session.refresh(ppl_subtask)
+                    try:
+                        await _run_perplexity_criteria(
+                            session=session,
+                            storage=storage,
+                            task=task,
+                            subtask=ppl_subtask,
+                            model=model,
+                            dataset_ids=dataset_ids,
+                            criteria=perplexity_criteria,
+                        )
+                        ppl_subtask.status = TaskStatus.completed
+                        ppl_subtask.progress_pct = 100.0
+                    except Exception as e:
+                        logger.error(
+                            "Task %s: perplexity computation failed: %s",
+                            task_id,
+                            e,
+                        )
+                        ppl_subtask.status = TaskStatus.failed
+                        ppl_subtask.error_log = str(e)
+                        partial_errors.append(f"perplexity failed: {e}")
+                    session.add(ppl_subtask)
+                    await session.commit()
+
+                # Warn about unsupported criteria
+                if custom_script_criteria:
+                    msg = (
+                        f"{len(custom_script_criteria)} custom_script "
+                        f"criteria skipped — not yet supported "
+                        f"alongside EvalScope service"
+                    )
+                    logger.warning("Task %s: %s", task_id, msg)
+                    partial_errors.append(msg)
+
                 task.finished_at = datetime.now(timezone.utc)
+                if partial_errors:
+                    task.status = TaskStatus.completed
+                    task.error_summary = "Partial: " + "; ".join(partial_errors)
+                else:
+                    task.status = TaskStatus.completed
+
+                # Record Prometheus metrics
+                elapsed = (task.finished_at - task.started_at).total_seconds()
+                tasks_total.labels(status="completed").inc()
+                tasks_running.dec()
+                task_duration_seconds.observe(elapsed)
+
                 session.add(task)
                 await session.commit()
                 return
+
+            # ── Legacy fallback path ──
+            logger.warning(
+                "Task %s: EvalScope unavailable or disabled, using legacy evaluators",
+                task_id,
+            )
 
             # Load datasets — fail explicitly on missing/broken datasets
             all_rows: list[tuple[uuid.UUID, dict]] = []
@@ -678,14 +997,13 @@ async def run_task(task_id: uuid.UUID):
                 logger.warning(
                     "Task %s: %d dataset(s) failed but continuing "
                     "(allow_partial_datasets=True) with %d rows: %s",
-                    task_id, len(dataset_errors), len(all_rows),
+                    task_id,
+                    len(dataset_errors),
+                    len(all_rows),
                     "; ".join(dataset_errors),
                 )
-                task.error_summary = (
-                    f"partial_datasets: {'; '.join(dataset_errors)}"
-                )
+                task.error_summary = f"partial_datasets: {'; '.join(dataset_errors)}"
                 session.add(task)
-                await session.commit()
                 await session.commit()
             logger.info("Task %s: total %d prompt rows to evaluate", task_id, len(all_rows))
 
@@ -701,9 +1019,7 @@ async def run_task(task_id: uuid.UUID):
                         cfg = json.loads(c.config_json) if c.config_json else {}
                         judge_model_id = cfg.get("judge_model_id")
                         if judge_model_id:
-                            judge_model = await session.get(
-                                LLMModel, uuid.UUID(judge_model_id)
-                            )
+                            judge_model = await session.get(LLMModel, uuid.UUID(judge_model_id))
                             if not judge_model:
                                 raise EvaluatorConfigError(
                                     f"Judge model {judge_model_id} for "
@@ -711,9 +1027,7 @@ async def run_task(task_id: uuid.UUID):
                                 )
                             cfg["endpoint_url"] = judge_model.endpoint_url
                             cfg["api_key"] = judge_model.api_key
-                            cfg["model_name"] = (
-                                judge_model.model_name or judge_model.name
-                            )
+                            cfg["model_name"] = judge_model.model_name or judge_model.name
                             if getattr(judge_model, "api_format", "openai") == "anthropic":
                                 cfg["api_format"] = "anthropic"
                         enriched_configs[str(c.id)] = json.dumps(cfg)
@@ -722,7 +1036,8 @@ async def run_task(task_id: uuid.UUID):
                 raise ValueError("No valid criteria found")
             logger.info(
                 "Task %s: %d criteria loaded — %s",
-                task_id, len(criteria),
+                task_id,
+                len(criteria),
                 ", ".join(c.name for c in criteria),
             )
 
@@ -743,9 +1058,9 @@ async def run_task(task_id: uuid.UUID):
                         session.add(st)
                 await session.commit()
                 logger.info(
-                    "Task %s: resuming with %d existing subtask(s), "
-                    "%d already completed",
-                    task_id, len(subtasks),
+                    "Task %s: resuming with %d existing subtask(s), %d already completed",
+                    task_id,
+                    len(subtasks),
                     sum(1 for s in subtasks if s.status == TaskStatus.completed),
                 )
             else:
@@ -764,7 +1079,8 @@ async def run_task(task_id: uuid.UUID):
                     await session.refresh(st)
                 logger.info(
                     "Task %s: created %d subtask(s), starting evaluation",
-                    task_id, len(subtasks),
+                    task_id,
+                    len(subtasks),
                 )
 
             # ── Run evaluation — all subtasks in parallel ──
@@ -785,7 +1101,10 @@ async def run_task(task_id: uuid.UUID):
             _enriched_snapshot = dict(enriched_configs)
 
             async def _eval_crit_retry(
-                crit_type: str, cfg: str, exp: str, out: str,
+                crit_type: str,
+                cfg: str,
+                exp: str,
+                out: str,
                 crit_name: str,
             ) -> float:
                 """Retry criterion evaluation up to 3 times.
@@ -797,10 +1116,15 @@ async def run_task(task_id: uuid.UUID):
                 for attempt in range(3):
                     try:
                         score = await asyncio.to_thread(
-                            run_criterion, crit_type, cfg, exp, out,
+                            run_criterion,
+                            crit_type,
+                            cfg,
+                            exp,
+                            out,
                         )
                         evaluations_total.labels(
-                            criterion_type=crit_type, status="success",
+                            criterion_type=crit_type,
+                            status="success",
                         ).inc()
                         evaluation_score.labels(
                             criterion_type=crit_type,
@@ -811,16 +1135,22 @@ async def run_task(task_id: uuid.UUID):
                         if attempt < 2:
                             logger.warning(
                                 "Task %s: '%s' attempt %d/3: %s",
-                                task_id, crit_name, attempt + 1, e,
+                                task_id,
+                                crit_name,
+                                attempt + 1,
+                                e,
                             )
-                            await asyncio.sleep(2 ** attempt)
+                            await asyncio.sleep(2**attempt)
                         else:
                             evaluations_total.labels(
-                                criterion_type=crit_type, status="error",
+                                criterion_type=crit_type,
+                                status="error",
                             ).inc()
                             logger.error(
                                 "Task %s: '%s' failed x3: %s",
-                                task_id, crit_name, e,
+                                task_id,
+                                crit_name,
+                                e,
                             )
                 raise EvaluationError(
                     f"Criterion '{crit_name}' failed after 3 attempts: {last_err}"
@@ -845,7 +1175,10 @@ async def run_task(task_id: uuid.UUID):
                     if start_idx > 0:
                         logger.info(
                             "Task %s run %d: resuming from prompt %d/%d",
-                            task_id, run_idx + 1, start_idx, total,
+                            task_id,
+                            run_idx + 1,
+                            start_idx,
+                            total,
                         )
                     completed = start_idx
 
@@ -862,12 +1195,15 @@ async def run_task(task_id: uuid.UUID):
                             await sub_session.commit()
                             logger.info(
                                 "Task %s run %d stopped (%s) at %d/%d",
-                                task_id, run_idx + 1, t.status,
-                                completed, total,
+                                task_id,
+                                run_idx + 1,
+                                t.status,
+                                completed,
+                                total,
                             )
                             return
 
-                        batch = all_rows[batch_start:batch_start + batch_size]
+                        batch = all_rows[batch_start : batch_start + batch_size]
 
                         async def _do_prompt(
                             idx: int,
@@ -881,29 +1217,48 @@ async def run_task(task_id: uuid.UUID):
                                 prompt = (
                                     str(row.get(pk, ""))
                                     if pk and pk in row
-                                    else _extract_field(row, [
-                                        "prompt", "instruction", "query",
-                                        "input", "question", "text",
-                                        "content",
-                                    ])
+                                    else _extract_field(
+                                        row,
+                                        [
+                                            "prompt",
+                                            "instruction",
+                                            "query",
+                                            "input",
+                                            "question",
+                                            "text",
+                                            "content",
+                                        ],
+                                    )
                                 )
                                 expected = (
                                     str(row.get(ek, ""))
                                     if ek and ek in row
-                                    else _extract_field(row, [
-                                        "expected", "response", "output",
-                                        "answer", "target", "label",
-                                    ])
+                                    else _extract_field(
+                                        row,
+                                        [
+                                            "expected",
+                                            "response",
+                                            "output",
+                                            "answer",
+                                            "target",
+                                            "label",
+                                        ],
+                                    )
                                 )
                                 mcr = await _call_model(
-                                    client, _model_snapshot,
-                                    prompt, seed_params,
+                                    client,
+                                    _model_snapshot,
+                                    prompt,
+                                    seed_params,
                                 )
                                 if idx % 20 == 0 or idx == 0:
                                     logger.info(
                                         "Task %s run %d: %d/%d — %.0fms",
-                                        task_id, run_idx + 1,
-                                        idx + 1, total, mcr.latency_ms,
+                                        task_id,
+                                        run_idx + 1,
+                                        idx + 1,
+                                        total,
+                                        mcr.latency_ms,
                                     )
 
                                 # If model call failed, write invalid results
@@ -932,12 +1287,16 @@ async def run_task(task_id: uuid.UUID):
                                     async with crit_sem:
                                         cid = str(c.id)
                                         cfg = _enriched_snapshot.get(
-                                            cid, c.config_json,
+                                            cid,
+                                            c.config_json,
                                         )
                                         try:
                                             sc = await _eval_crit_retry(
-                                                c.type, cfg, expected,
-                                                mcr.output, c.name,
+                                                c.type,
+                                                cfg,
+                                                expected,
+                                                mcr.output,
+                                                c.name,
                                             )
                                             return EvalResult(
                                                 task_id=_task_id,
@@ -969,9 +1328,9 @@ async def run_task(task_id: uuid.UUID):
                                                 error_category=e.error_code,
                                             )
 
-                                return list(await asyncio.gather(
-                                    *[_score(c) for c in _criteria_snapshot]
-                                ))
+                                return list(
+                                    await asyncio.gather(*[_score(c) for c in _criteria_snapshot])
+                                )
 
                         batch_results = await asyncio.gather(
                             *[
@@ -997,7 +1356,9 @@ async def run_task(task_id: uuid.UUID):
                     await sub_session.commit()
                     logger.info(
                         "Task %s run %d: COMPLETED (%d prompts)",
-                        task_id, run_idx + 1, total,
+                        task_id,
+                        run_idx + 1,
+                        total,
                     )
 
             # Launch non-completed subtasks concurrently
@@ -1011,9 +1372,7 @@ async def run_task(task_id: uuid.UUID):
                         sp["seed"] = random.randint(0, 2**31)
                     elif task.seed_strategy == "fixed":
                         sp["seed"] = 42 + run_idx
-                    subtask_coros.append(
-                        _run_subtask(run_idx, subtask.id, sp, client)
-                    )
+                    subtask_coros.append(_run_subtask(run_idx, subtask.id, sp, client))
                 await asyncio.gather(*subtask_coros)
 
             task.status = TaskStatus.completed
@@ -1024,24 +1383,33 @@ async def run_task(task_id: uuid.UUID):
             task_duration_seconds.observe(elapsed)
             logger.info(
                 "Task %s COMPLETED in %.1fs — %d runs × %d prompts × %d criteria",
-                task_id, elapsed, len(subtasks), len(all_rows), len(criteria),
+                task_id,
+                elapsed,
+                len(subtasks),
+                len(all_rows),
+                len(criteria),
             )
 
             # Cleanup vLLM deployment if we created one
             if _vllm_deployment and _vllm_kubeconfig and _vllm_namespace:
                 try:
                     from app.services.k8s_vllm import cleanup_vllm
+
                     await cleanup_vllm(
-                        _vllm_kubeconfig, _vllm_namespace, _vllm_deployment,
+                        _vllm_kubeconfig,
+                        _vllm_namespace,
+                        _vllm_deployment,
                     )
                     logger.info(
                         "Task %s: vLLM deployment %s cleaned up",
-                        task_id, _vllm_deployment,
+                        task_id,
+                        _vllm_deployment,
                     )
                 except Exception as ce:
                     logger.error(
                         "Task %s: vLLM cleanup failed: %s",
-                        task_id, ce,
+                        task_id,
+                        ce,
                     )
                 # Reset model deploy status (separate try to avoid masking cleanup errors)
                 try:
@@ -1053,7 +1421,8 @@ async def run_task(task_id: uuid.UUID):
                 except Exception:
                     logger.warning(
                         "Task %s: failed to update model status after cleanup",
-                        task_id, exc_info=True,
+                        task_id,
+                        exc_info=True,
                     )
 
         except Exception as e:
@@ -1065,8 +1434,11 @@ async def run_task(task_id: uuid.UUID):
             if _vllm_deployment and _vllm_kubeconfig and _vllm_namespace:
                 try:
                     from app.services.k8s_vllm import cleanup_vllm
+
                     await cleanup_vllm(
-                        _vllm_kubeconfig, _vllm_namespace, _vllm_deployment,
+                        _vllm_kubeconfig,
+                        _vllm_namespace,
+                        _vllm_deployment,
                     )
                 except Exception:
                     logger.warning("vLLM cleanup failed during error handling", exc_info=True)
@@ -1093,7 +1465,8 @@ async def run_task(task_id: uuid.UUID):
                     # Reset model deploy status if we had a vLLM deployment
                     if _vllm_deployment:
                         model_for_cleanup = await session.get(
-                            LLMModel, snapshot_model_id,
+                            LLMModel,
+                            snapshot_model_id,
                         )
                         if model_for_cleanup:
                             model_for_cleanup.deploy_status = "failed"
@@ -1104,7 +1477,8 @@ async def run_task(task_id: uuid.UUID):
             except Exception as cleanup_err:
                 logger.error(
                     "Task %s: failed to update status after error: %s",
-                    task_id, cleanup_err,
+                    task_id,
+                    cleanup_err,
                 )
             return
 

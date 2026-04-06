@@ -76,9 +76,7 @@ async def create_report(
         "status": report.status,
         "title": report.title,
         "content": (
-            json.loads(report.content_json)
-            if report.status == ReportStatus.ready
-            else None
+            json.loads(report.content_json) if report.status == ReportStatus.ready else None
         ),
         "error_message": report.error_message,
         "created_at": report.created_at.isoformat(),
@@ -178,17 +176,12 @@ async def generate_report(
     if not generator:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "无效的报告类型，可选: "
-                f"{list(REPORT_GENERATORS.keys())}"
-            ),
+            detail=(f"无效的报告类型，可选: {list(REPORT_GENERATORS.keys())}"),
         )
     try:
         return await generator(task_id, session)
     except ValueError as e:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, detail=str(e)
-        ) from e
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # ── Export endpoints ────────────────────────────────────
@@ -202,20 +195,13 @@ async def export_csv(
     current_user: User = require_permission("reports.export"),
 ):
     """Export report as CSV."""
-    report = await _get_report(
-        task_id, report_type, session
-    )
+    report = await _get_report(task_id, report_type, session)
     csv_content = _report_to_csv(report)
 
     return StreamingResponse(
         io.BytesIO(csv_content.encode("utf-8-sig")),
         media_type="text/csv; charset=utf-8",
-        headers={
-            "Content-Disposition": (
-                f'attachment; filename='
-                f'"{report_type}_report.csv"'
-            )
-        },
+        headers={"Content-Disposition": (f'attachment; filename="{report_type}_report.csv"')},
     )
 
 
@@ -227,20 +213,13 @@ async def export_html(
     current_user: User = require_permission("reports.export"),
 ):
     """Export report as HTML."""
-    report = await _get_report(
-        task_id, report_type, session
-    )
+    report = await _get_report(task_id, report_type, session)
     html = _report_to_html(report)
 
     return StreamingResponse(
         io.BytesIO(html.encode("utf-8")),
         media_type="text/html; charset=utf-8",
-        headers={
-            "Content-Disposition": (
-                f'attachment; filename='
-                f'"{report_type}_report.html"'
-            )
-        },
+        headers={"Content-Disposition": (f'attachment; filename="{report_type}_report.html"')},
     )
 
 
@@ -252,23 +231,13 @@ async def export_docx(
     current_user: User = require_permission("reports.export"),
 ):
     """Export report as DOCX."""
-    report = await _get_report(
-        task_id, report_type, session
-    )
+    report = await _get_report(task_id, report_type, session)
     docx_bytes = _report_to_docx(report)
 
     return StreamingResponse(
         io.BytesIO(docx_bytes),
-        media_type=(
-            "application/vnd.openxmlformats-"
-            "officedocument.wordprocessingml.document"
-        ),
-        headers={
-            "Content-Disposition": (
-                f'attachment; filename='
-                f'"{report_type}_report.docx"'
-            )
-        },
+        media_type=("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        headers={"Content-Disposition": (f'attachment; filename="{report_type}_report.docx"')},
     )
 
 
@@ -294,9 +263,7 @@ async def export_pdf(
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'attachment; filename="{report_type}_report.pdf"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{report_type}_report.pdf"'},
     )
 
 
@@ -310,9 +277,7 @@ async def _get_report(task_id, report_type, session):
     try:
         return await generator(task_id, session)
     except ValueError as e:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, detail=str(e)
-        ) from e
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # ── CSV helper ──────────────────────────────────────────
@@ -326,9 +291,7 @@ def _report_to_csv(report: dict) -> str:
     # Header row with metadata
     writer.writerow(["Report", report.get("title", "")])
     writer.writerow(["Model", report.get("model_name", "")])
-    writer.writerow(
-        ["Generated", report.get("generated_at", "")]
-    )
+    writer.writerow(["Generated", report.get("generated_at", "")])
     writer.writerow([])
 
     if rtype == "performance":
@@ -342,51 +305,67 @@ def _report_to_csv(report: dict) -> str:
         ]
         writer.writerow(headers)
         for row in report.get("criteria_breakdown", []):
-            writer.writerow([
-                row["criterion"],
-                row["avg_score"],
-                row["min_score"],
-                row["max_score"],
-                row["sample_count"],
-                row["avg_latency_ms"],
-            ])
+            writer.writerow(
+                [
+                    row["criterion"],
+                    row["avg_score"],
+                    row["min_score"],
+                    row["max_score"],
+                    row["sample_count"],
+                    row["avg_latency_ms"],
+                ]
+            )
         writer.writerow([])
-        writer.writerow([
-            "Overall Score",
-            report.get("overall_score", 0),
-        ])
+        writer.writerow(
+            [
+                "Overall Score",
+                report.get("overall_score", 0),
+            ]
+        )
 
     elif rtype == "safety":
-        writer.writerow([
-            "Total",
-            report.get("total_samples", 0),
-        ])
-        writer.writerow([
-            "Errors",
-            report.get("error_count", 0),
-        ])
-        writer.writerow([
-            "Error Rate",
-            report.get("error_rate", 0),
-        ])
-        writer.writerow([
-            "Risk",
-            report.get("risk_level", ""),
-        ])
+        writer.writerow(
+            [
+                "Total",
+                report.get("total_samples", 0),
+            ]
+        )
+        writer.writerow(
+            [
+                "Errors",
+                report.get("error_count", 0),
+            ]
+        )
+        writer.writerow(
+            [
+                "Error Rate",
+                report.get("error_rate", 0),
+            ]
+        )
+        writer.writerow(
+            [
+                "Risk",
+                report.get("risk_level", ""),
+            ]
+        )
         writer.writerow([])
-        writer.writerow([
-            "Prompt",
-            "Expected",
-            "Actual",
-            "Score",
-        ])
+        writer.writerow(
+            [
+                "Prompt",
+                "Expected",
+                "Actual",
+                "Score",
+            ]
+        )
         for c in report.get("error_cases", []):
-            writer.writerow([
-                c["prompt"][:200],
-                c["expected"][:200],
-                c["actual"][:200],
-                c["score"],
-            ])
+            writer.writerow(
+                [
+                    c["prompt"][:200],
+                    c["expected"][:200],
+                    c["actual"][:200],
+                    c["score"],
+                ]
+            )
 
     elif rtype == "cost":
         for key in [
@@ -403,22 +382,30 @@ def _report_to_csv(report: dict) -> str:
             writer.writerow([key, report.get(key, "")])
 
     elif rtype == "value":
-        writer.writerow([
-            "Overall Score",
-            report.get("overall_score", 0),
-        ])
-        writer.writerow([
-            "Avg Latency (ms)",
-            report.get("avg_latency_ms", 0),
-        ])
-        writer.writerow([
-            "Value Index",
-            report.get("value_index", 0),
-        ])
-        writer.writerow([
-            "Throughput (tok/s)",
-            report.get("throughput_tokens_per_sec", 0),
-        ])
+        writer.writerow(
+            [
+                "Overall Score",
+                report.get("overall_score", 0),
+            ]
+        )
+        writer.writerow(
+            [
+                "Avg Latency (ms)",
+                report.get("avg_latency_ms", 0),
+            ]
+        )
+        writer.writerow(
+            [
+                "Value Index",
+                report.get("value_index", 0),
+            ]
+        )
+        writer.writerow(
+            [
+                "Throughput (tok/s)",
+                report.get("throughput_tokens_per_sec", 0),
+            ]
+        )
         writer.writerow([])
         headers = [
             "Criterion",
@@ -430,14 +417,16 @@ def _report_to_csv(report: dict) -> str:
         ]
         writer.writerow(headers)
         for row in report.get("criteria_breakdown", []):
-            writer.writerow([
-                row["criterion"],
-                row["avg_score"],
-                row["min_score"],
-                row["max_score"],
-                row["sample_count"],
-                row["avg_latency_ms"],
-            ])
+            writer.writerow(
+                [
+                    row["criterion"],
+                    row["avg_score"],
+                    row["min_score"],
+                    row["max_score"],
+                    row["sample_count"],
+                    row["avg_latency_ms"],
+                ]
+            )
 
     return buf.getvalue()
 
@@ -525,13 +514,7 @@ def _html_perf(r: dict) -> str:
 
 def _html_safety(r: dict) -> str:
     rl = r.get("risk_level", "")
-    css = (
-        "low"
-        if "\u4f4e" in rl
-        else "mid"
-        if "\u4e2d" in rl
-        else "high"
-    )
+    css = "low" if "\u4f4e" in rl else "mid" if "\u4e2d" in rl else "high"
     out = (
         f"<p>Risk: <span class='badge {css}'>"
         f"{rl}</span></p>"
@@ -594,6 +577,7 @@ def _html_to_pdf(html: str) -> bytes:
     Raises ImportError if weasyprint is not installed.
     """
     from weasyprint import HTML
+
     return HTML(string=html).write_pdf()
 
 
@@ -608,8 +592,7 @@ def _report_to_docx(report: dict) -> bytes:
     title = report.get("title", "Report")
     doc.add_heading(title, level=1)
     doc.add_paragraph(
-        f"Model: {report.get('model_name', '')}  |  "
-        f"Generated: {report.get('generated_at', '')}"
+        f"Model: {report.get('model_name', '')}  |  Generated: {report.get('generated_at', '')}"
     )
 
     rtype = report.get("type", "")
@@ -628,9 +611,7 @@ def _report_to_docx(report: dict) -> bytes:
 
 
 def _docx_add_table(doc, headers, rows):
-    table = doc.add_table(
-        rows=1 + len(rows), cols=len(headers)
-    )
+    table = doc.add_table(rows=1 + len(rows), cols=len(headers))
     table.style = "Light Grid Accent 1"
     for i, h in enumerate(headers):
         table.rows[0].cells[i].text = str(h)
@@ -640,10 +621,7 @@ def _docx_add_table(doc, headers, rows):
 
 
 def _docx_perf(doc, r):
-    doc.add_paragraph(
-        f"Overall Score: {r['overall_score']}  "
-        f"({r['total_samples']} samples)"
-    )
+    doc.add_paragraph(f"Overall Score: {r['overall_score']}  ({r['total_samples']} samples)")
     headers = [
         "Criterion",
         "Avg",

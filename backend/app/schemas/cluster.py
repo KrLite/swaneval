@@ -18,6 +18,7 @@ class ClusterCreate(BaseModel):
         if len(v) > 1_000_000:
             raise ValueError("Kubeconfig too large (max 1MB)")
         import yaml
+
         try:
             data = yaml.safe_load(v)
         except Exception:

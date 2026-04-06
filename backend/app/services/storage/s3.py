@@ -63,9 +63,7 @@ class S3Storage(StorageBackend):
         data = await self.read_file(key)
         return data.decode(encoding)
 
-    async def read_lines(
-        self, key: str, max_lines: int = 0, encoding: str = "utf-8"
-    ) -> list[str]:
+    async def read_lines(self, key: str, max_lines: int = 0, encoding: str = "utf-8") -> list[str]:
         text = await self.read_text(key, encoding)
         all_lines = text.splitlines()
         if max_lines > 0:
@@ -110,9 +108,7 @@ class S3Storage(StorageBackend):
 
     # -- listing --------------------------------------------------------
 
-    async def list_files(
-        self, prefix: str, patterns: list[str] | None = None
-    ) -> list[str]:
+    async def list_files(self, prefix: str, patterns: list[str] | None = None) -> list[str]:
         full_prefix = self._full_key(prefix)
         if not full_prefix.endswith("/"):
             full_prefix += "/"
@@ -120,9 +116,7 @@ class S3Storage(StorageBackend):
         def _list() -> list[str]:
             results: list[str] = []
             paginator = self._client.get_paginator("list_objects_v2")
-            for page in paginator.paginate(
-                Bucket=self._bucket, Prefix=full_prefix
-            ):
+            for page in paginator.paginate(Bucket=self._bucket, Prefix=full_prefix):
                 for obj in page.get("Contents", []):
                     obj_key: str = obj["Key"]
                     if obj_key.endswith("/"):

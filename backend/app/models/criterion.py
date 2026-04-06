@@ -10,10 +10,11 @@ from sqlmodel import Field, SQLModel
 # 评估标准类型枚举 / Evaluation criterion type enumeration
 class CriterionType(str, enum.Enum):
     """评估标准类型枚举 / Evaluation criterion type enumeration"""
-    preset = "preset"       # 预设指标 / Preset metric (exact_match, perplexity, bleu, rouge, etc)
-    regex = "regex"         # 正则表达式匹配 / Regular expression matching
-    sandbox = "sandbox"     # 沙箱执行 / Sandboxed code execution
-    llm_judge = "llm_judge" # LLM作为评判者 / LLM-as-a-judge evaluation
+
+    preset = "preset"  # 预设指标 / Preset metric (exact_match, perplexity, bleu, rouge, etc)
+    regex = "regex"  # 正则表达式匹配 / Regular expression matching
+    sandbox = "sandbox"  # 沙箱执行 / Sandboxed code execution
+    llm_judge = "llm_judge"  # LLM作为评判者 / LLM-as-a-judge evaluation
 
 
 class Criterion(SQLModel, table=True):
@@ -23,6 +24,7 @@ class Criterion(SQLModel, table=True):
     存储评估标准的配置信息，用于评估LLM输出质量。
     Stores evaluation criterion configuration for assessing LLM output quality.
     """
+
     __tablename__ = "criteria"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -55,6 +57,7 @@ class Criterion(SQLModel, table=True):
 
 class JudgeTemplate(SQLModel, table=True):
     """Reusable LLM judge prompt templates."""
+
     __tablename__ = "judge_templates"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)

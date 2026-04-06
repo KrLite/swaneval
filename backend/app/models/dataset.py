@@ -10,11 +10,12 @@ from sqlmodel import Field, SQLModel
 # 数据集来源类型枚举 / Dataset source type enumeration
 class SourceType(str, enum.Enum):
     """数据集来源类型枚举 / Dataset source type enumeration"""
-    upload = "upload"           # 本地上传 / Uploaded from local file
-    huggingface = "huggingface" # HuggingFace数据集 / HuggingFace dataset
-    modelscope = "modelscope"   # ModelScope数据集 / ModelScope dataset
-    server_path = "server_path" # 服务器路径 / Server file path
-    preset = "preset"           # 预设数据集 / Preset built-in dataset
+
+    upload = "upload"  # 本地上传 / Uploaded from local file
+    huggingface = "huggingface"  # HuggingFace数据集 / HuggingFace dataset
+    modelscope = "modelscope"  # ModelScope数据集 / ModelScope dataset
+    server_path = "server_path"  # 服务器路径 / Server file path
+    preset = "preset"  # 预设数据集 / Preset built-in dataset
 
 
 class Dataset(SQLModel, table=True):
@@ -24,6 +25,7 @@ class Dataset(SQLModel, table=True):
     存储评估数据集的元数据信息。
     Stores metadata for evaluation datasets.
     """
+
     __tablename__ = "datasets"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -105,6 +107,7 @@ class DatasetVersion(SQLModel, table=True):
     存储数据集的版本历史记录。
     Stores version history for datasets.
     """
+
     __tablename__ = "dataset_versions"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -140,6 +143,7 @@ class DatasetVersion(SQLModel, table=True):
 
 class SyncLog(SQLModel, table=True):
     """Sync history record for auto-update subscriptions."""
+
     __tablename__ = "sync_logs"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)

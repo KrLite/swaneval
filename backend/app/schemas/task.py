@@ -62,6 +62,7 @@ class SubtaskResponse(BaseModel):
 
 class StabilityStatsResponse(BaseModel):
     """Aggregated stability statistics for repeat_count > 1 tasks."""
+
     criterion_id: uuid.UUID
     criterion_name: str
     run_count: int

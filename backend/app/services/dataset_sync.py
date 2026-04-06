@@ -38,19 +38,16 @@ def _get_hf_latest_sha(dataset_id: str) -> str | None:
 
     try:
         from huggingface_hub import repo_info
+
         info = repo_info(dataset_id, repo_type="dataset")
         return info.sha
     except Exception as exc:
-        if RepositoryNotFoundError is not None and isinstance(
-            exc, RepositoryNotFoundError
-        ):
+        if RepositoryNotFoundError is not None and isinstance(exc, RepositoryNotFoundError):
             return None
         raise
 
 
-async def check_and_sync_dataset(
-    dataset_id, triggered_by: str = "auto"
-) -> str:
+async def check_and_sync_dataset(dataset_id, triggered_by: str = "auto") -> str:
     """Check a single dataset for updates and sync if needed.
 
     Returns a status string: "synced", "up_to_date", or "failed:<reason>".
@@ -85,22 +82,33 @@ async def check_and_sync_dataset(
                     ds.last_synced_at = datetime.now(timezone.utc)
                     session.add(ds)
                     elapsed = int((_time.monotonic() - t0) * 1000)
-                    session.add(SyncLog(
-                        dataset_id=ds.id, triggered_by=triggered_by,
-                        status="up_to_date", old_version=old_version,
-                        old_row_count=old_row_count, duration_ms=elapsed,
-                    ))
+                    session.add(
+                        SyncLog(
+                            dataset_id=ds.id,
+                            triggered_by=triggered_by,
+                            status="up_to_date",
+                            old_version=old_version,
+                            old_row_count=old_row_count,
+                            duration_ms=elapsed,
+                        )
+                    )
                     await session.commit()
                     return "up_to_date"
 
                 source_uri, row_count, size_bytes = await import_huggingface(
-                    hf_id, ds.hf_subset, ds.hf_split, storage,
+                    hf_id,
+                    ds.hf_subset,
+                    ds.hf_split,
+                    storage,
                 )
                 new_sha = latest_sha or ""
 
             elif ds.source_type == SourceType.modelscope:
                 source_uri, row_count, size_bytes = await import_modelscope(
-                    hf_id, ds.hf_subset, ds.hf_split, storage,
+                    hf_id,
+                    ds.hf_subset,
+                    ds.hf_split,
+                    storage,
                 )
                 new_sha = ""
 
@@ -108,12 +116,17 @@ async def check_and_sync_dataset(
                 ds.sync_status = "failed"
                 session.add(ds)
                 elapsed = int((_time.monotonic() - t0) * 1000)
-                session.add(SyncLog(
-                    dataset_id=ds.id, triggered_by=triggered_by,
-                    status="failed", old_version=old_version,
-                    old_row_count=old_row_count, duration_ms=elapsed,
-                    error_message="unsupported source type",
-                ))
+                session.add(
+                    SyncLog(
+                        dataset_id=ds.id,
+                        triggered_by=triggered_by,
+                        status="failed",
+                        old_version=old_version,
+                        old_row_count=old_row_count,
+                        duration_ms=elapsed,
+                        error_message="unsupported source type",
+                    )
+                )
                 await session.commit()
                 return "failed:unsupported source type"
 
@@ -124,11 +137,16 @@ async def check_and_sync_dataset(
                 ds.hf_last_sha = new_sha
                 session.add(ds)
                 elapsed = int((_time.monotonic() - t0) * 1000)
-                session.add(SyncLog(
-                    dataset_id=ds.id, triggered_by=triggered_by,
-                    status="up_to_date", old_version=old_version,
-                    old_row_count=old_row_count, duration_ms=elapsed,
-                ))
+                session.add(
+                    SyncLog(
+                        dataset_id=ds.id,
+                        triggered_by=triggered_by,
+                        status="up_to_date",
+                        old_version=old_version,
+                        old_row_count=old_row_count,
+                        duration_ms=elapsed,
+                    )
+                )
                 await session.commit()
                 return "up_to_date"
 
@@ -145,6 +163,7 @@ async def check_and_sync_dataset(
             session.add(ds)
 
             import os
+
             ext = os.path.splitext(source_uri)[1].lstrip(".")
             dv = DatasetVersion(
                 dataset_id=ds.id,
@@ -158,17 +177,26 @@ async def check_and_sync_dataset(
             session.add(dv)
 
             elapsed = int((_time.monotonic() - t0) * 1000)
-            session.add(SyncLog(
-                dataset_id=ds.id, triggered_by=triggered_by,
-                status="synced", old_version=old_version,
-                new_version=new_version, old_row_count=old_row_count,
-                new_row_count=row_count, duration_ms=elapsed,
-            ))
+            session.add(
+                SyncLog(
+                    dataset_id=ds.id,
+                    triggered_by=triggered_by,
+                    status="synced",
+                    old_version=old_version,
+                    new_version=new_version,
+                    old_row_count=old_row_count,
+                    new_row_count=row_count,
+                    duration_ms=elapsed,
+                )
+            )
             await session.commit()
 
             logger.info(
                 "Dataset %s (%s) updated to v%d: %d rows",
-                ds.name, hf_id, new_version, row_count,
+                ds.name,
+                hf_id,
+                new_version,
+                row_count,
             )
             return "synced"
 
@@ -178,12 +206,17 @@ async def check_and_sync_dataset(
             ds.last_synced_at = datetime.now(timezone.utc)
             session.add(ds)
             elapsed = int((_time.monotonic() - t0) * 1000)
-            session.add(SyncLog(
-                dataset_id=ds.id, triggered_by=triggered_by,
-                status="failed", old_version=old_version,
-                old_row_count=old_row_count, duration_ms=elapsed,
-                error_message=str(e)[:500],
-            ))
+            session.add(
+                SyncLog(
+                    dataset_id=ds.id,
+                    triggered_by=triggered_by,
+                    status="failed",
+                    old_version=old_version,
+                    old_row_count=old_row_count,
+                    duration_ms=elapsed,
+                    error_message=str(e)[:500],
+                )
+            )
             await session.commit()
             return f"failed:{e}"
 

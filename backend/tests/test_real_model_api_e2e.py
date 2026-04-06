@@ -224,7 +224,9 @@ class TestRealModelApiE2E(unittest.TestCase):
             finally:
                 self._stop_process(process)
 
-    def _wait_server_ready(self, host: str, port: int, process: subprocess.Popen, timeout: int = 40):
+    def _wait_server_ready(
+        self, host: str, port: int, process: subprocess.Popen, timeout: int = 40
+    ):
         start = time.time()
         last_err = ""
         while time.time() - start < timeout:

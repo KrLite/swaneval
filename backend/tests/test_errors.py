@@ -29,11 +29,23 @@ class TestErrorHierarchy(unittest.TestCase):
 
     def test_all_errors_inherit_from_base(self):
         classes = [
-            ModelCallError, ModelTimeoutError, ModelAuthError, ModelRateLimitError,
-            EvaluationError, EvaluatorConfigError, EvaluatorRuntimeError, JudgeModelError,
-            DataError, DatasetNotFoundError, DatasetParseError, DatasetEmptyError,
-            ConfigError, InvalidEnvVarsError,
-            ResultIngestionError, TaskRecoveryError, ResourceError,
+            ModelCallError,
+            ModelTimeoutError,
+            ModelAuthError,
+            ModelRateLimitError,
+            EvaluationError,
+            EvaluatorConfigError,
+            EvaluatorRuntimeError,
+            JudgeModelError,
+            DataError,
+            DatasetNotFoundError,
+            DatasetParseError,
+            DatasetEmptyError,
+            ConfigError,
+            InvalidEnvVarsError,
+            ResultIngestionError,
+            TaskRecoveryError,
+            ResourceError,
         ]
         for cls in classes:
             err = cls("test")
@@ -57,11 +69,23 @@ class TestErrorHierarchy(unittest.TestCase):
 
     def test_error_codes_are_unique(self):
         classes = [
-            ModelCallError, ModelTimeoutError, ModelAuthError, ModelRateLimitError,
-            EvaluationError, EvaluatorConfigError, EvaluatorRuntimeError, JudgeModelError,
-            DataError, DatasetNotFoundError, DatasetParseError, DatasetEmptyError,
-            ConfigError, InvalidEnvVarsError,
-            ResultIngestionError, TaskRecoveryError, ResourceError,
+            ModelCallError,
+            ModelTimeoutError,
+            ModelAuthError,
+            ModelRateLimitError,
+            EvaluationError,
+            EvaluatorConfigError,
+            EvaluatorRuntimeError,
+            JudgeModelError,
+            DataError,
+            DatasetNotFoundError,
+            DatasetParseError,
+            DatasetEmptyError,
+            ConfigError,
+            InvalidEnvVarsError,
+            ResultIngestionError,
+            TaskRecoveryError,
+            ResourceError,
         ]
         codes = [cls.error_code for cls in classes]
         self.assertEqual(len(codes), len(set(codes)), f"Duplicate error codes: {codes}")

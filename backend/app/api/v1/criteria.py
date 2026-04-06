@@ -45,6 +45,7 @@ async def list_preset_criteria(
 ):
     """Return the catalog of available preset criteria (not stored in DB)."""
     from app.database import PRESET_CRITERIA
+
     return PRESET_CRITERIA
 
 
@@ -55,6 +56,7 @@ async def list_judge_templates(
 ):
     """List all judge prompt templates (builtin + user-created)."""
     from app.models.criterion import JudgeTemplate
+
     stmt = select(JudgeTemplate).order_by(JudgeTemplate.created_at.desc())
     result = await session.exec(stmt)
     return result.all()
@@ -70,6 +72,7 @@ async def create_judge_template(
     import json as _json
 
     from app.models.criterion import JudgeTemplate
+
     t = JudgeTemplate(
         name=body.get("name", ""),
         description=body.get("description", ""),

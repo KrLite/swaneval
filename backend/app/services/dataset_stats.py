@@ -16,9 +16,7 @@ from app.services.storage.file_io import read_bytes, read_text
 logger = logging.getLogger(__name__)
 
 
-async def _load_dataframe(
-    storage: StorageBackend, source_uri: str
-) -> pd.DataFrame:
+async def _load_dataframe(storage: StorageBackend, source_uri: str) -> pd.DataFrame:
     """Load a dataset file into a pandas DataFrame."""
     ext = os.path.splitext(source_uri)[1].lower()
 
@@ -47,11 +45,7 @@ async def _load_dataframe(
         return pd.json_normalize([parsed])
 
     # Default: JSONL
-    rows = [
-        json.loads(line)
-        for line in text.splitlines()
-        if line.strip()
-    ]
+    rows = [json.loads(line) for line in text.splitlines() if line.strip()]
     if not rows:
         return pd.DataFrame()
     return pd.json_normalize(rows)
@@ -101,9 +95,7 @@ def _column_stats(series: pd.Series) -> dict:
     # Top 5 most common values
     try:
         vc = non_null.value_counts().head(5)
-        top_values = [
-            {"value": str(v), "count": int(c)} for v, c in vc.items()
-        ]
+        top_values = [{"value": str(v), "count": int(c)} for v, c in vc.items()]
     except TypeError:
         top_values = []
 
@@ -143,9 +135,7 @@ async def compute_dataset_stats(
             "columns": [],
         }
 
-    columns = await asyncio.to_thread(
-        lambda: [_column_stats(df[col]) for col in df.columns]
-    )
+    columns = await asyncio.to_thread(lambda: [_column_stats(df[col]) for col in df.columns])
 
     return {
         "row_count": len(df),

@@ -40,13 +40,9 @@ class LocalFileStorage(StorageBackend):
         return await asyncio.to_thread(self._full_path(key).read_bytes)
 
     async def read_text(self, key: str, encoding: str = "utf-8") -> str:
-        return await asyncio.to_thread(
-            self._full_path(key).read_text, encoding=encoding
-        )
+        return await asyncio.to_thread(self._full_path(key).read_text, encoding=encoding)
 
-    async def read_lines(
-        self, key: str, max_lines: int = 0, encoding: str = "utf-8"
-    ) -> list[str]:
+    async def read_lines(self, key: str, max_lines: int = 0, encoding: str = "utf-8") -> list[str]:
         def _read() -> list[str]:
             lines: list[str] = []
             with self._full_path(key).open(encoding=encoding) as f:
@@ -83,9 +79,7 @@ class LocalFileStorage(StorageBackend):
 
     # -- listing --------------------------------------------------------
 
-    async def list_files(
-        self, prefix: str, patterns: list[str] | None = None
-    ) -> list[str]:
+    async def list_files(self, prefix: str, patterns: list[str] | None = None) -> list[str]:
         def _list() -> list[str]:
             root = self._full_path(prefix)
             if not root.exists():

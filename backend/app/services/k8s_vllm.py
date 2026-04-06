@@ -31,12 +31,14 @@ def _get_k8s_clients(kubeconfig_encrypted: str):
 
 
 async def prepare_namespace(
-    kubeconfig_encrypted: str, namespace: str,
+    kubeconfig_encrypted: str,
+    namespace: str,
 ) -> None:
     """Ensure the namespace exists, creating it if necessary."""
     from kubernetes import client as k8s_client
 
     from app.services.k8s_client import create_core_v1
+
     core_v1 = await asyncio.to_thread(create_core_v1, kubeconfig_encrypted)
 
     def _ensure():
@@ -91,8 +93,7 @@ async def validate_gpu_support(kubeconfig_encrypted: str, gpu_count: int) -> lis
             core_v1 = k8s_client.CoreV1Api(api_client=api_client)
             nodes = core_v1.list_node().items
             total_gpu = sum(
-                int((n.status.allocatable or {}).get("nvidia.com/gpu", 0))
-                for n in nodes
+                int((n.status.allocatable or {}).get("nvidia.com/gpu", 0)) for n in nodes
             )
             if total_gpu == 0:
                 w.append("集群中未检测到 GPU (nvidia.com/gpu=0)，将尝试 CPU 模式部署。")
@@ -139,15 +140,19 @@ async def deploy_vllm(
     from kubernetes import client as k8s_client
 
     core_v1, apps_v1 = await asyncio.to_thread(
-        _get_k8s_clients, kubeconfig_encrypted,
+        _get_k8s_clients,
+        kubeconfig_encrypted,
     )
     dep_name = deployment_name or f"vllm-{uuid.uuid4().hex[:8]}"
 
     # -- Build container args (matches vLLM Helm chart) --
     args = [
-        "--model", hf_model_id,
-        "--port", "8000",
-        "--dtype", dtype,
+        "--model",
+        hf_model_id,
+        "--port",
+        "8000",
+        "--dtype",
+        dtype,
         "--trust-remote-code",
     ]
     if gpu_count > 1:
@@ -160,9 +165,12 @@ async def deploy_vllm(
         k8s_client.V1EnvVar(name="VLLM_LOGGING_LEVEL", value="INFO"),
     ]
     if hf_token:
-        env.append(k8s_client.V1EnvVar(
-            name="HUGGING_FACE_HUB_TOKEN", value=hf_token,
-        ))
+        env.append(
+            k8s_client.V1EnvVar(
+                name="HUGGING_FACE_HUB_TOKEN",
+                value=hf_token,
+            )
+        )
 
     # -- Resource requirements --
     use_gpu = gpu_count > 0
@@ -182,7 +190,8 @@ async def deploy_vllm(
     # -- Volume mounts -- /dev/shm for tensor parallelism shared memory --
     volume_mounts = [
         k8s_client.V1VolumeMount(
-            name="dshm", mount_path="/dev/shm",
+            name="dshm",
+            mount_path="/dev/shm",
         ),
     ]
     volumes = [
@@ -277,7 +286,13 @@ async def deploy_vllm(
     await asyncio.to_thread(_create_deployment)
     logger.info(
         "Deployed vLLM %s in %s (image=%s, model=%s, gpu=%d, mem=%dGi, dtype=%s)",
-        dep_name, namespace, effective_image, hf_model_id, gpu_count, memory_gb, dtype,
+        dep_name,
+        namespace,
+        effective_image,
+        hf_model_id,
+        gpu_count,
+        memory_gb,
+        dtype,
     )
 
     # ── Service (NodePort for external access, ClusterIP for in-cluster) ──
@@ -285,13 +300,19 @@ async def deploy_vllm(
     effective_svc_type = service_type if service_type in allowed_types else "NodePort"
     service = k8s_client.V1Service(
         metadata=k8s_client.V1ObjectMeta(
-            name=dep_name, namespace=namespace, labels=labels,
+            name=dep_name,
+            namespace=namespace,
+            labels=labels,
         ),
         spec=k8s_client.V1ServiceSpec(
             selector={"app": dep_name},
-            ports=[k8s_client.V1ServicePort(
-                port=8000, target_port=8000, name="http",
-            )],
+            ports=[
+                k8s_client.V1ServicePort(
+                    port=8000,
+                    target_port=8000,
+                    name="http",
+                )
+            ],
             type=effective_svc_type,
         ),
     )
@@ -313,24 +334,23 @@ async def _resolve_node_port_endpoint(
 
     Returns http://<node_ip>:<node_port>.
     """
+
     def _resolve():
         svc = core_v1.read_namespaced_service(service_name, namespace)
         node_port = None
-        for port in (svc.spec.ports or []):
+        for port in svc.spec.ports or []:
             if port.node_port:
                 node_port = port.node_port
                 break
         if not node_port:
-            raise RuntimeError(
-                f"Service {service_name} has no NodePort assigned"
-            )
+            raise RuntimeError(f"Service {service_name} has no NodePort assigned")
 
         # Find a node IP (prefer ExternalIP, fall back to InternalIP)
         nodes = core_v1.list_node().items
         external_ip = None
         internal_ip = None
         for node in nodes:
-            for addr in (node.status.addresses or []):
+            for addr in node.status.addresses or []:
                 if addr.type == "ExternalIP" and addr.address:
                     external_ip = addr.address
                 elif addr.type == "InternalIP" and addr.address and not internal_ip:
@@ -362,7 +382,8 @@ async def wait_vllm_ready(
     For ClusterIP, returns the internal DNS endpoint.
     """
     core_v1, apps_v1 = await asyncio.to_thread(
-        _get_k8s_clients, kubeconfig_encrypted,
+        _get_k8s_clients,
+        kubeconfig_encrypted,
     )
     t0 = _time.monotonic()
 
@@ -376,7 +397,8 @@ async def wait_vllm_ready(
         def _check_with_details():
             """Check deployment readiness + gather pod details for logging."""
             dep = apps_v1.read_namespaced_deployment(
-                deployment_name, namespace,
+                deployment_name,
+                namespace,
             )
             ready = dep.status.ready_replicas or 0
             desired = dep.spec.replicas or 1
@@ -386,7 +408,8 @@ async def wait_vllm_ready(
             pod_info = ""
             try:
                 pods = core_v1.list_namespaced_pod(
-                    namespace, label_selector=f"app={deployment_name}",
+                    namespace,
+                    label_selector=f"app={deployment_name}",
                 )
                 if pods.items:
                     pod = pods.items[0]
@@ -414,8 +437,10 @@ async def wait_vllm_ready(
                     if phase == "Running" and not is_ready:
                         try:
                             logs = core_v1.read_namespaced_pod_log(
-                                pod.metadata.name, namespace,
-                                container="vllm", tail_lines=1,
+                                pod.metadata.name,
+                                namespace,
+                                container="vllm",
+                                tail_lines=1,
                             )
                             if logs and logs.strip():
                                 last_line = logs.strip().split("\n")[-1][:120]
@@ -434,9 +459,12 @@ async def wait_vllm_ready(
         if is_ready:
             if service_type == "NodePort":
                 base_url = await _resolve_node_port_endpoint(
-                    core_v1, namespace, deployment_name,
+                    core_v1,
+                    namespace,
+                    deployment_name,
                 )
             elif service_type == "LoadBalancer":
+
                 def _get_lb():
                     svc = core_v1.read_namespaced_service(deployment_name, namespace)
                     lb = svc.status.load_balancer
@@ -445,6 +473,7 @@ async def wait_vllm_ready(
                         host = ingress[0].ip or ingress[0].hostname
                         return f"http://{host}:8000"
                     return None
+
                 lb_url = await asyncio.to_thread(_get_lb)
                 if lb_url:
                     endpoint = f"{lb_url}/v1/chat/completions"
@@ -453,10 +482,7 @@ async def wait_vllm_ready(
                 await asyncio.sleep(poll_interval)
                 continue
             else:
-                base_url = (
-                    f"http://{deployment_name}.{namespace}"
-                    f".svc.cluster.local:8000"
-                )
+                base_url = f"http://{deployment_name}.{namespace}.svc.cluster.local:8000"
             endpoint = f"{base_url}/v1/chat/completions"
             logger.info("vLLM %s ready at %s", deployment_name, endpoint)
             return endpoint
@@ -465,7 +491,10 @@ async def wait_vllm_ready(
         if pod_info != last_pod_status or int(elapsed) % 30 < poll_interval:
             logger.info(
                 "vLLM %s: %ds/%ds — %s",
-                deployment_name, int(elapsed), timeout_seconds, pod_info,
+                deployment_name,
+                int(elapsed),
+                timeout_seconds,
+                pod_info,
             )
             last_pod_status = pod_info
 
@@ -485,7 +514,8 @@ async def get_deployment_status(
 ) -> dict:
     """Get current status of a vLLM deployment."""
     _, apps_v1 = await asyncio.to_thread(
-        _get_k8s_clients, kubeconfig_encrypted,
+        _get_k8s_clients,
+        kubeconfig_encrypted,
     )
 
     def _status():
@@ -511,7 +541,8 @@ async def cleanup_vllm(
 ) -> dict:
     """Delete vLLM deployment and service. Returns cleanup status."""
     core_v1, apps_v1 = await asyncio.to_thread(
-        _get_k8s_clients, kubeconfig_encrypted,
+        _get_k8s_clients,
+        kubeconfig_encrypted,
     )
 
     def _is_not_found(exc: Exception) -> bool:
@@ -552,7 +583,8 @@ async def cleanup_vllm(
             for _ in range(6):
                 try:
                     pods = core_v1.list_namespaced_pod(
-                        namespace, label_selector=f"app={deployment_name}",
+                        namespace,
+                        label_selector=f"app={deployment_name}",
                     )
                     if not pods.items:
                         break
@@ -561,8 +593,12 @@ async def cleanup_vllm(
                     break
                 time.sleep(5)
 
-        return {"deployment_deleted": dep_ok, "service_deleted": svc_ok,
-                "deployment_error": dep_err, "service_error": svc_err}
+        return {
+            "deployment_deleted": dep_ok,
+            "service_deleted": svc_ok,
+            "deployment_error": dep_err,
+            "service_error": svc_err,
+        }
 
     result = await asyncio.to_thread(_delete)
     if not result["deployment_deleted"] and not result["service_deleted"]:
@@ -604,13 +640,23 @@ async def full_vllm_lifecycle(
     await prepare_namespace(kubeconfig_encrypted, namespace)
     await validate_gpu_support(kubeconfig_encrypted, gpu_count)
     dep_name = await deploy_vllm(
-        kubeconfig_encrypted, namespace, model_name, hf_model_id,
-        gpu_count=gpu_count, gpu_type=gpu_type, memory_gb=memory_gb,
-        dtype=dtype, hf_token=hf_token, extra_args=extra_args,
-        image=image, service_type=service_type,
+        kubeconfig_encrypted,
+        namespace,
+        model_name,
+        hf_model_id,
+        gpu_count=gpu_count,
+        gpu_type=gpu_type,
+        memory_gb=memory_gb,
+        dtype=dtype,
+        hf_token=hf_token,
+        extra_args=extra_args,
+        image=image,
+        service_type=service_type,
     )
     endpoint = await wait_vllm_ready(
-        kubeconfig_encrypted, namespace, dep_name,
+        kubeconfig_encrypted,
+        namespace,
+        dep_name,
         timeout_seconds=effective_timeout,
         service_type=service_type,
     )

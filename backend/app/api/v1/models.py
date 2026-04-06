@@ -329,9 +329,17 @@ async def deploy_model(
 
     # Run deployment in background — returns immediately
     background_tasks.add_task(
-        _do_deploy, _model_id, hf_model_id, _model_name,
-        _kubeconfig, _namespace, gpu_count, _gpu_type,
-        memory_gb, _hf_token, _vllm_image,
+        _do_deploy,
+        _model_id,
+        hf_model_id,
+        _model_name,
+        _kubeconfig,
+        _namespace,
+        gpu_count,
+        _gpu_type,
+        memory_gb,
+        _hf_token,
+        _vllm_image,
     )
     return {"status": "deploying", "model_id": str(_model_id)}
 
@@ -373,7 +381,9 @@ async def undeploy_model(
     if dep_name:
         try:
             await cleanup_vllm(
-                cluster.kubeconfig_encrypted, cluster.namespace, dep_name,
+                cluster.kubeconfig_encrypted,
+                cluster.namespace,
+                dep_name,
             )
             cleanup_ok = True
         except Exception as e:
@@ -430,7 +440,9 @@ async def check_deploy_health(
 
     try:
         dep_status = await get_deployment_status(
-            cluster.kubeconfig_encrypted, cluster.namespace, m.vllm_deployment_name,
+            cluster.kubeconfig_encrypted,
+            cluster.namespace,
+            m.vllm_deployment_name,
         )
     except Exception as e:
         err_str = str(e).lower()

@@ -14,6 +14,7 @@ class ExternalBenchmark(SQLModel, table=True):
     Stores benchmark results for models that cannot be locally deployed,
     pulled from public benchmark platforms for comparison.
     """
+
     __tablename__ = "external_benchmarks"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)

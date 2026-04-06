@@ -12,7 +12,10 @@ from app.services.storage.utils import uri_to_key
 
 
 async def read_bytes(
-    storage: StorageBackend, source_uri: str, *, key: str | None = None,
+    storage: StorageBackend,
+    source_uri: str,
+    *,
+    key: str | None = None,
 ) -> bytes:
     """Read a file as bytes from storage or local filesystem.
 
@@ -34,7 +37,10 @@ async def read_bytes(
 
 
 async def read_text(
-    storage: StorageBackend, source_uri: str, *, key: str | None = None,
+    storage: StorageBackend,
+    source_uri: str,
+    *,
+    key: str | None = None,
 ) -> str:
     """Read a file as UTF-8 text from storage or local filesystem.
 

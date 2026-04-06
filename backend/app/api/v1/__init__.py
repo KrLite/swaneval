@@ -29,4 +29,3 @@ router.include_router(users.router, prefix="/users", tags=["users"])
 router.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
 router.include_router(permissions.router, prefix="/permissions", tags=["permissions"])
 router.include_router(clusters.router, prefix="/clusters", tags=["clusters"])
-

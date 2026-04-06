@@ -109,9 +109,7 @@ class TestLocalFileStorage(unittest.IsolatedAsyncioTestCase):
         jsonl_files = await self.storage.list_files("out", patterns=["*.jsonl"])
         self.assertEqual(len(jsonl_files), 1)
 
-        both = await self.storage.list_files(
-            "out", patterns=["*.json", "*.jsonl"]
-        )
+        both = await self.storage.list_files("out", patterns=["*.json", "*.jsonl"])
         self.assertEqual(len(both), 3)
 
     async def test_list_files_empty_dir(self):

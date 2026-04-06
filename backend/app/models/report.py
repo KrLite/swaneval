@@ -24,6 +24,7 @@ class ReportStatus(str, enum.Enum):
 
 class Report(SQLModel, table=True):
     """Persistent report entity."""
+
     __tablename__ = "reports"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -54,6 +55,7 @@ class Report(SQLModel, table=True):
 
 class ReportExportLog(SQLModel, table=True):
     """Tracks report export history."""
+
     __tablename__ = "report_export_logs"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)

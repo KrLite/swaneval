@@ -18,12 +18,8 @@ class ImportProgress:
     phase: str = ""  # e.g. "Connecting to HuggingFace", "Downloading", "Processing"
     progress: float = 0.0  # 0.0 - 1.0
     error: str = ""
-    created_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
-    updated_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # Global progress store

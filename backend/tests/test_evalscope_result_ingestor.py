@@ -27,9 +27,7 @@ class TestEvalscopeResultIngestor(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_extract_int(row, ("tokens_generated",)), 12)
         self.assertIsNone(_extract_float({"score": "x"}, ("score",)))
         self.assertEqual(_extract_text({"prompt": 42}, ("prompt",)), "42")
-        self.assertEqual(
-            _extract_text({"messages": [123, {"content": "ok"}]}, ("prompt",)), "ok"
-        )
+        self.assertEqual(_extract_text({"messages": [123, {"content": "ok"}]}, ("prompt",)), "ok")
 
     def test_extract_sample_from_row_with_output_fallback(self):
         row = {
@@ -97,10 +95,7 @@ class TestEvalscopeResultIngestor(unittest.IsolatedAsyncioTestCase):
             input_key = "work/input.jsonl"
             await storage.write_file(
                 input_key,
-                (
-                    json.dumps({"query": "q-input", "response": "a-input"})
-                    + "\n"
-                ).encode(),
+                (json.dumps({"query": "q-input", "response": "a-input"}) + "\n").encode(),
             )
 
             # No artifacts → fallback to input
@@ -173,9 +168,7 @@ class TestEvalscopeResultIngestor(unittest.IsolatedAsyncioTestCase):
             await storage.write_file("work/configs/task_config.json", b"{}")
             await storage.write_file("work/progress.json", b"{}")
 
-            result = await ingest_evalscope_results(
-                storage, "work", None, default_score=0.0
-            )
+            result = await ingest_evalscope_results(storage, "work", None, default_score=0.0)
             # pred.jsonl has {} which has no prompt/expected/output → no samples
             self.assertEqual(result, [])
 

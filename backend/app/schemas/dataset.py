@@ -23,6 +23,7 @@ class DatasetMountRequest(BaseModel):
 
 class DatasetImportRequest(BaseModel):
     """Import dataset from HuggingFace or ModelScope."""
+
     source: str  # "huggingface" or "modelscope"
     dataset_id: str  # e.g. "openai/gsm8k" or HF/MS URL
     name: str = ""  # display name, defaults to dataset_id
@@ -34,6 +35,7 @@ class DatasetImportRequest(BaseModel):
 
 class DatasetSubscribeRequest(BaseModel):
     """Enable auto-update subscription for a dataset."""
+
     hf_dataset_id: str  # e.g. "openai/gsm8k"
     hf_subset: str = ""
     hf_split: str = "test"
@@ -93,6 +95,7 @@ class SyncLogResponse(BaseModel):
 
 class PreflightResponse(BaseModel):
     """Result of two-stage import: preflight check."""
+
     source_type: str
     format: str
     row_count: int
@@ -107,6 +110,7 @@ class PreflightResponse(BaseModel):
 
 class PreflightConfirmRequest(BaseModel):
     """Confirm a preflight import."""
+
     preflight_token: str
     name: str
     description: str = ""
@@ -115,6 +119,7 @@ class PreflightConfirmRequest(BaseModel):
 
 class DatasetStatsResponse(BaseModel):
     """Statistical summary of a dataset."""
+
     row_count: int
     column_count: int
     size_bytes: int

@@ -55,7 +55,9 @@ async def run_worker():
             backend = job.get("execution_backend", "external_api")
             logger.info(
                 "Worker %s picked up task %s (backend=%s)",
-                WORKER_ID, task_id, backend,
+                WORKER_ID,
+                task_id,
+                backend,
             )
 
             await update_worker_status(WORKER_ID, "busy")

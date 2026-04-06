@@ -77,7 +77,9 @@ class TestModelConnectivity(unittest.IsolatedAsyncioTestCase):
             "https://coding.dashscope.aliyuncs.com/apps/anthropic/v1/messages",
         )
         self.assertEqual(
-            _normalize_endpoint_url("https://coding.dashscope.aliyuncs.com/apps/anthropic/v1/messages"),
+            _normalize_endpoint_url(
+                "https://coding.dashscope.aliyuncs.com/apps/anthropic/v1/messages"
+            ),
             "https://coding.dashscope.aliyuncs.com/apps/anthropic/v1/messages",
         )
         self.assertEqual(

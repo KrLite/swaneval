@@ -28,10 +28,12 @@ async def lifespan(app: FastAPI):
     await init_db()
 
     # Set app info metric
-    app_info.info({
-        "version": "0.5.0",
-        "storage_backend": settings.STORAGE_BACKEND,
-    })
+    app_info.info(
+        {
+            "version": "0.5.0",
+            "storage_backend": settings.STORAGE_BACKEND,
+        }
+    )
 
     storage = get_storage()
     try:
@@ -61,9 +63,9 @@ async def lifespan(app: FastAPI):
         from app.models.llm_model import LLMModel
 
         async with _AS(_engine) as _s:
-            stale = (await _s.exec(
-                _sel(LLMModel).where(LLMModel.deploy_status == "deploying")
-            )).all()
+            stale = (
+                await _s.exec(_sel(LLMModel).where(LLMModel.deploy_status == "deploying"))
+            ).all()
             for m in stale:
                 logger.warning("Resetting stale deploying model: %s (%s)", m.name, m.id)
                 m.deploy_status = "failed"
@@ -79,9 +81,9 @@ async def lifespan(app: FastAPI):
         from app.models.eval_task import EvalTask, TaskStatus
 
         async with _AS(_engine) as _s:
-            stale_tasks = (await _s.exec(
-                _sel(EvalTask).where(EvalTask.status == TaskStatus.running)
-            )).all()
+            stale_tasks = (
+                await _s.exec(_sel(EvalTask).where(EvalTask.status == TaskStatus.running))
+            ).all()
             for t in stale_tasks:
                 logger.warning("Resetting stale running task: %s (%s)", t.name, t.id)
                 t.status = TaskStatus.failed
@@ -98,6 +100,7 @@ async def lifespan(app: FastAPI):
     _embedded_worker_task = None
     if settings.EMBEDDED_WORKER:
         from app.services.task_queue import embedded_worker_loop
+
         _embedded_worker_task = asyncio.create_task(embedded_worker_loop())
         logger.info("Embedded worker started (set EMBEDDED_WORKER=false for standalone mode)")
 
@@ -137,10 +140,7 @@ async def prometheus_middleware(request: Request, call_next):
     # Normalize path: replace UUIDs with {id}
     path = request.url.path
     parts = path.split("/")
-    normalized = "/".join(
-        "{id}" if len(p) == 36 and "-" in p else p
-        for p in parts
-    )
+    normalized = "/".join("{id}" if len(p) == 36 and "-" in p else p for p in parts)
 
     start = time.perf_counter()
     response = await call_next(request)

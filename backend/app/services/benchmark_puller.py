@@ -69,16 +69,18 @@ async def pull_open_llm_leaderboard(
                                 # Normalize to 0-1 if needed
                                 if score_val > 1.0:
                                     score_val = score_val / 100.0
-                                results.append({
-                                    "model_name": model_name,
-                                    "provider": r.get("organization", ""),
-                                    "benchmark_name": bench_name,
-                                    "score": round(max(0, min(1, score_val)), 4),
-                                    "score_display": str(score),
-                                    "source_url": f"https://huggingface.co/{model_name}",
-                                    "source_platform": "Open LLM Leaderboard",
-                                    "notes": "",
-                                })
+                                results.append(
+                                    {
+                                        "model_name": model_name,
+                                        "provider": r.get("organization", ""),
+                                        "benchmark_name": bench_name,
+                                        "score": round(max(0, min(1, score_val)), 4),
+                                        "score_display": str(score),
+                                        "source_url": f"https://huggingface.co/{model_name}",
+                                        "source_platform": "Open LLM Leaderboard",
+                                        "notes": "",
+                                    }
+                                )
                             except (ValueError, TypeError):
                                 continue
     except Exception as e:

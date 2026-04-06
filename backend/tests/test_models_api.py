@@ -191,7 +191,10 @@ class TestModelsApi(unittest.IsolatedAsyncioTestCase):
         model.model_name = ""
         session = _FakeSession([model])
 
-        with patch("app.api.v1.models.test_model_connectivity", new=AsyncMock(return_value=(True, "Connected (200)"))):
+        with patch(
+            "app.api.v1.models.test_model_connectivity",
+            new=AsyncMock(return_value=(True, "Connected (200)")),
+        ):
             resp = await api_test_model(
                 model_id=model.id,
                 session=cast(Any, session),
@@ -200,7 +203,10 @@ class TestModelsApi(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(resp.ok)
         self.assertEqual(resp.message, "Connected (200)")
 
-        with patch("app.api.v1.models.test_model_connectivity", new=AsyncMock(return_value=(False, "HTTP 500"))):
+        with patch(
+            "app.api.v1.models.test_model_connectivity",
+            new=AsyncMock(return_value=(False, "HTTP 500")),
+        ):
             resp = await api_test_model(
                 model_id=model.id,
                 session=cast(Any, session),

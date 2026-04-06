@@ -5,6 +5,7 @@ Revises:
 Create Date: 2026-03-20
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -24,14 +25,18 @@ def upgrade() -> None:
     def _enum_safe(name: str, values: list[str]):
         """Create PG enum IF NOT EXISTS, return a reference for column types."""
         vals = ", ".join(f"'{v}'" for v in values)
-        op.execute(sa.text(
-            f"DO $$ BEGIN CREATE TYPE {name} AS ENUM ({vals}); "
-            f"EXCEPTION WHEN duplicate_object THEN null; END $$;"
-        ))
+        op.execute(
+            sa.text(
+                f"DO $$ BEGIN CREATE TYPE {name} AS ENUM ({vals}); "
+                f"EXCEPTION WHEN duplicate_object THEN null; END $$;"
+            )
+        )
         return postgresql.ENUM(*values, name=name, create_type=False)
 
     userrole = _enum_safe("userrole", ["admin", "data_admin", "engineer", "viewer"])
-    sourcetype = _enum_safe("sourcetype", ["upload", "huggingface", "modelscope", "server_path", "preset"])
+    sourcetype = _enum_safe(
+        "sourcetype", ["upload", "huggingface", "modelscope", "server_path", "preset"]
+    )
     criteriontype = _enum_safe("criteriontype", ["preset", "regex", "script", "llm_judge"])
     modeltype = _enum_safe("modeltype", ["api", "local", "huggingface"])
     apiformat = _enum_safe("apiformat", ["openai", "anthropic"])
@@ -71,7 +76,9 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("auto_update", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("update_interval_hours", sa.Integer(), nullable=False, server_default=sa.text("24")),
+        sa.Column(
+            "update_interval_hours", sa.Integer(), nullable=False, server_default=sa.text("24")
+        ),
         sa.Column("last_synced_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("sync_status", sa.String(), nullable=False, server_default=""),
         sa.Column("hf_dataset_id", sa.String(), nullable=False, server_default=""),
@@ -133,7 +140,12 @@ def upgrade() -> None:
         sa.Column("model_id", sa.Uuid(), sa.ForeignKey("llm_models.id"), nullable=False),
         sa.Column("dataset_ids", sa.String(), nullable=False, server_default=""),
         sa.Column("criteria_ids", sa.String(), nullable=False, server_default=""),
-        sa.Column("params_json", sa.String(), nullable=False, server_default='{"temperature": 0.7, "max_tokens": 1024}'),
+        sa.Column(
+            "params_json",
+            sa.String(),
+            nullable=False,
+            server_default='{"temperature": 0.7, "max_tokens": 1024}',
+        ),
         sa.Column("repeat_count", sa.Integer(), nullable=False, server_default=sa.text("1")),
         sa.Column("seed_strategy", seedstrategy, nullable=False, server_default="fixed"),
         sa.Column("gpu_ids", sa.String(), nullable=False, server_default=""),
@@ -153,7 +165,9 @@ def upgrade() -> None:
         sa.Column("run_index", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("status", taskstatus, nullable=False, server_default="pending"),
         sa.Column("progress_pct", sa.Float(), nullable=False, server_default=sa.text("0.0")),
-        sa.Column("last_completed_index", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column(
+            "last_completed_index", sa.Integer(), nullable=False, server_default=sa.text("0")
+        ),
         sa.Column("error_log", sa.String(), nullable=False, server_default=""),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
@@ -206,5 +220,13 @@ def downgrade() -> None:
     op.drop_table("datasets")
     op.drop_table("users")
 
-    for name in ("seedstrategy", "taskstatus", "apiformat", "modeltype", "criteriontype", "sourcetype", "userrole"):
+    for name in (
+        "seedstrategy",
+        "taskstatus",
+        "apiformat",
+        "modeltype",
+        "criteriontype",
+        "sourcetype",
+        "userrole",
+    ):
         postgresql.ENUM(name=name).drop(op.get_bind(), checkfirst=True)

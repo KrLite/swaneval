@@ -181,9 +181,13 @@ async def stability_stats(
         raise HTTPException(400, "稳定性统计需要重复次数 > 1")
 
     # Get all subtasks for this task
-    sub_stmt = select(EvalSubtask).where(
-        EvalSubtask.task_id == task_id,
-    ).order_by(EvalSubtask.run_index)
+    sub_stmt = (
+        select(EvalSubtask)
+        .where(
+            EvalSubtask.task_id == task_id,
+        )
+        .order_by(EvalSubtask.run_index)
+    )
     subtasks = (await session.exec(sub_stmt)).all()
     subtask_ids = [st.id for st in subtasks]
 
@@ -209,6 +213,7 @@ async def stability_stats(
 
     # Organize: {criterion_id: {subtask_id: avg_score}}
     from collections import defaultdict
+
     crit_runs: dict[str, dict[str, float]] = defaultdict(dict)
     crit_names: dict[str, str] = {}
     for row in agg_rows:
@@ -230,18 +235,20 @@ async def stability_stats(
         t_val = 1.96 if n >= 30 else 2.0
         margin = t_val * std_dev / math.sqrt(n)
 
-        results.append({
-            "criterion_id": cid,
-            "criterion_name": crit_names[cid],
-            "run_count": n,
-            "mean_score": round(mean, 6),
-            "std_dev": round(std_dev, 6),
-            "variance": round(variance, 6),
-            "ci_95_lower": round(max(0, mean - margin), 6),
-            "ci_95_upper": round(min(1, mean + margin), 6),
-            "min_score": round(min(per_run_scores), 6),
-            "max_score": round(max(per_run_scores), 6),
-            "per_run_scores": [round(s, 6) for s in per_run_scores],
-        })
+        results.append(
+            {
+                "criterion_id": cid,
+                "criterion_name": crit_names[cid],
+                "run_count": n,
+                "mean_score": round(mean, 6),
+                "std_dev": round(std_dev, 6),
+                "variance": round(variance, 6),
+                "ci_95_lower": round(max(0, mean - margin), 6),
+                "ci_95_upper": round(min(1, mean + margin), 6),
+                "min_score": round(min(per_run_scores), 6),
+                "max_score": round(max(per_run_scores), 6),
+                "per_run_scores": [round(s, 6) for s in per_run_scores],
+            }
+        )
 
     return results

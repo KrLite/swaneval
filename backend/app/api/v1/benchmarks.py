@@ -60,9 +60,7 @@ async def list_benchmarks(
     if model_name:
         stmt = stmt.where(ExternalBenchmark.model_name == model_name)
     if benchmark_name:
-        stmt = stmt.where(
-            ExternalBenchmark.benchmark_name == benchmark_name
-        )
+        stmt = stmt.where(ExternalBenchmark.benchmark_name == benchmark_name)
     stmt = stmt.order_by(
         ExternalBenchmark.benchmark_name,
         ExternalBenchmark.score.desc(),
@@ -94,9 +92,7 @@ async def create_benchmark(
     return entry
 
 
-@router.post(
-    "/batch", response_model=list[BenchmarkResponse], status_code=201
-)
+@router.post("/batch", response_model=list[BenchmarkResponse], status_code=201)
 async def create_benchmarks_batch(
     body: BenchmarkBatchCreate,
     session: AsyncSession = Depends(get_db),
@@ -142,9 +138,7 @@ async def pull_benchmarks_from_platform(
     try:
         entries = await pull_benchmarks(source, model_filter, limit)
     except Exception as e:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, f"拉取失败: {e}"
-        ) from e
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"拉取失败: {e}") from e
 
     if not auto_import:
         return {"source": source, "count": len(entries), "preview": entries[:20]}
@@ -178,8 +172,6 @@ async def delete_benchmark(
 ):
     entry = await session.get(ExternalBenchmark, benchmark_id)
     if not entry:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, "基准数据未找到"
-        )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "基准数据未找到")
     await session.delete(entry)
     await session.commit()

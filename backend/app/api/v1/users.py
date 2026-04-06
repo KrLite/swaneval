@@ -29,9 +29,7 @@ async def create_user(
 ):
     """Admin creates a new user with any role."""
     existing = await session.exec(
-        select(User).where(
-            (User.username == body.username) | (User.email == body.email)
-        )
+        select(User).where((User.username == body.username) | (User.email == body.email))
     )
     if existing.first():
         raise HTTPException(

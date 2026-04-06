@@ -62,10 +62,12 @@ class ComputeCluster(SQLModel, table=True):
 
     vllm_cache_ready: bool = Field(default=False)
     last_probed_at: datetime | None = Field(
-        default=None, sa_type=DateTime(timezone=True),
+        default=None,
+        sa_type=DateTime(timezone=True),
     )
     created_by: uuid.UUID | None = Field(
-        default=None, foreign_key="users.id",
+        default=None,
+        foreign_key="users.id",
     )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

@@ -38,9 +38,7 @@ class PermissionGroup(SQLModel, table=True):
 
 class UserGroupMembership(SQLModel, table=True):
     __tablename__ = "user_group_memberships"
-    __table_args__ = (
-        UniqueConstraint("user_id", "group_id"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "group_id"),)
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="users.id")
@@ -55,8 +53,11 @@ class ResourceAcl(SQLModel, table=True):
     __tablename__ = "resource_acls"
     __table_args__ = (
         UniqueConstraint(
-            "resource_type", "resource_id",
-            "grantee_type", "grantee_id", "access_level",
+            "resource_type",
+            "resource_id",
+            "grantee_type",
+            "grantee_id",
+            "access_level",
         ),
     )
 

@@ -45,6 +45,7 @@ async def _enrich_task(session: AsyncSession, task: EvalTask) -> TaskResponse:
         created_at=task.created_at,
     )
 
+
 router = APIRouter()
 
 
@@ -122,11 +123,7 @@ async def list_subtasks(
     session: AsyncSession = Depends(get_db),
     current_user: User = require_permission("tasks.read"),
 ):
-    stmt = (
-        select(EvalSubtask)
-        .where(EvalSubtask.task_id == task_id)
-        .order_by(EvalSubtask.run_index)
-    )
+    stmt = select(EvalSubtask).where(EvalSubtask.task_id == task_id).order_by(EvalSubtask.run_index)
     result = await session.exec(stmt)
     return result.all()
 

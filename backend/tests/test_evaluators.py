@@ -120,9 +120,7 @@ class TestEvaluators(unittest.TestCase):
         with self.assertRaises(ValueError):
             evaluate_sandbox_custom({}, "x", "y")
         with self.assertRaises(ValueError):
-            evaluate_sandbox_custom(
-                {"script_path": "/tmp/does-not-exist.py"}, "x", "y"
-            )
+            evaluate_sandbox_custom({"script_path": "/tmp/does-not-exist.py"}, "x", "y")
 
     def test_evaluate_llm_judge_openai_and_anthropic(self):
         openai_payload = {
@@ -164,17 +162,20 @@ class TestEvaluators(unittest.TestCase):
         with self.assertRaises(ValueError):
             evaluate_llm_judge(
                 {**base, "endpoint_url": "   "},
-                expected="A", actual="B",
+                expected="A",
+                actual="B",
             )
         with self.assertRaises(ValueError):
             evaluate_llm_judge(
                 {**base, "model_name": "   "},
-                expected="A", actual="B",
+                expected="A",
+                actual="B",
             )
         with self.assertRaises(ValueError):
             evaluate_llm_judge(
                 {**base, "api_key": "   "},
-                expected="A", actual="B",
+                expected="A",
+                actual="B",
             )
 
     def test_run_criterion_sandbox_and_llm_judge_paths(self):
@@ -187,22 +188,27 @@ class TestEvaluators(unittest.TestCase):
                 """),
                 encoding="utf-8",
             )
-            cfg = json.dumps({
-                "mode": "custom_script",
-                "script_path": str(p),
-                "entrypoint": "evaluate",
-            })
+            cfg = json.dumps(
+                {
+                    "mode": "custom_script",
+                    "script_path": str(p),
+                    "entrypoint": "evaluate",
+                }
+            )
             self.assertEqual(run_criterion("sandbox", cfg, "x", "y"), 1.0)
 
         payload = {"choices": [{"message": {"content": "0.4"}}]}
         with patch(_HTTPX_CLIENT, return_value=_fake(payload)):
-            cfg2 = json.dumps({
-                "endpoint_url": _ENDPOINT,
-                "api_key": "k",
-                "model_name": "m",
-            })
+            cfg2 = json.dumps(
+                {
+                    "endpoint_url": _ENDPOINT,
+                    "api_key": "k",
+                    "model_name": "m",
+                }
+            )
             self.assertEqual(
-                run_criterion("llm_judge", cfg2, "x", "y"), 0.4,
+                run_criterion("llm_judge", cfg2, "x", "y"),
+                0.4,
             )
 
         with self.assertRaises(ValueError):

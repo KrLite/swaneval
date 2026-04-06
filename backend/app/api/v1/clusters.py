@@ -35,11 +35,13 @@ router = APIRouter()
 # Background probe helper
 # ---------------------------------------------------------------------------
 
+
 async def _do_probe(cluster_id: uuid.UUID, kubeconfig_encrypted: str) -> None:
     """Run K8s resource probe in background thread, then persist results."""
     try:
         resources = await asyncio.to_thread(
-            probe_cluster_resources, kubeconfig_encrypted,
+            probe_cluster_resources,
+            kubeconfig_encrypted,
         )
     except Exception as exc:
         logger.error("Probe failed for cluster %s: %s", cluster_id, exc)
@@ -154,6 +156,7 @@ async def update_cluster(
         cluster.description = body.description
     if body.namespace is not None and body.namespace != cluster.namespace:
         from app.models.llm_model import LLMModel
+
         active_stmt = select(LLMModel).where(
             LLMModel.cluster_id == cluster_id,
             LLMModel.deploy_status.in_(["deploying", "running"]),
@@ -188,6 +191,7 @@ async def delete_cluster(
 
     # Check for active deployments
     from app.models.llm_model import LLMModel
+
     active_stmt = select(LLMModel).where(
         LLMModel.cluster_id == cluster_id,
         LLMModel.deploy_status.in_(["deploying", "running"]),
@@ -217,7 +221,8 @@ async def probe_cluster(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "集群未找到")
     if not cluster.kubeconfig_encrypted:
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "集群缺少 Kubeconfig",
+            status.HTTP_400_BAD_REQUEST,
+            "集群缺少 Kubeconfig",
         )
 
     cluster.status = ClusterStatus.connecting
@@ -228,7 +233,9 @@ async def probe_cluster(
     await session.refresh(cluster)
 
     background_tasks.add_task(
-        _do_probe, cluster.id, cluster.kubeconfig_encrypted,
+        _do_probe,
+        cluster.id,
+        cluster.kubeconfig_encrypted,
     )
     return cluster
 
@@ -245,12 +252,14 @@ async def list_cluster_nodes(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "集群未找到")
     if not cluster.kubeconfig_encrypted:
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "集群缺少 Kubeconfig",
+            status.HTTP_400_BAD_REQUEST,
+            "集群缺少 Kubeconfig",
         )
 
     try:
         nodes = await asyncio.to_thread(
-            get_cluster_nodes, cluster.kubeconfig_encrypted,
+            get_cluster_nodes,
+            cluster.kubeconfig_encrypted,
         )
     except Exception as exc:
         raise HTTPException(
@@ -286,17 +295,20 @@ async def list_cluster_deployments(
             )
             result = []
             for dep in deps.items:
-                result.append({
-                    "name": dep.metadata.name,
-                    "model": dep.metadata.labels.get("swaneval.io/model", ""),
-                    "replicas": dep.spec.replicas or 0,
-                    "ready_replicas": dep.status.ready_replicas or 0,
-                    "available": (dep.status.ready_replicas or 0) >= (dep.spec.replicas or 1),
-                    "created_at": (
-                        dep.metadata.creation_timestamp.isoformat()
-                        if dep.metadata.creation_timestamp else ""
-                    ),
-                })
+                result.append(
+                    {
+                        "name": dep.metadata.name,
+                        "model": dep.metadata.labels.get("swaneval.io/model", ""),
+                        "replicas": dep.spec.replicas or 0,
+                        "ready_replicas": dep.status.ready_replicas or 0,
+                        "available": (dep.status.ready_replicas or 0) >= (dep.spec.replicas or 1),
+                        "created_at": (
+                            dep.metadata.creation_timestamp.isoformat()
+                            if dep.metadata.creation_timestamp
+                            else ""
+                        ),
+                    }
+                )
             return result
 
         return await asyncio.to_thread(_list)
@@ -339,7 +351,8 @@ async def get_deployment_logs(
 
             try:
                 log_text = core_v1.read_namespaced_pod_log(
-                    pod_name, cluster.namespace,
+                    pod_name,
+                    cluster.namespace,
                     tail_lines=tail_lines,
                     container="vllm",
                 )

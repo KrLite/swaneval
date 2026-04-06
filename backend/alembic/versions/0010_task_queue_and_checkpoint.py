@@ -20,7 +20,12 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column(
         "eval_tasks",
-        sa.Column("execution_backend", sa.String(), nullable=False, server_default=sa.text("'external_api'")),
+        sa.Column(
+            "execution_backend",
+            sa.String(),
+            nullable=False,
+            server_default=sa.text("'external_api'"),
+        ),
     )
     op.add_column(
         "eval_tasks",

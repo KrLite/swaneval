@@ -41,9 +41,7 @@ async def list_groups(
 
     results = []
     for g in groups:
-        count_stmt = select(func.count()).where(
-            UserGroupMembership.group_id == g.id
-        )
+        count_stmt = select(func.count()).where(UserGroupMembership.group_id == g.id)
         count = (await session.exec(count_stmt)).one()
         try:
             perms = json.loads(g.permissions_json)
@@ -99,9 +97,7 @@ async def get_group(
     if not group:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "权限组未找到")
 
-    count_stmt = select(func.count()).where(
-        UserGroupMembership.group_id == group.id
-    )
+    count_stmt = select(func.count()).where(UserGroupMembership.group_id == group.id)
     count = (await session.exec(count_stmt)).one()
     try:
         perms = json.loads(group.permissions_json)
@@ -140,9 +136,7 @@ async def update_group(
     await session.commit()
     await session.refresh(group)
 
-    count_stmt = select(func.count()).where(
-        UserGroupMembership.group_id == group.id
-    )
+    count_stmt = select(func.count()).where(UserGroupMembership.group_id == group.id)
     count = (await session.exec(count_stmt)).one()
     try:
         perms = json.loads(group.permissions_json)
@@ -170,13 +164,12 @@ async def delete_group(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "权限组未找到")
     if group.is_system:
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "无法删除系统权限组",
+            status.HTTP_400_BAD_REQUEST,
+            "无法删除系统权限组",
         )
 
     # Check for active members
-    mem_stmt = select(UserGroupMembership).where(
-        UserGroupMembership.group_id == group_id
-    )
+    mem_stmt = select(UserGroupMembership).where(UserGroupMembership.group_id == group_id)
     memberships = (await session.exec(mem_stmt)).all()
     if memberships:
         member_names = []
@@ -380,9 +373,7 @@ async def list_role_configs(
         {
             "name": "admin",
             "label": "管理员",
-            "description": (
-                "系统完全控制权限，包括用户管理、权限配置、所有资源的增删改查。"
-            ),
+            "description": ("系统完全控制权限，包括用户管理、权限配置、所有资源的增删改查。"),
             "permissions": ALL_PERMISSIONS,
             "is_preset": True,
         },

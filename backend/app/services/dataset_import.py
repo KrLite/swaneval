@@ -14,12 +14,8 @@ from app.services.storage import StorageBackend
 
 logger = logging.getLogger(__name__)
 
-_HF_URL_RE = re.compile(
-    r"(?:https?://huggingface\.co/datasets/)?([^/]+/[^/?#]+)"
-)
-_MS_URL_RE = re.compile(
-    r"(?:https?://(?:www\.)?modelscope\.cn/datasets/)?([^/]+/[^/?#]+)"
-)
+_HF_URL_RE = re.compile(r"(?:https?://huggingface\.co/datasets/)?([^/]+/[^/?#]+)")
+_MS_URL_RE = re.compile(r"(?:https?://(?:www\.)?modelscope\.cn/datasets/)?([^/]+/[^/?#]+)")
 
 
 def _parse_dataset_id(source: str, raw_id: str) -> str:
@@ -61,11 +57,17 @@ async def import_huggingface(
     ) -> None:
         if job_id:
             update_job(
-                job_id, status=status, phase=phase, progress=progress,
+                job_id,
+                status=status,
+                phase=phase,
+                progress=progress,
             )
 
     logger.info(
-        "Importing HF dataset: %s (subset=%s, split=%s)", repo, subset, split,
+        "Importing HF dataset: %s (subset=%s, split=%s)",
+        repo,
+        subset,
+        split,
     )
     prog("downloading", "正在连接 HuggingFace...", 0.05)
 
@@ -73,7 +75,11 @@ async def import_huggingface(
     try:
         prog("downloading", "正在加载数据集...", 0.1)
         result = await _load_via_datasets_lib(
-            repo, subset, split, storage, hf_token=token,
+            repo,
+            subset,
+            split,
+            storage,
+            hf_token=token,
         )
         prog("done", "完成", 1.0)
         return result
@@ -94,16 +100,16 @@ async def import_huggingface(
 
         def _list_files():
             return list_repo_files(
-                repo, repo_type="dataset", token=token,
+                repo,
+                repo_type="dataset",
+                token=token,
             )
 
         all_files = await asyncio.to_thread(_list_files)
 
         target = _pick_best_file(all_files, subset, split)
         if not target:
-            raise ValueError(
-                f"在 '{repo}' 中未找到可用的数据文件"
-            )
+            raise ValueError(f"在 '{repo}' 中未找到可用的数据文件")
 
         prog("downloading", f"正在下载 {target}...", 0.4)
 
@@ -122,13 +128,13 @@ async def import_huggingface(
         return result
     except Exception as e:
         prog("failed", str(e), 0.0)
-        raise ValueError(
-            f"导入 HuggingFace 数据集 '{repo}' 失败: {e}"
-        ) from e
+        raise ValueError(f"导入 HuggingFace 数据集 '{repo}' 失败: {e}") from e
 
 
 def _pick_best_file(
-    files: list[str], subset: str, split: str,
+    files: list[str],
+    subset: str,
+    split: str,
 ) -> str | None:
     """
     Pick the best data file from the repo file list.
@@ -179,7 +185,9 @@ async def import_modelscope(
     clean_id = _parse_dataset_id("modelscope", dataset_id)
     logger.info(
         "Importing ModelScope dataset: %s (subset=%s, split=%s)",
-        clean_id, subset, split,
+        clean_id,
+        subset,
+        split,
     )
 
     try:
@@ -191,7 +199,9 @@ async def import_modelscope(
 
         subset_name = subset or None
         ds = MsDataset.load(
-            clean_id, subset_name=subset_name, split=split,
+            clean_id,
+            subset_name=subset_name,
+            split=split,
         )
 
         file_id = uuid.uuid4()
@@ -203,17 +213,15 @@ async def import_modelscope(
         uri = await storage.write_file(key, content_bytes)
         return uri, len(lines), len(content_bytes)
     except ImportError:
-        raise ValueError(
-            "需要安装 ModelScope SDK: pip install modelscope"
-        )
+        raise ValueError("需要安装 ModelScope SDK: pip install modelscope")
     except Exception as e:
-        raise ValueError(
-            f"导入 ModelScope 数据集 '{clean_id}' 失败: {e}"
-        ) from e
+        raise ValueError(f"导入 ModelScope 数据集 '{clean_id}' 失败: {e}") from e
 
 
 async def _store_downloaded_file(
-    storage: StorageBackend, local_path: str, dataset_id: str,
+    storage: StorageBackend,
+    local_path: str,
+    dataset_id: str,
 ) -> tuple[str, int, int]:
     """Store a downloaded file into storage and count rows."""
     ext = os.path.splitext(local_path)[1].lower()
@@ -236,6 +244,7 @@ def _count_rows(content: bytes, ext: str) -> int:
             import io
 
             import pyarrow.parquet as pq
+
             return pq.ParquetFile(io.BytesIO(content)).metadata.num_rows
         text = content.decode("utf-8")
         if ext == ".json":

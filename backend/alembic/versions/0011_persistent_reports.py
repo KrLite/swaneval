@@ -25,10 +25,12 @@ def _create_enum_safe(name: str, values: list[str]):
     create_table won't try to CREATE TYPE again.
     """
     vals = ", ".join(f"'{v}'" for v in values)
-    op.execute(sa.text(
-        f"DO $$ BEGIN CREATE TYPE {name} AS ENUM ({vals}); "
-        f"EXCEPTION WHEN duplicate_object THEN null; END $$;"
-    ))
+    op.execute(
+        sa.text(
+            f"DO $$ BEGIN CREATE TYPE {name} AS ENUM ({vals}); "
+            f"EXCEPTION WHEN duplicate_object THEN null; END $$;"
+        )
+    )
     return postgresql.ENUM(*values, name=name, create_type=False)
 
 
@@ -43,13 +45,19 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("task_id", sa.Uuid(), nullable=False),
         sa.Column("report_type", reporttype_enum, nullable=False),
-        sa.Column("status", reportstatus_enum, nullable=False, server_default=sa.text("'generating'")),
+        sa.Column(
+            "status", reportstatus_enum, nullable=False, server_default=sa.text("'generating'")
+        ),
         sa.Column("title", sa.String(), nullable=False, server_default=sa.text("''")),
         sa.Column("content_json", sa.String(), nullable=False, server_default=sa.text("'{}'")),
         sa.Column("error_message", sa.String(), nullable=False, server_default=sa.text("''")),
         sa.Column("created_by", sa.Uuid(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["task_id"], ["eval_tasks.id"]),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"]),
@@ -63,7 +71,9 @@ def upgrade() -> None:
         sa.Column("report_id", sa.Uuid(), nullable=False),
         sa.Column("format", sa.String(), nullable=False, server_default=sa.text("''")),
         sa.Column("exported_by", sa.Uuid(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["report_id"], ["reports.id"]),
         sa.ForeignKeyConstraint(["exported_by"], ["users.id"]),

@@ -18,10 +18,19 @@ logger = logging.getLogger(__name__)
 
 PROMPT_KEYS = ("prompt", "query", "input", "question")
 EXPECTED_KEYS = (
-    "expected", "response", "answer", "target", "ground_truth", "reference",
+    "expected",
+    "response",
+    "answer",
+    "target",
+    "ground_truth",
+    "reference",
 )
 MODEL_OUTPUT_KEYS = (
-    "model_output", "prediction", "pred", "generated_text", "completion",
+    "model_output",
+    "prediction",
+    "pred",
+    "generated_text",
+    "completion",
 )
 SCORE_KEYS = ("score", "Score", "avg_score", "AverageAccuracy", "accuracy", "acc")
 LATENCY_KEYS = ("latency_ms", "latency", "elapsed_ms")
@@ -55,16 +64,12 @@ async def ingest_evalscope_results(
     return []
 
 
-async def _candidate_artifact_files(
-    storage: StorageBackend, work_dir_key: str
-) -> list[str]:
+async def _candidate_artifact_files(storage: StorageBackend, work_dir_key: str) -> list[str]:
     if not await storage.exists(work_dir_key):
         # For S3 "directories" don't really exist — try listing anyway
         pass
 
-    all_files = await storage.list_files(
-        work_dir_key, patterns=["*.jsonl", "*.json"]
-    )
+    all_files = await storage.list_files(work_dir_key, patterns=["*.jsonl", "*.json"])
     candidates: list[str] = []
     for f in all_files:
         parts = f.split("/")
@@ -77,15 +82,11 @@ async def _candidate_artifact_files(
     return sorted(candidates)
 
 
-async def _iter_json_rows(
-    storage: StorageBackend, file_key: str
-) -> list[dict[str, Any]]:
+async def _iter_json_rows(storage: StorageBackend, file_key: str) -> list[dict[str, Any]]:
     try:
         text = await storage.read_text(file_key)
     except Exception as e:
-        raise ResultIngestionError(
-            f"Failed to read artifact file {file_key}: {e}"
-        ) from e
+        raise ResultIngestionError(f"Failed to read artifact file {file_key}: {e}") from e
 
     results: list[dict[str, Any]] = []
     parse_errors = 0
@@ -112,16 +113,17 @@ async def _iter_json_rows(
                 )
             logger.warning(
                 "Ingestor: %d/%d lines failed to parse in %s (%.0f%% error rate)",
-                parse_errors, total_lines, file_key, error_rate * 100,
+                parse_errors,
+                total_lines,
+                file_key,
+                error_rate * 100,
             )
         return results
 
     try:
         node = json.loads(text)
     except Exception as e:
-        raise ResultIngestionError(
-            f"Failed to parse JSON artifact {file_key}: {e}"
-        ) from e
+        raise ResultIngestionError(f"Failed to parse JSON artifact {file_key}: {e}") from e
     results.extend(_walk_dict_nodes(node))
     return results
 
@@ -233,9 +235,7 @@ async def _fallback_from_input(
     try:
         text = await storage.read_text(input_key)
     except Exception as e:
-        raise ResultIngestionError(
-            f"Failed to read fallback input {input_key}: {e}"
-        ) from e
+        raise ResultIngestionError(f"Failed to read fallback input {input_key}: {e}") from e
 
     rows: list[dict[str, Any]] = []
     parse_errors = 0
@@ -251,9 +251,7 @@ async def _fallback_from_input(
         if not isinstance(node, dict):
             continue
         prompt = _extract_text(node, ("query", "prompt", "question", "input"))
-        expected = _extract_text(
-            node, ("response", "expected", "answer", "output")
-        )
+        expected = _extract_text(node, ("response", "expected", "answer", "output"))
         if not prompt and not expected:
             continue
         rows.append(
@@ -271,6 +269,8 @@ async def _fallback_from_input(
         )
     if parse_errors > 0:
         logger.warning(
-            "Ingestor fallback: %d lines failed to parse in %s", parse_errors, input_key,
+            "Ingestor fallback: %d lines failed to parse in %s",
+            parse_errors,
+            input_key,
         )
     return rows

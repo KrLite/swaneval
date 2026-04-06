@@ -10,10 +10,11 @@ from sqlmodel import Field, SQLModel
 # 用户角色枚举 / User role enumeration
 class UserRole(str, enum.Enum):
     """用户角色枚举 / User role enumeration"""
-    admin = "admin"           # 管理员 / Administrator with full access
-    data_admin = "data_admin" # 数据管理员 / Data administrator (datasets & criteria)
-    engineer = "engineer"     # 工程师 / Engineer (run tasks, view data)
-    viewer = "viewer"         # 查看者 / Viewer (view only)
+
+    admin = "admin"  # 管理员 / Administrator with full access
+    data_admin = "data_admin"  # 数据管理员 / Data administrator (datasets & criteria)
+    engineer = "engineer"  # 工程师 / Engineer (run tasks, view data)
+    viewer = "viewer"  # 查看者 / Viewer (view only)
 
 
 class User(SQLModel, table=True):
@@ -23,6 +24,7 @@ class User(SQLModel, table=True):
     存储系统用户信息，包括认证和权限管理。
     Stores system user information including authentication and permission management.
     """
+
     __tablename__ = "users"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)

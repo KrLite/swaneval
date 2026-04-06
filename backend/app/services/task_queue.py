@@ -27,7 +27,8 @@ def _get_redis() -> aioredis.Redis:
     global _pool
     if _pool is None:
         _pool = aioredis.from_url(
-            settings.REDIS_URL, decode_responses=True,
+            settings.REDIS_URL,
+            decode_responses=True,
             max_connections=10,
         )
     return _pool
@@ -44,11 +45,13 @@ async def close_pool() -> None:
 async def enqueue_task(task_id: str, execution_backend: str = "external_api") -> None:
     """Push a task onto the persistent queue."""
     r = _get_redis()
-    payload = json.dumps({
-        "task_id": task_id,
-        "execution_backend": execution_backend,
-        "enqueued_at": datetime.now(timezone.utc).isoformat(),
-    })
+    payload = json.dumps(
+        {
+            "task_id": task_id,
+            "execution_backend": execution_backend,
+            "enqueued_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
     await r.rpush(QUEUE_KEY, payload)
     logger.info("Task %s enqueued (backend=%s)", task_id, execution_backend)
 
@@ -66,10 +69,16 @@ async def dequeue_task(timeout: int = 5) -> dict | None:
 async def mark_running(task_id: str, worker_id: str) -> None:
     """Track that a task is being executed by a worker."""
     r = _get_redis()
-    await r.hset(RUNNING_KEY, task_id, json.dumps({
-        "worker_id": worker_id,
-        "started_at": datetime.now(timezone.utc).isoformat(),
-    }))
+    await r.hset(
+        RUNNING_KEY,
+        task_id,
+        json.dumps(
+            {
+                "worker_id": worker_id,
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ),
+    )
 
 
 async def mark_done(task_id: str) -> None:
@@ -90,19 +99,31 @@ async def get_queue_status() -> dict:
 async def register_worker(worker_id: str) -> None:
     """Register a worker as alive."""
     r = _get_redis()
-    await r.hset(WORKER_KEY, worker_id, json.dumps({
-        "registered_at": datetime.now(timezone.utc).isoformat(),
-        "status": "idle",
-    }))
+    await r.hset(
+        WORKER_KEY,
+        worker_id,
+        json.dumps(
+            {
+                "registered_at": datetime.now(timezone.utc).isoformat(),
+                "status": "idle",
+            }
+        ),
+    )
 
 
 async def update_worker_status(worker_id: str, status: str) -> None:
     """Update worker status (idle, busy, stopping)."""
     r = _get_redis()
-    await r.hset(WORKER_KEY, worker_id, json.dumps({
-        "status": status,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }))
+    await r.hset(
+        WORKER_KEY,
+        worker_id,
+        json.dumps(
+            {
+                "status": status,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ),
+    )
 
 
 async def unregister_worker(worker_id: str) -> None:
@@ -170,7 +191,8 @@ async def embedded_worker_loop() -> None:
                 if redis_fail_count >= max_redis_failures:
                     logger.error(
                         "Embedded worker %s: Redis unreachable for %d consecutive attempts",
-                        worker_id, redis_fail_count,
+                        worker_id,
+                        redis_fail_count,
                     )
                     await _best_effort_worker_bookkeeping(
                         worker_id,
@@ -182,7 +204,8 @@ async def embedded_worker_loop() -> None:
                 else:
                     logger.warning(
                         "Embedded worker %s: Redis connection error (attempt %d)",
-                        worker_id, redis_fail_count,
+                        worker_id,
+                        redis_fail_count,
                     )
                 await asyncio.sleep(min(5 * redis_fail_count, 30))
                 continue

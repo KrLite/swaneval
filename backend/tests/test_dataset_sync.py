@@ -33,9 +33,7 @@ class TestGetHfLatestSha(unittest.TestCase):
             raise repo_not_found_error("missing repo")
 
         fake_hf_module = types.SimpleNamespace(repo_info=fake_repo_info)
-        fake_utils_module = types.SimpleNamespace(
-            RepositoryNotFoundError=repo_not_found_error
-        )
+        fake_utils_module = types.SimpleNamespace(RepositoryNotFoundError=repo_not_found_error)
 
         with patch.dict(
             sys.modules,

@@ -33,6 +33,7 @@ def validate_kubeconfig(kubeconfig_yaml: str) -> dict:
     try:
         _inline_cert_data(kubeconfig_dict)
         from kubernetes.config import new_client_from_config_dict
+
         api_client = new_client_from_config_dict(kubeconfig_dict)
         v1 = client.CoreV1Api(api_client=api_client)
         v1.list_namespace(limit=1, _request_timeout=10)
@@ -81,11 +82,12 @@ def probe_cluster_resources(kubeconfig_encrypted: str) -> dict:
             field_selector="status.phase=Running",
         ).items
         for pod in pods:
-            for container in (pod.spec.containers or []):
+            for container in pod.spec.containers or []:
                 reqs = (container.resources.requests or {}) if container.resources else {}
                 gpu_in_use += int(reqs.get("nvidia.com/gpu", 0))
     except Exception as e:
         from app.errors import ResourceError
+
         raise ResourceError(
             f"Failed to probe GPU usage (pod listing): {e}. "
             "Cannot determine GPU availability — refusing to report "
@@ -115,19 +117,23 @@ def get_cluster_nodes(kubeconfig_encrypted: str) -> list[dict]:
         gpu = int(alloc.get("nvidia.com/gpu", 0))
         cpu_str = alloc.get("cpu", "0")
         cpu_m = int(cpu_str[:-1]) if cpu_str.endswith("m") else int(float(cpu_str) * 1000)
-        result.append({
-            "name": node.metadata.name,
-            "gpu_count": gpu,
-            "gpu_type": labels.get("nvidia.com/gpu.product", ""),
-            "cpu_millicores": cpu_m,
-            "memory_bytes": _parse_memory(alloc.get("memory", "0")),
-            "status": (
-                "Ready" if any(
-                    c.type == "Ready" and c.status == "True"
-                    for c in (node.status.conditions or [])
-                ) else "NotReady"
-            ),
-        })
+        result.append(
+            {
+                "name": node.metadata.name,
+                "gpu_count": gpu,
+                "gpu_type": labels.get("nvidia.com/gpu.product", ""),
+                "cpu_millicores": cpu_m,
+                "memory_bytes": _parse_memory(alloc.get("memory", "0")),
+                "status": (
+                    "Ready"
+                    if any(
+                        c.type == "Ready" and c.status == "True"
+                        for c in (node.status.conditions or [])
+                    )
+                    else "NotReady"
+                ),
+            }
+        )
     return result
 
 
@@ -135,12 +141,18 @@ def _parse_memory(mem_str: str) -> int:
     """Parse K8s memory string to bytes."""
     mem_str = str(mem_str)
     units = {
-        "Ki": 1024, "Mi": 1024**2, "Gi": 1024**3, "Ti": 1024**4,
-        "K": 1000, "M": 1000**2, "G": 1000**3, "T": 1000**4,
+        "Ki": 1024,
+        "Mi": 1024**2,
+        "Gi": 1024**3,
+        "Ti": 1024**4,
+        "K": 1000,
+        "M": 1000**2,
+        "G": 1000**3,
+        "T": 1000**4,
     }
     for suffix, multiplier in units.items():
         if mem_str.endswith(suffix):
-            return int(float(mem_str[:-len(suffix)]) * multiplier)
+            return int(float(mem_str[: -len(suffix)]) * multiplier)
     try:
         return int(float(mem_str))
     except (ValueError, OverflowError):

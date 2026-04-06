@@ -24,23 +24,36 @@ _false = sa.text("false")
 
 def upgrade() -> None:
     # ── Create enum types (idempotent) ──────────────────────────────
-    op.execute(sa.text(
-        "DO $$ BEGIN CREATE TYPE clusterstatus AS ENUM "
-        "('connecting', 'ready', 'error', 'provisioning', 'offline'); "
-        "EXCEPTION WHEN duplicate_object THEN null; END $$;"
-    ))
-    op.execute(sa.text(
-        "DO $$ BEGIN CREATE TYPE infrajobtype AS ENUM "
-        "('namespace_setup', 'vllm_cache', 'resource_quota', 'probe'); "
-        "EXCEPTION WHEN duplicate_object THEN null; END $$;"
-    ))
+    op.execute(
+        sa.text(
+            "DO $$ BEGIN CREATE TYPE clusterstatus AS ENUM "
+            "('connecting', 'ready', 'error', 'provisioning', 'offline'); "
+            "EXCEPTION WHEN duplicate_object THEN null; END $$;"
+        )
+    )
+    op.execute(
+        sa.text(
+            "DO $$ BEGIN CREATE TYPE infrajobtype AS ENUM "
+            "('namespace_setup', 'vllm_cache', 'resource_quota', 'probe'); "
+            "EXCEPTION WHEN duplicate_object THEN null; END $$;"
+        )
+    )
     clusterstatus = postgresql.ENUM(
-        "connecting", "ready", "error", "provisioning", "offline",
-        name="clusterstatus", create_type=False,
+        "connecting",
+        "ready",
+        "error",
+        "provisioning",
+        "offline",
+        name="clusterstatus",
+        create_type=False,
     )
     infrajobtype = postgresql.ENUM(
-        "namespace_setup", "vllm_cache", "resource_quota", "probe",
-        name="infrajobtype", create_type=False,
+        "namespace_setup",
+        "vllm_cache",
+        "resource_quota",
+        "probe",
+        name="infrajobtype",
+        create_type=False,
     )
 
     # ── compute_clusters ────────────────────────────────────────────
@@ -50,69 +63,101 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column("name", sa.String(128), nullable=False),
         sa.Column(
-            "description", sa.String(),
-            nullable=False, server_default="",
+            "description",
+            sa.String(),
+            nullable=False,
+            server_default="",
         ),
         sa.Column(
-            "kubeconfig_encrypted", sa.String(),
-            nullable=False, server_default="",
+            "kubeconfig_encrypted",
+            sa.String(),
+            nullable=False,
+            server_default="",
         ),
         sa.Column(
-            "api_server_url", sa.String(),
-            nullable=False, server_default="",
+            "api_server_url",
+            sa.String(),
+            nullable=False,
+            server_default="",
         ),
         sa.Column(
-            "namespace", sa.String(),
-            nullable=False, server_default="default",
+            "namespace",
+            sa.String(),
+            nullable=False,
+            server_default="default",
         ),
         sa.Column(
-            "status", clusterstatus,
-            nullable=False, server_default="connecting",
+            "status",
+            clusterstatus,
+            nullable=False,
+            server_default="connecting",
         ),
         sa.Column(
-            "status_message", sa.String(),
-            nullable=False, server_default="",
+            "status_message",
+            sa.String(),
+            nullable=False,
+            server_default="",
         ),
         sa.Column(
-            "gpu_count", sa.Integer(),
-            nullable=False, server_default=_zero,
+            "gpu_count",
+            sa.Integer(),
+            nullable=False,
+            server_default=_zero,
         ),
         sa.Column(
-            "gpu_type", sa.String(),
-            nullable=False, server_default="",
+            "gpu_type",
+            sa.String(),
+            nullable=False,
+            server_default="",
         ),
         sa.Column(
-            "gpu_available", sa.Integer(),
-            nullable=False, server_default=_zero,
+            "gpu_available",
+            sa.Integer(),
+            nullable=False,
+            server_default=_zero,
         ),
         sa.Column(
-            "cpu_total_millicores", sa.Integer(),
-            nullable=False, server_default=_zero,
+            "cpu_total_millicores",
+            sa.Integer(),
+            nullable=False,
+            server_default=_zero,
         ),
         sa.Column(
-            "memory_total_bytes", sa.BigInteger(),
-            nullable=False, server_default=_zero,
+            "memory_total_bytes",
+            sa.BigInteger(),
+            nullable=False,
+            server_default=_zero,
         ),
         sa.Column(
-            "node_count", sa.Integer(),
-            nullable=False, server_default=_zero,
+            "node_count",
+            sa.Integer(),
+            nullable=False,
+            server_default=_zero,
         ),
         sa.Column(
-            "vllm_cache_ready", sa.Boolean(),
-            nullable=False, server_default=_false,
+            "vllm_cache_ready",
+            sa.Boolean(),
+            nullable=False,
+            server_default=_false,
         ),
         sa.Column("last_probed_at", tz, nullable=True),
         sa.Column(
-            "created_by", sa.Uuid(),
-            sa.ForeignKey("users.id"), nullable=True,
+            "created_by",
+            sa.Uuid(),
+            sa.ForeignKey("users.id"),
+            nullable=True,
         ),
         sa.Column(
-            "created_at", tz,
-            nullable=False, server_default=_now,
+            "created_at",
+            tz,
+            nullable=False,
+            server_default=_now,
         ),
         sa.Column(
-            "updated_at", tz,
-            nullable=False, server_default=_now,
+            "updated_at",
+            tz,
+            nullable=False,
+            server_default=_now,
         ),
     )
 
@@ -121,25 +166,35 @@ def upgrade() -> None:
         "cluster_infra_jobs",
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column(
-            "cluster_id", sa.Uuid(),
-            sa.ForeignKey("compute_clusters.id"), nullable=False,
+            "cluster_id",
+            sa.Uuid(),
+            sa.ForeignKey("compute_clusters.id"),
+            nullable=False,
         ),
         sa.Column("job_type", infrajobtype, nullable=False),
         sa.Column(
-            "status", sa.String(),
-            nullable=False, server_default="pending",
+            "status",
+            sa.String(),
+            nullable=False,
+            server_default="pending",
         ),
         sa.Column(
-            "log", sa.String(),
-            nullable=False, server_default="",
+            "log",
+            sa.String(),
+            nullable=False,
+            server_default="",
         ),
         sa.Column(
-            "created_at", tz,
-            nullable=False, server_default=_now,
+            "created_at",
+            tz,
+            nullable=False,
+            server_default=_now,
         ),
         sa.Column(
-            "updated_at", tz,
-            nullable=False, server_default=_now,
+            "updated_at",
+            tz,
+            nullable=False,
+            server_default=_now,
         ),
     )
 
@@ -147,7 +202,8 @@ def upgrade() -> None:
     op.add_column(
         "eval_tasks",
         sa.Column(
-            "cluster_id", sa.Uuid(),
+            "cluster_id",
+            sa.Uuid(),
             sa.ForeignKey("compute_clusters.id"),
             nullable=True,
         ),
@@ -159,8 +215,10 @@ def downgrade() -> None:
     op.drop_table("cluster_infra_jobs")
     op.drop_table("compute_clusters")
     postgresql.ENUM(name="infrajobtype").drop(
-        op.get_bind(), checkfirst=True,
+        op.get_bind(),
+        checkfirst=True,
     )
     postgresql.ENUM(name="clusterstatus").drop(
-        op.get_bind(), checkfirst=True,
+        op.get_bind(),
+        checkfirst=True,
     )

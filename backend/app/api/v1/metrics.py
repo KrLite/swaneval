@@ -30,16 +30,19 @@ async def dashboard_metrics(
     task_counts = {str(row[0]): row[1] for row in task_counts_raw}
 
     # Recent task activity (last 7 days, per day)
-    recent_stmt = select(
-        sa_func.date_trunc("day", EvalTask.created_at).label("day"),
-        sa_func.count().label("total"),
-        sa_func.sum(
-            case((EvalTask.status == TaskStatus.completed, 1), else_=0)
-        ).label("completed"),
-        sa_func.sum(
-            case((EvalTask.status == TaskStatus.failed, 1), else_=0)
-        ).label("failed"),
-    ).group_by("day").order_by("day").limit(7)
+    recent_stmt = (
+        select(
+            sa_func.date_trunc("day", EvalTask.created_at).label("day"),
+            sa_func.count().label("total"),
+            sa_func.sum(case((EvalTask.status == TaskStatus.completed, 1), else_=0)).label(
+                "completed"
+            ),
+            sa_func.sum(case((EvalTask.status == TaskStatus.failed, 1), else_=0)).label("failed"),
+        )
+        .group_by("day")
+        .order_by("day")
+        .limit(7)
+    )
     recent_raw = (await session.exec(recent_stmt)).all()
     recent_activity = [
         {

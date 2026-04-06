@@ -10,19 +10,21 @@ from sqlmodel import Field, SQLModel
 # 任务状态枚举 / Task status enumeration
 class TaskStatus(str, enum.Enum):
     """任务状态枚举 / Task status enumeration"""
-    pending = "pending"         # 待处理 / Pending
-    running = "running"         # 运行中 / Running
-    paused = "paused"           # 暂停 / Paused by user
-    completed = "completed"     # 已完成 / Completed
-    failed = "failed"           # 失败 / Failed due to error
-    cancelled = "cancelled"     # 已取消 / Cancelled by user
+
+    pending = "pending"  # 待处理 / Pending
+    running = "running"  # 运行中 / Running
+    paused = "paused"  # 暂停 / Paused by user
+    completed = "completed"  # 已完成 / Completed
+    failed = "failed"  # 失败 / Failed due to error
+    cancelled = "cancelled"  # 已取消 / Cancelled by user
 
 
 # 随机种子策略枚举 / Random seed strategy enumeration
 class SeedStrategy(str, enum.Enum):
     """随机种子策略枚举 / Random seed strategy enumeration"""
-    fixed = "fixed"     # 固定种子 / Fixed seed (same random seed each run)
-    random = "random"   # 随机种子 / Random seed (different each run)
+
+    fixed = "fixed"  # 固定种子 / Fixed seed (same random seed each run)
+    random = "random"  # 随机种子 / Random seed (different each run)
 
 
 class EvalTask(SQLModel, table=True):
@@ -32,6 +34,7 @@ class EvalTask(SQLModel, table=True):
     存储评估任务的配置和状态信息。
     Stores evaluation task configuration and status.
     """
+
     __tablename__ = "eval_tasks"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -93,7 +96,8 @@ class EvalTask(SQLModel, table=True):
     # 已完成 Prompt 数
 
     cluster_id: uuid.UUID | None = Field(
-        default=None, foreign_key="compute_clusters.id",
+        default=None,
+        foreign_key="compute_clusters.id",
     )
     # 计算集群ID / Compute cluster ID (foreign key to compute_clusters)
 
@@ -126,6 +130,7 @@ class EvalSubtask(SQLModel, table=True):
     存储评估任务的子任务信息，用于跟踪进度和恢复。
     Stores subtask information for progress tracking and resume capability.
     """
+
     __tablename__ = "eval_subtasks"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)

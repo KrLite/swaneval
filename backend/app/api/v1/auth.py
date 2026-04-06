@@ -23,25 +23,19 @@ router = APIRouter()
 
 @router.get("/user-count")
 async def user_count(session: AsyncSession = Depends(get_db)):
-    count = (await session.exec(
-        select(sa_func.count()).select_from(User)
-    )).one()
+    count = (await session.exec(select(sa_func.count()).select_from(User))).one()
     return {"count": count}
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)
 async def register(body: RegisterRequest, session: AsyncSession = Depends(get_db)):
     # Detect first user
-    count = (await session.exec(
-        select(sa_func.count()).select_from(User)
-    )).one()
+    count = (await session.exec(select(sa_func.count()).select_from(User))).one()
     is_first = count == 0
 
     # Check uniqueness
     effective_username = "admin" if is_first else body.username
-    stmt = select(User).where(
-        (User.username == effective_username) | (User.email == body.email)
-    )
+    stmt = select(User).where((User.username == effective_username) | (User.email == body.email))
     existing = (await session.exec(stmt)).first()
     if existing:
         raise HTTPException(status.HTTP_409_CONFLICT, "用户名或邮箱已被使用")

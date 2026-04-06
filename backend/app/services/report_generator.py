@@ -13,9 +13,7 @@ from app.models.eval_task import EvalTask
 from app.models.llm_model import LLMModel
 
 
-async def generate_performance_report(
-    task_id: uuid.UUID, session: AsyncSession
-) -> dict:
+async def generate_performance_report(task_id: uuid.UUID, session: AsyncSession) -> dict:
     """性能报告: scores per criterion, strengths/weaknesses."""
     task = await session.get(EvalTask, task_id)
     if not task:
@@ -30,9 +28,7 @@ async def generate_performance_report(
             sa_func.min(EvalResult.score).label("min_score"),
             sa_func.max(EvalResult.score).label("max_score"),
             sa_func.count(EvalResult.id).label("count"),
-            sa_func.avg(EvalResult.latency_ms).label(
-                "avg_latency_ms"
-            ),
+            sa_func.avg(EvalResult.latency_ms).label("avg_latency_ms"),
         )
         .join(Criterion, EvalResult.criterion_id == Criterion.id)
         .where(EvalResult.task_id == task_id)
@@ -52,12 +48,10 @@ async def generate_performance_report(
     ]
 
     # Overall stats
-    overall_stmt = (
-        select(
-            sa_func.avg(EvalResult.score),
-            sa_func.count(EvalResult.id),
-        ).where(EvalResult.task_id == task_id)
-    )
+    overall_stmt = select(
+        sa_func.avg(EvalResult.score),
+        sa_func.count(EvalResult.id),
+    ).where(EvalResult.task_id == task_id)
     overall = (await session.exec(overall_stmt)).one()
 
     return {
@@ -66,9 +60,7 @@ async def generate_performance_report(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "task_name": task.name,
         "model_name": model.name if model else "Unknown",
-        "overall_score": (
-            round(overall[0], 4) if overall[0] else 0
-        ),
+        "overall_score": (round(overall[0], 4) if overall[0] else 0),
         "total_samples": overall[1],
         "criteria_breakdown": sorted(
             criteria_stats,
@@ -78,9 +70,7 @@ async def generate_performance_report(
     }
 
 
-async def generate_safety_report(
-    task_id: uuid.UUID, session: AsyncSession
-) -> dict:
+async def generate_safety_report(task_id: uuid.UUID, session: AsyncSession) -> dict:
     """安全报告: error cases, risk ratings."""
     task = await session.get(EvalTask, task_id)
     if not task:
@@ -88,10 +78,7 @@ async def generate_safety_report(
     model = await session.get(LLMModel, task.model_id)
 
     # Count total
-    total_stmt = (
-        select(sa_func.count(EvalResult.id))
-        .where(EvalResult.task_id == task_id)
-    )
+    total_stmt = select(sa_func.count(EvalResult.id)).where(EvalResult.task_id == task_id)
     total = (await session.exec(total_stmt)).one()
 
     # Count model wrong answers (is_valid=True, score < 1.0)
@@ -156,54 +143,34 @@ async def generate_safety_report(
     }
 
 
-async def generate_cost_report(
-    task_id: uuid.UUID, session: AsyncSession
-) -> dict:
+async def generate_cost_report(task_id: uuid.UUID, session: AsyncSession) -> dict:
     """成本报告: latency, throughput, token stats."""
     task = await session.get(EvalTask, task_id)
     if not task:
         raise ValueError("Task not found")
     model = await session.get(LLMModel, task.model_id)
 
-    stmt = (
-        select(
-            sa_func.avg(EvalResult.latency_ms).label(
-                "avg_latency"
-            ),
-            sa_func.min(EvalResult.latency_ms).label(
-                "min_latency"
-            ),
-            sa_func.max(EvalResult.latency_ms).label(
-                "max_latency"
-            ),
-            sa_func.avg(EvalResult.first_token_ms).label(
-                "avg_first_token"
-            ),
-            sa_func.avg(EvalResult.tokens_generated).label(
-                "avg_tokens"
-            ),
-            sa_func.sum(EvalResult.tokens_generated).label(
-                "total_tokens"
-            ),
-            sa_func.count(EvalResult.id).label("total_samples"),
-        ).where(EvalResult.task_id == task_id)
-    )
+    stmt = select(
+        sa_func.avg(EvalResult.latency_ms).label("avg_latency"),
+        sa_func.min(EvalResult.latency_ms).label("min_latency"),
+        sa_func.max(EvalResult.latency_ms).label("max_latency"),
+        sa_func.avg(EvalResult.first_token_ms).label("avg_first_token"),
+        sa_func.avg(EvalResult.tokens_generated).label("avg_tokens"),
+        sa_func.sum(EvalResult.tokens_generated).label("total_tokens"),
+        sa_func.count(EvalResult.id).label("total_samples"),
+    ).where(EvalResult.task_id == task_id)
     r = (await session.exec(stmt)).one()
 
     # Duration
     duration_sec = 0.0
     if task.started_at and task.finished_at:
-        duration_sec = (
-            task.finished_at - task.started_at
-        ).total_seconds()
+        duration_sec = (task.finished_at - task.started_at).total_seconds()
 
     throughput = (r.total_tokens or 0) / max(duration_sec, 1)
 
     # Determine execution backend for cost metrics split
     execution_backend = (
-        task.execution_backend
-        if hasattr(task, "execution_backend")
-        else "external_api"
+        task.execution_backend if hasattr(task, "execution_backend") else "external_api"
     )
 
     base_report = {
@@ -226,26 +193,28 @@ async def generate_cost_report(
 
     if execution_backend == "k8s_vllm":
         # K8s/vLLM: add GPU-specific fields (populated from DCGM exporter)
-        base_report.update({
-            "gpu_ids": task.gpu_ids or "",
-            "gpu_utilization_pct": None,
-            "gpu_memory_peak_mb": None,
-            "gpu_power_watts": None,
-            "metrics_note": "GPU 指标需通过 Prometheus + DCGM Exporter 采集",
-        })
+        base_report.update(
+            {
+                "gpu_ids": task.gpu_ids or "",
+                "gpu_utilization_pct": None,
+                "gpu_memory_peak_mb": None,
+                "gpu_power_watts": None,
+                "metrics_note": "GPU 指标需通过 Prometheus + DCGM Exporter 采集",
+            }
+        )
     else:
         # API model: no GPU metrics
-        base_report.update({
-            "gpu_ids": task.gpu_ids if task.gpu_ids else "N/A (API 模型)",
-            "estimated_cost_usd": None,
-        })
+        base_report.update(
+            {
+                "gpu_ids": task.gpu_ids if task.gpu_ids else "N/A (API 模型)",
+                "estimated_cost_usd": None,
+            }
+        )
 
     return base_report
 
 
-async def generate_value_report(
-    task_id: uuid.UUID, session: AsyncSession
-) -> dict:
+async def generate_value_report(task_id: uuid.UUID, session: AsyncSession) -> dict:
     """性价比报告: combines performance + cost data."""
     perf = await generate_performance_report(task_id, session)
     cost = await generate_cost_report(task_id, session)
@@ -253,9 +222,7 @@ async def generate_value_report(
     # Value score: performance per unit of latency
     avg_score = perf["overall_score"]
     avg_latency = cost["avg_latency_ms"]
-    value_index = round(
-        avg_score / max(avg_latency / 1000, 0.001), 4
-    )
+    value_index = round(avg_score / max(avg_latency / 1000, 0.001), 4)
 
     return {
         "type": "value",
@@ -265,9 +232,7 @@ async def generate_value_report(
         "model_name": perf["model_name"],
         "overall_score": avg_score,
         "avg_latency_ms": avg_latency,
-        "throughput_tokens_per_sec": cost[
-            "throughput_tokens_per_sec"
-        ],
+        "throughput_tokens_per_sec": cost["throughput_tokens_per_sec"],
         "total_tokens": cost["total_tokens"],
         "value_index": value_index,
         "criteria_breakdown": perf["criteria_breakdown"],

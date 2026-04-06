@@ -21,9 +21,7 @@ class StorageBackend(ABC):
         """Read entire file as text."""
 
     @abstractmethod
-    async def read_lines(
-        self, key: str, max_lines: int = 0, encoding: str = "utf-8"
-    ) -> list[str]:
+    async def read_lines(self, key: str, max_lines: int = 0, encoding: str = "utf-8") -> list[str]:
         """Read file lines. If max_lines > 0, return at most that many non-empty lines."""
 
     @abstractmethod
@@ -39,9 +37,7 @@ class StorageBackend(ABC):
         """Get file size in bytes."""
 
     @abstractmethod
-    async def list_files(
-        self, prefix: str, patterns: list[str] | None = None
-    ) -> list[str]:
+    async def list_files(self, prefix: str, patterns: list[str] | None = None) -> list[str]:
         """List file keys under prefix, optionally filtered by glob patterns.
 
         Returns keys relative to the storage root (same format as other methods).

@@ -43,11 +43,11 @@ def _cleanup_preflight_cache() -> None:
     """Remove expired preflight entries."""
     now = time.time()
     expired = [
-        k for k, v in _preflight_cache.items()
-        if now - v.get("created_at", 0) > _PREFLIGHT_TTL
+        k for k, v in _preflight_cache.items() if now - v.get("created_at", 0) > _PREFLIGHT_TTL
     ]
     for k in expired:
         _preflight_cache.pop(k, None)
+
 
 router = APIRouter()
 
@@ -75,6 +75,7 @@ async def _count_rows(storage: StorageBackend, source_uri: str) -> int:
         import io
 
         import pyarrow.parquet as pq
+
         return pq.ParquetFile(io.BytesIO(content)).metadata.num_rows
 
     # Excel — use openpyxl read-only mode for row count
@@ -85,6 +86,7 @@ async def _count_rows(storage: StorageBackend, source_uri: str) -> int:
         import io
 
         from openpyxl import load_workbook
+
         wb = load_workbook(io.BytesIO(content), read_only=True)
         count = wb.active.max_row - 1 if wb.active else 0  # minus header
         wb.close()
@@ -152,9 +154,7 @@ async def upload_dataset(
     row_count = await _count_rows(storage, uri)
 
     # Check if dataset with same name exists (auto-version)
-    stmt = (
-        select(Dataset).where(Dataset.name == name).order_by(Dataset.version.desc())
-    )
+    stmt = select(Dataset).where(Dataset.name == name).order_by(Dataset.version.desc())
     existing = (await session.exec(stmt)).first()
     version = (existing.version + 1) if existing else 1
 
@@ -206,9 +206,7 @@ async def import_dataset(
     if body.source not in ("huggingface", "modelscope"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "source 必须为 huggingface 或 modelscope")
 
-    source_type = (
-        SourceType.huggingface if body.source == "huggingface" else SourceType.modelscope
-    )
+    source_type = SourceType.huggingface if body.source == "huggingface" else SourceType.modelscope
     display_name = body.name or body.dataset_id.split("/")[-1]
 
     # Create progress tracking job if ID provided
@@ -219,20 +217,28 @@ async def import_dataset(
     try:
         if body.source == "huggingface":
             source_uri, row_count, size_bytes = await import_huggingface(
-                body.dataset_id, body.subset, body.split, storage,
+                body.dataset_id,
+                body.subset,
+                body.split,
+                storage,
                 job_id=tracking_id,
                 hf_token=current_user.hf_token or None,
             )
         else:
             source_uri, row_count, size_bytes = await import_modelscope(
-                body.dataset_id, body.subset, body.split, storage,
+                body.dataset_id,
+                body.subset,
+                body.split,
+                storage,
                 ms_token=current_user.ms_token or None,
             )
         update_job(tracking_id, status="done", progress=1.0, phase="完成")
         from app.metrics import dataset_imports_total
+
         dataset_imports_total.labels(source=body.source, status="success").inc()
     except ValueError as e:
         from app.metrics import dataset_imports_total
+
         dataset_imports_total.labels(source=body.source, status="error").inc()
         error_msg = str(e)
         lower_msg = error_msg.lower()
@@ -245,9 +251,7 @@ async def import_dataset(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, error_msg) from e
 
     # Auto-version if same name exists
-    stmt = (
-        select(Dataset).where(Dataset.name == display_name).order_by(Dataset.version.desc())
-    )
+    stmt = select(Dataset).where(Dataset.name == display_name).order_by(Dataset.version.desc())
     existing = (await session.exec(stmt)).first()
     version = (existing.version + 1) if existing else 1
 
@@ -295,9 +299,7 @@ async def mount_dataset(
 ):
     # Mount always operates on local filesystem paths
     if not os.path.exists(body.server_path):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "服务器路径不存在"
-        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "服务器路径不存在")
 
     row_count = await _count_rows(storage, body.server_path)
     size = os.path.getsize(body.server_path)
@@ -326,6 +328,7 @@ async def list_preset_datasets(
 ):
     """Return the catalog of available preset datasets (not stored in DB)."""
     from app.database import PRESET_DATASETS
+
     return PRESET_DATASETS
 
 
@@ -344,12 +347,14 @@ async def stream_import_progress(
                 payload = json.dumps(dict(status="not_found"))
                 yield "data: " + payload + "\n\n"
                 return
-            payload = json.dumps(dict(
-                status=job.status,
-                phase=job.phase,
-                progress=job.progress,
-                error=job.error,
-            ))
+            payload = json.dumps(
+                dict(
+                    status=job.status,
+                    phase=job.phase,
+                    progress=job.progress,
+                    error=job.error,
+                )
+            )
             yield "data: " + payload + "\n\n"
             if job.status in ("done", "failed"):
                 return
@@ -386,13 +391,9 @@ async def list_datasets(
     total = (await session.exec(count_stmt)).one()
 
     offset = (page - 1) * page_size
-    items_stmt = (
-        base.order_by(Dataset.created_at.desc()).offset(offset).limit(page_size)
-    )
+    items_stmt = base.order_by(Dataset.created_at.desc()).offset(offset).limit(page_size)
     result = await session.exec(items_stmt)
-    return PaginatedResponse(
-        items=result.all(), total=total, page=page, page_size=page_size
-    )
+    return PaginatedResponse(items=result.all(), total=total, page=page, page_size=page_size)
 
 
 @router.post("/{dataset_id}/download", response_model=DatasetResponse)
@@ -442,7 +443,10 @@ async def download_preset_content(
 
     try:
         source_uri, row_count, size_bytes = await import_huggingface(
-            hf_id, subset, split, storage,
+            hf_id,
+            subset,
+            split,
+            storage,
             hf_token=current_user.hf_token or None,
         )
     except Exception as e:
@@ -512,13 +516,16 @@ async def preview_dataset(
         if content is None:
             return {"rows": [], "total": 0}
         import io
+
         if lower.endswith(".parquet"):
             import pyarrow.parquet as pq
+
             tbl = pq.read_table(io.BytesIO(content)).slice(0, limit)
             df = tbl.to_pandas()
         else:
             df = pd.read_excel(
-                io.BytesIO(content), nrows=limit,
+                io.BytesIO(content),
+                nrows=limit,
             )
         rows = df.fillna("").to_dict(orient="records")
         return {"rows": rows, "total": ds.row_count}
@@ -530,6 +537,7 @@ async def preview_dataset(
 
     if lower.endswith(".csv"):
         import io
+
         df = pd.read_csv(io.StringIO(text), nrows=limit)
         rows = df.fillna("").to_dict(orient="records")
     elif lower.endswith(".json"):
@@ -603,9 +611,7 @@ async def sync_dataset_now(
     if not ds:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "数据集未找到")
 
-    if not ds.hf_dataset_id and ds.source_type not in (
-        SourceType.huggingface, SourceType.preset
-    ):
+    if not ds.hf_dataset_id and ds.source_type not in (SourceType.huggingface, SourceType.preset):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "仅支持 HuggingFace/预设数据集的同步",
@@ -709,12 +715,18 @@ async def preflight_import(
         try:
             if source == "huggingface":
                 source_uri, row_count, size_bytes = await import_huggingface(
-                    dataset_id, subset, split, storage,
+                    dataset_id,
+                    subset,
+                    split,
+                    storage,
                     hf_token=current_user.hf_token or None,
                 )
             else:
                 source_uri, row_count, size_bytes = await import_modelscope(
-                    dataset_id, subset, split, storage,
+                    dataset_id,
+                    subset,
+                    split,
+                    storage,
                     ms_token=current_user.ms_token or None,
                 )
         except Exception as e:
@@ -744,17 +756,12 @@ async def preflight_import(
     if row_count == 0:
         warnings.append("数据集为空（0行）")
     if row_count > 0:
-        null_cols = [
-            col for col in df.columns
-            if df[col].isna().sum() / row_count > 0.5
-        ]
+        null_cols = [col for col in df.columns if df[col].isna().sum() / row_count > 0.5]
         if null_cols:
             warnings.append(f"以下字段空值率超过 50%: {', '.join(null_cols)}")
 
     # Generate preflight token and cache
-    token = hashlib.sha256(
-        f"{source_uri}:{time.time()}".encode()
-    ).hexdigest()[:32]
+    token = hashlib.sha256(f"{source_uri}:{time.time()}".encode()).hexdigest()[:32]
     _preflight_cache[token] = {
         "source_uri": source_uri,
         "source_type": source_type,
@@ -804,10 +811,7 @@ async def confirm_import(
     st = source_type_map.get(cached["source_type"], SourceType.upload)
 
     # Auto-version
-    stmt = (
-        select(Dataset).where(Dataset.name == body.name)
-        .order_by(Dataset.version.desc())
-    )
+    stmt = select(Dataset).where(Dataset.name == body.name).order_by(Dataset.version.desc())
     existing = (await session.exec(stmt)).first()
     version = (existing.version + 1) if existing else 1
 
@@ -879,12 +883,9 @@ async def preview_version(
     storage: StorageBackend = Depends(_get_storage),
 ):
     """Preview rows from a specific dataset version."""
-    stmt = (
-        select(DatasetVersion)
-        .where(
-            DatasetVersion.dataset_id == dataset_id,
-            DatasetVersion.version == version,
-        )
+    stmt = select(DatasetVersion).where(
+        DatasetVersion.dataset_id == dataset_id,
+        DatasetVersion.version == version,
     )
     dv = (await session.exec(stmt)).first()
     if not dv:
