@@ -1,6 +1,7 @@
 """In-process task runner for MVP. Runs eval tasks as asyncio background tasks."""
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -31,6 +32,7 @@ from app.errors import (
     ModelCallError,
     ModelRateLimitError,
     ModelTimeoutError,
+    ResultIngestionError,
 )
 from app.metrics import (
     evaluation_score,
@@ -336,12 +338,9 @@ async def _run_task_via_evalscope_service(
     )
 
     # 6. Build prompt → dataset_id mapping for correct attribution.
-    #    Use first-seen semantics: if the same query appears in multiple
-    #    datasets, the first dataset wins (no silent overwrite).
-    #    Fail-fast: any read/parse failure aborts the task, otherwise
-    #    multi-dataset results would be silently misattributed.
-    from app.errors import ResultIngestionError
-
+    #    Fail-fast on read/parse errors AND on cross-dataset duplicate
+    #    queries — the same query appearing in two datasets makes
+    #    attribution ambiguous, so refuse to guess.
     prompt_to_dataset: dict[str, uuid.UUID] = {}
     for ds in datasets:
         stem = dataset_stems[ds.id]
@@ -364,8 +363,16 @@ async def _run_task_via_evalscope_service(
                     f"Malformed JSONL in {ds_input_key} at line {line_no}: {e}"
                 ) from e
             q = row_data.get("query", "")
-            if q and q not in prompt_to_dataset:
-                prompt_to_dataset[q] = ds.id
+            if not q:
+                continue
+            existing = prompt_to_dataset.get(q)
+            if existing is not None and existing != ds.id:
+                raise ResultIngestionError(
+                    f"Ambiguous prompt→dataset attribution: duplicate query "
+                    f"found in datasets {existing} and {ds.id} "
+                    f"(at {ds_input_key} line {line_no})"
+                )
+            prompt_to_dataset[q] = ds.id
 
     # 7. Ingest results from EvalScope output artifacts
     score = await extract_primary_score(storage, work_dir_key)
@@ -406,10 +413,14 @@ async def _run_task_via_evalscope_service(
         prompt_text = row["prompt_text"]
         dataset_id = prompt_to_dataset.get(prompt_text)
         if dataset_id is None:
+            # Use a stable digest rather than the raw prompt — the message
+            # ends up persisted in EvalSubtask.error_log, so avoid leaking
+            # any PII/secret content that may live inside dataset rows.
+            digest = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()[:16]
             raise ResultIngestionError(
                 f"Task {task_id}: ingested result prompt not found in any "
-                f"dataset input; cannot attribute to a dataset. "
-                f"Prompt preview: {prompt_text[:120]!r}"
+                f"dataset input; cannot attribute to a dataset "
+                f"(prompt sha256: {digest})"
             )
         for criterion in criteria:
             result = EvalResult(
@@ -629,8 +640,6 @@ def _validate_result(result: EvalResult) -> None:
 
     Raises ResultIngestionError if the result is in an invalid state.
     """
-    from app.errors import ResultIngestionError
-
     if result.model_output.startswith("[ERROR]"):
         raise ResultIngestionError(
             f"Refusing dirty result: model_output contains error string: {result.model_output[:80]}"
