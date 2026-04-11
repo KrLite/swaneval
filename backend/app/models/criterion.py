@@ -15,6 +15,7 @@ class CriterionType(str, enum.Enum):
     regex = "regex"  # 正则表达式匹配 / Regular expression matching
     sandbox = "sandbox"  # 沙箱执行 / Sandboxed code execution
     llm_judge = "llm_judge"  # LLM作为评判者 / LLM-as-a-judge evaluation
+    elo = "elo"  # ELO rating via pairwise LLM judge comparison
 
 
 class Criterion(SQLModel, table=True):
@@ -38,6 +39,8 @@ class Criterion(SQLModel, table=True):
 
     config_json: str = Field(default="{}")
     # 配置JSON / Configuration JSON (type-specific settings)
+
+    tenant_id: uuid.UUID | None = Field(default=None, foreign_key="tenants.id", index=True)
 
     created_by: uuid.UUID | None = Field(default=None, foreign_key="users.id")
     # 创建者ID / Creator user ID (foreign key to users)

@@ -4,7 +4,7 @@ import logging
 
 import yaml
 
-from app.services.k8s_client import create_core_v1
+from app.services.k8s_client import create_apps_v1, create_core_v1
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,59 @@ def get_cluster_nodes(kubeconfig_encrypted: str) -> list[dict]:
             }
         )
     return result
+
+
+def verify_dcgm_exporter(
+    kubeconfig_encrypted: str, namespace: str = "gpu-operator"
+) -> dict:
+    """Check whether a DCGM Exporter DaemonSet is running in the target namespace.
+
+    Matches on the canonical label ``app.kubernetes.io/name=dcgm-exporter``
+    used by NVIDIA's Helm charts. Returns a dict describing the status so
+    callers can surface a warning when GPU metric collection is unavailable.
+
+    Fail-soft: if the API call raises (e.g., RBAC forbidden, network error),
+    returns ``{"found": False, "error": "..."}`` rather than bubbling up,
+    because DCGM verification should never block cluster registration.
+    """
+    try:
+        apps_v1 = create_apps_v1(kubeconfig_encrypted)
+        ds_list = apps_v1.list_namespaced_daemon_set(
+            namespace,
+            label_selector="app.kubernetes.io/name=dcgm-exporter",
+            _request_timeout=10,
+        )
+    except Exception as e:  # kubernetes client raises ApiException; degrade gracefully
+        logger.warning("DCGM verify failed for namespace %s: %s", namespace, e)
+        return {
+            "found": False,
+            "daemonset_name": None,
+            "desired": 0,
+            "ready": 0,
+            "namespace": namespace,
+            "error": str(e),
+        }
+
+    items = ds_list.items or []
+    if not items:
+        return {
+            "found": False,
+            "daemonset_name": None,
+            "desired": 0,
+            "ready": 0,
+            "namespace": namespace,
+        }
+
+    ds = items[0]
+    desired = ds.status.desired_number_scheduled or 0
+    ready = ds.status.number_ready or 0
+    return {
+        "found": True,
+        "daemonset_name": ds.metadata.name,
+        "desired": desired,
+        "ready": ready,
+        "namespace": namespace,
+    }
 
 
 def _parse_memory(mem_str: str) -> int:

@@ -1,8 +1,8 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func as sa_func
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import get_db, require_permission
@@ -10,8 +10,10 @@ from app.models.criterion import Criterion
 from app.models.eval_result import EvalResult
 from app.models.eval_task import EvalSubtask, EvalTask
 from app.models.llm_model import LLMModel
+from app.models.pairwise_comparison import PairwiseComparison
 from app.models.user import User
 from app.schemas.result import PaginatedResultResponse
+from app.services.elo_rating import PairRecord, build_ranking, compute_elo_ratings
 
 router = APIRouter()
 
@@ -81,6 +83,200 @@ async def leaderboard(
         }
         for r in rows
     ]
+
+
+@router.get("/throughput")
+async def throughput_comparison(
+    task_ids: list[uuid.UUID] = Query(default_factory=list),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = require_permission("results.read"),
+):
+    """Token-generation throughput keyed by (task, model, concurrency).
+
+    Used by the frontend throughput chart to plot tokens/sec across
+    concurrency levels for one or more models. Only valid results
+    contribute to the aggregation; tasks with no samples are omitted.
+    """
+    if not task_ids:
+        return []
+
+    stmt = (
+        select(
+            EvalTask.id.label("task_id"),
+            EvalTask.name.label("task_name"),
+            EvalTask.model_id,
+            LLMModel.name.label("model_name"),
+            EvalTask.concurrency,
+            EvalTask.execution_backend,
+            sa_func.avg(EvalResult.latency_ms).label("avg_latency_ms"),
+            sa_func.avg(EvalResult.first_token_ms).label("avg_first_token_ms"),
+            sa_func.avg(EvalResult.tokens_generated).label("avg_tokens_generated"),
+            sa_func.count(EvalResult.id).label("sample_count"),
+        )
+        .join(LLMModel, EvalTask.model_id == LLMModel.id)
+        .join(EvalResult, EvalResult.task_id == EvalTask.id)
+        .where(
+            col(EvalTask.id).in_(task_ids),
+            EvalResult.is_valid == True,  # noqa: E712
+        )
+        .group_by(
+            EvalTask.id,
+            EvalTask.name,
+            EvalTask.model_id,
+            LLMModel.name,
+            EvalTask.concurrency,
+            EvalTask.execution_backend,
+        )
+    )
+    rows = (await session.exec(stmt)).all()
+
+    result = []
+    for r in rows:
+        avg_latency_sec = (r.avg_latency_ms or 0) / 1000.0
+        avg_tokens_per_sec = (
+            (r.avg_tokens_generated or 0) / avg_latency_sec
+            if avg_latency_sec > 0
+            else 0.0
+        )
+        result.append(
+            {
+                "task_id": str(r.task_id),
+                "task_name": r.task_name,
+                "model_id": str(r.model_id),
+                "model_name": r.model_name,
+                "concurrency": r.concurrency,
+                "execution_backend": r.execution_backend,
+                "avg_tokens_per_sec": round(avg_tokens_per_sec, 2),
+                "avg_first_token_ms": round(r.avg_first_token_ms or 0, 2),
+                "avg_latency_ms": round(r.avg_latency_ms or 0, 2),
+                "sample_count": r.sample_count,
+            }
+        )
+    result.sort(key=lambda row: (row["model_name"], row["concurrency"]))
+    return result
+
+
+@router.get("/elo-ranking")
+async def elo_ranking(
+    task_id: uuid.UUID,
+    criterion_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = require_permission("results.read"),
+):
+    """Return the ELO ranking for an ELO-type criterion on a single task.
+
+    Replays every stored `PairwiseComparison` in created_at order and
+    computes final ratings. Model names are joined in for display.
+    """
+    stmt = (
+        select(PairwiseComparison)
+        .where(
+            PairwiseComparison.task_id == task_id,
+            PairwiseComparison.criterion_id == criterion_id,
+        )
+        .order_by(PairwiseComparison.created_at.asc())
+    )
+    pairs = (await session.exec(stmt)).all()
+
+    pair_records = [
+        PairRecord(
+            model_a_id=p.model_a_id,
+            model_b_id=p.model_b_id,
+            winner=p.winner,
+        )
+        for p in pairs
+    ]
+    comparison_counts: dict[uuid.UUID, int] = {}
+    for p in pairs:
+        comparison_counts[p.model_a_id] = comparison_counts.get(p.model_a_id, 0) + 1
+        comparison_counts[p.model_b_id] = comparison_counts.get(p.model_b_id, 0) + 1
+
+    ratings = compute_elo_ratings(pair_records)
+    ranking = build_ranking(ratings, comparison_counts)
+
+    # Fetch model names for display.
+    if ratings:
+        name_stmt = select(LLMModel.id, LLMModel.name, LLMModel.version).where(
+            col(LLMModel.id).in_(list(ratings.keys()))
+        )
+        name_rows = (await session.exec(name_stmt)).all()
+        name_map = {str(r[0]): (r[1], r[2]) for r in name_rows}
+        for row in ranking:
+            name, version = name_map.get(row["model_id"], ("Unknown", ""))
+            row["model_name"] = name
+            row["version"] = version
+
+    return ranking
+
+
+@router.get("/version-comparison")
+async def version_comparison(
+    base_model_id: uuid.UUID,
+    criterion_id: uuid.UUID | None = None,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = require_permission("results.read"),
+):
+    """Compare all versions in a model family by average criterion score.
+
+    Resolution: finds every LLMModel whose id equals ``base_model_id``
+    or whose ``base_model_id`` points at it. Joins into eval_results and
+    groups by (model, criterion). Used by the cross-version line chart.
+    """
+    version_stmt = select(LLMModel).where(
+        (LLMModel.id == base_model_id) | (LLMModel.base_model_id == base_model_id)
+    )
+    versions = (await session.exec(version_stmt)).all()
+    if not versions:
+        return []
+
+    version_ids = [v.id for v in versions]
+    version_map = {v.id: v for v in versions}
+
+    agg_stmt = (
+        select(
+            EvalTask.model_id,
+            EvalResult.criterion_id,
+            Criterion.name.label("criterion_name"),
+            sa_func.avg(EvalResult.score).label("avg_score"),
+            sa_func.count(EvalResult.id).label("sample_count"),
+            sa_func.max(EvalTask.finished_at).label("latest_task_at"),
+        )
+        .join(EvalTask, EvalResult.task_id == EvalTask.id)
+        .join(Criterion, EvalResult.criterion_id == Criterion.id)
+        .where(
+            col(EvalTask.model_id).in_(version_ids),
+            EvalResult.is_valid == True,  # noqa: E712
+        )
+        .group_by(EvalTask.model_id, EvalResult.criterion_id, Criterion.name)
+    )
+    if criterion_id:
+        agg_stmt = agg_stmt.where(EvalResult.criterion_id == criterion_id)
+
+    rows = (await session.exec(agg_stmt)).all()
+
+    result = []
+    for r in rows:
+        model = version_map.get(r.model_id)
+        if not model:
+            continue
+        result.append(
+            {
+                "model_id": str(r.model_id),
+                "model_name": model.name,
+                "version": model.version,
+                "criterion_id": str(r.criterion_id),
+                "criterion_name": r.criterion_name,
+                "avg_score": round(r.avg_score, 4),
+                "sample_count": r.sample_count,
+                "latest_task_at": (
+                    r.latest_task_at.isoformat() if r.latest_task_at else None
+                ),
+                "created_at": model.created_at.isoformat(),
+            }
+        )
+    # Sort by version creation order so the line chart reads left → right.
+    result.sort(key=lambda row: row["created_at"])
+    return result
 
 
 @router.get("/errors", response_model=PaginatedResultResponse)

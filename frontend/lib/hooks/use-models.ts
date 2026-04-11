@@ -18,6 +18,69 @@ export function useModels() {
   });
 }
 
+export interface HubPreflightResult {
+  ok: boolean;
+  error?: string;
+  source?: string;
+  repo?: string;
+  license?: string;
+  pipeline_tag?: string;
+  tags?: string[];
+  downloads?: number;
+  likes?: number;
+  estimated_size_bytes?: number;
+  url?: string;
+}
+
+export function useModelVersions(modelId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ["models", modelId, "versions"],
+    queryFn: async () => {
+      const res = await api.get<LLMModel[]>(`/models/${modelId}/versions`);
+      return res.data;
+    },
+    enabled: !!modelId && enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useCreateModelVersion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      base_id: string;
+      name: string; // used as the version tag
+      description?: string;
+      model_name?: string;
+      endpoint_url?: string;
+    }) => {
+      const { base_id, ...body } = data;
+      const res = await api.post<LLMModel>(
+        `/models/${base_id}/versions`,
+        body,
+      );
+      return res.data;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["models"] });
+      qc.invalidateQueries({ queryKey: ["models", vars.base_id, "versions"] });
+    },
+  });
+}
+
+export function usePreflightHub() {
+  return useMutation({
+    mutationFn: async (data: { source: string; model_id: string }) => {
+      const res = await api.post<HubPreflightResult>(
+        "/models/preflight-hub",
+        null,
+        { params: data },
+      );
+      return res.data;
+    },
+  });
+}
+
 export function useCreateModel() {
   const qc = useQueryClient();
   return useMutation({

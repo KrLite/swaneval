@@ -66,6 +66,17 @@ class LLMModel(SQLModel, table=True):
     max_tokens: int | None = Field(default=None)
     # 模型 token 上限 / Optional model token limit
 
+    tenant_id: uuid.UUID | None = Field(default=None, foreign_key="tenants.id", index=True)
+
+    version: str = Field(default="v1", max_length=64)
+    # 版本号 / Model version tag. Multiple versions of the same logical
+    # model can coexist; (name, version) pairs identify each one.
+
+    base_model_id: uuid.UUID | None = Field(default=None, foreign_key="llm_models.id")
+    # 所属 base model ID / Points to the v1 "base" model in the family.
+    # None for the base itself; set for every subsequent version. Used
+    # by the cross-version regression report to group related records.
+
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_type=DateTime(timezone=True),
@@ -96,3 +107,8 @@ class LLMModel(SQLModel, table=True):
 
     last_test_ok: bool | None = Field(default=None)
     # 上次测试结果
+
+    supports_vision: bool = Field(default=False)
+    # 是否支持视觉输入 / Vision capability marker. When true, the
+    # task runner is allowed to bind the model against vision_text
+    # datasets; when false, such tasks are rejected at creation time.

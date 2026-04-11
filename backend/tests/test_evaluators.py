@@ -231,11 +231,11 @@ class TestEvaluators(unittest.TestCase):
             run_criterion("preset", json.dumps({"metric": "other"}), "x", "x")
         self.assertIn("Unknown preset metric", str(ctx.exception))
 
-    def test_empty_regex_pattern_raises(self):
-        """Empty regex pattern must raise, not return 0.0."""
+    def test_empty_regex_pattern_and_keywords_raises(self):
+        """Regex criterion with neither pattern nor keywords must raise."""
         with self.assertRaises(ValueError) as ctx:
             run_criterion("regex", json.dumps({"pattern": ""}), "", "abc")
-        self.assertIn("empty pattern", str(ctx.exception))
+        self.assertIn("pattern or keywords", str(ctx.exception))
 
     def test_numeric_closeness_non_numeric_expected_raises(self):
         """Non-numeric expected value must raise ValueError."""

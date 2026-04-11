@@ -106,6 +106,7 @@ export function useCreateTask() {
       criteria_ids: string[];
       params_json?: string;
       repeat_count?: number;
+      concurrency?: number;
       seed_strategy?: string;
       gpu_ids?: string;
       env_vars?: string;

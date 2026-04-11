@@ -51,6 +51,7 @@ class DatasetResponse(BaseModel):
     source_type: SourceType
     source_uri: str
     format: str
+    modality: str = "text"
     tags: str
     version: int
     size_bytes: int

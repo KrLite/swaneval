@@ -11,6 +11,8 @@ class ClusterCreate(BaseModel):
     description: str = ""
     vllm_image: str = ""  # 留空使用默认镜像
     install_gpu_support: str = ""  # "device-plugin", "gpu-operator", or "" (skip)
+    prometheus_url: str = ""
+    dcgm_namespace: str = "gpu-operator"
 
     @field_validator("kubeconfig")
     @classmethod
@@ -33,6 +35,8 @@ class ClusterUpdate(BaseModel):
     description: str | None = None
     namespace: str | None = None
     vllm_image: str | None = None
+    prometheus_url: str | None = None
+    dcgm_namespace: str | None = None
 
 
 class ClusterResponse(BaseModel):
@@ -52,6 +56,8 @@ class ClusterResponse(BaseModel):
     node_count: int
     vllm_image: str = ""
     gpu_operator_installed: bool = False
+    prometheus_url: str = ""
+    dcgm_namespace: str = "gpu-operator"
     vllm_cache_ready: bool
     last_probed_at: datetime | None
     created_at: datetime

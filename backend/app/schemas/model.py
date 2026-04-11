@@ -8,15 +8,17 @@ from app.models.llm_model import ApiFormat, ModelType
 
 class LLMModelCreate(BaseModel):
     name: str
-    provider: str
-    endpoint_url: str
+    provider: str = ""
+    endpoint_url: str = ""
     api_key: str = ""
-    model_type: ModelType
+    model_type: ModelType = ModelType.api
     api_format: ApiFormat = ApiFormat.openai
     description: str = ""
     model_name: str = ""
     max_tokens: int | None = None
     source_model_id: str = ""
+    version: str = "v1"
+    supports_vision: bool = False
 
 
 class LLMModelUpdate(BaseModel):
@@ -46,6 +48,9 @@ class LLMModelResponse(BaseModel):
     vllm_deployment_name: str = ""
     cluster_id: uuid.UUID | None = None
     source_model_id: str = ""
+    version: str = "v1"
+    base_model_id: uuid.UUID | None = None
+    supports_vision: bool = False
     last_test_at: datetime | None = None
     last_test_ok: bool | None = None
 

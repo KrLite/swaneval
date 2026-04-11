@@ -46,6 +46,12 @@ class Dataset(SQLModel, table=True):
     format: str = Field(default="jsonl", max_length=32)
     # 数据格式 / Data format (jsonl, csv, parquet, etc)
 
+    modality: str = Field(default="text", max_length=32)
+    # 数据集模态 / Modality of inputs: "text" or "vision_text".
+    # vision_text datasets have an image or images field alongside
+    # the text prompt, consumed by vision-capable models via the
+    # OpenAI chat completions `content` array format.
+
     tags: str = Field(default="")  # comma-separated
     # 标签 / Tags (comma-separated, e.g., "math,reasoning")
 
@@ -57,6 +63,10 @@ class Dataset(SQLModel, table=True):
 
     row_count: int = Field(default=0)
     # 数据行数 / Number of data rows
+
+    tenant_id: uuid.UUID | None = Field(default=None, foreign_key="tenants.id", index=True)
+    # 多租户隔离 / Tenant ownership. Nullable in SQLModel so existing code
+    # compiles; DB constraint is NOT NULL via migration 0022.
 
     created_by: uuid.UUID | None = Field(default=None, foreign_key="users.id")
     # 创建者ID / Creator user ID (foreign key to users)

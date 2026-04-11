@@ -556,10 +556,23 @@ def _html_cost(r: dict) -> str:
             f"{r['throughput_tokens_per_sec']} tok/s",
         ),
     ]
-    return _html_table(
+    # GPU metrics from DCGM Exporter (may be None when unavailable).
+    def _fmt(val, suffix=""):
+        return f"{val}{suffix}" if val is not None else "N/A"
+
+    gpu_rows = [
+        ("GPU 利用率", _fmt(r.get("gpu_utilization_pct"), "%")),
+        ("显存峰值", _fmt(r.get("gpu_memory_peak_mb"), " MiB")),
+        ("平均功耗", _fmt(r.get("gpu_power_watts"), " W")),
+    ]
+    main = _html_table(
         ["Metric", "Value"],
-        [[k, v] for k, v in items],
+        [[k, v] for k, v in items + gpu_rows],
     )
+    note = r.get("metrics_note")
+    if note:
+        main += f"<p class='meta'>{note}</p>"
+    return main
 
 
 def _html_value(r: dict) -> str:

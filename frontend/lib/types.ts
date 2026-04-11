@@ -28,6 +28,7 @@ export interface Dataset {
   source_type: "upload" | "huggingface" | "modelscope" | "server_path" | "preset";
   source_uri: string;
   format: string;
+  modality: string;
   tags: string;
   version: number;
   size_bytes: number;
@@ -43,7 +44,7 @@ export interface Dataset {
 export interface Criterion {
   id: string;
   name: string;
-  type: "preset" | "regex" | "sandbox" | "llm_judge";
+  type: "preset" | "regex" | "sandbox" | "llm_judge" | "elo";
   config_json: string;
   created_at: string;
 }
@@ -58,6 +59,9 @@ export interface LLMModel {
   description: string;
   model_name: string;
   max_tokens: number | null;
+  version: string;
+  base_model_id: string | null;
+  supports_vision: boolean;
   created_at: string;
   deploy_status: string;
   cluster_id: string | null;
@@ -65,6 +69,57 @@ export interface LLMModel {
   vllm_deployment_name: string;
   last_test_at: string | null;
   last_test_ok: boolean | null;
+}
+
+export interface VersionComparisonRow {
+  model_id: string;
+  model_name: string;
+  version: string;
+  criterion_id: string;
+  criterion_name: string;
+  avg_score: number;
+  sample_count: number;
+  latest_task_at: string | null;
+  created_at: string;
+}
+
+export interface EloRankingRow {
+  model_id: string;
+  model_name?: string;
+  version?: string;
+  rating: number;
+  comparisons: number;
+}
+
+export interface ComplianceCveFinding {
+  id: string;
+  severity: string;
+  description: string;
+}
+
+export interface ComplianceRecord {
+  id: string;
+  resource_type: "model" | "dataset";
+  resource_id: string;
+  resource_name: string;
+  license_spdx: string;
+  license_status: "compliant" | "restricted" | "unknown";
+  cve_findings: ComplianceCveFinding[];
+  notes: string;
+  last_scanned_at: string | null;
+}
+
+export interface CompliancePolicy {
+  compliant: string[];
+  restricted: string[];
+}
+
+export interface Tenant {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  created_at: string;
 }
 
 export interface PlaygroundResponse {
@@ -95,6 +150,7 @@ export interface EvalTask {
   criteria_ids: string;
   params_json: string;
   repeat_count: number;
+  concurrency: number;
   seed_strategy: "fixed" | "random";
   gpu_ids: string;
   env_vars: string;
@@ -128,6 +184,19 @@ export interface StabilityStats {
   min_score: number;
   max_score: number;
   per_run_scores: number[];
+}
+
+export interface ThroughputPoint {
+  task_id: string;
+  task_name: string;
+  model_id: string;
+  model_name: string;
+  concurrency: number;
+  execution_backend: string;
+  avg_tokens_per_sec: number;
+  avg_first_token_ms: number;
+  avg_latency_ms: number;
+  sample_count: number;
 }
 
 export interface EvalSubtask {
@@ -252,9 +321,21 @@ export interface ComputeCluster {
   node_count: number;
   vllm_image: string;
   gpu_operator_installed: boolean;
+  prometheus_url: string;
+  dcgm_namespace: string;
   vllm_cache_ready: boolean;
   last_probed_at: string | null;
   created_at: string;
+}
+
+export interface DcgmStatus {
+  found: boolean;
+  daemonset_name: string | null;
+  desired: number;
+  ready: number;
+  namespace: string;
+  prometheus_url: string;
+  error?: string;
 }
 
 export interface ClusterNode {

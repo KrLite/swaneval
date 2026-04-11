@@ -60,6 +60,15 @@ class ComputeCluster(SQLModel, table=True):
     gpu_operator_installed: bool = Field(default=False)
     # 是否已安装 NVIDIA GPU Operator
 
+    prometheus_url: str = Field(default="")
+    # 集群外可访问的 Prometheus HTTP 端点，用于 DCGM GPU 指标查询。
+    # 空字符串表示未配置，报告生成时将跳过 GPU 硬件指标采集。
+
+    dcgm_namespace: str = Field(default="gpu-operator")
+    # DCGM Exporter 所在的 K8s 命名空间
+
+    tenant_id: uuid.UUID | None = Field(default=None, foreign_key="tenants.id", index=True)
+
     vllm_cache_ready: bool = Field(default=False)
     last_probed_at: datetime | None = Field(
         default=None,

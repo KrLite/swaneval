@@ -63,6 +63,7 @@ async def create_task(
         criteria_ids=",".join(str(c) for c in body.criteria_ids),
         params_json=body.params_json,
         repeat_count=body.repeat_count,
+        concurrency=body.concurrency,
         seed_strategy=body.seed_strategy,
         gpu_ids=body.gpu_ids,
         env_vars=body.env_vars,

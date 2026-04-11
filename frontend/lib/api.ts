@@ -18,6 +18,10 @@ api.interceptors.request.use((config) => {
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    const tenantId = localStorage.getItem("active_tenant_id");
+    if (tenantId) {
+      config.headers["X-Tenant-ID"] = tenantId;
+    }
   }
   return config;
 });
@@ -31,6 +35,7 @@ api.interceptors.response.use(
       if (!url.includes("/auth/")) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+        localStorage.removeItem("active_tenant_id");
         window.location.href = "/login";
       }
     }

@@ -11,7 +11,8 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ThroughputChart } from "@/components/tasks/throughput-chart";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -132,6 +133,7 @@ export default function ResultsPage() {
   const deleteBenchmark = useDeleteBenchmark();
 
   const [activeView, setActiveView] = useState("leaderboard");
+  const [throughputTaskIds, setThroughputTaskIds] = useState<string[]>([]);
   const [criterionFilter, setCriterionFilter] = useState<string>("__all__");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [importOpen, setImportOpen] = useState(false);
@@ -544,6 +546,7 @@ export default function ResultsPage() {
             { key: "champion", label: "天梯榜", icon: Trophy },
             { key: "compare", label: "对比", icon: BarChart3 },
             { key: "radar", label: "雷达图", icon: Hexagon },
+            { key: "throughput", label: "吞吐量", icon: BarChart3 },
             { key: "external", label: "外部数据", icon: Globe },
             { key: "reports", label: "报告", icon: FileText },
             { key: "detail", label: "明细", icon: List },
@@ -687,6 +690,55 @@ export default function ResultsPage() {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {/* ── 吞吐量 (Throughput × Concurrency) ── */}
+        {activeView === "throughput" && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">选择任务</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-[11px] text-muted-foreground mb-2">
+                  选择至少一个已完成的任务。相同模型的不同并发度任务会在同一条折线上对比。
+                </p>
+                <div className="max-h-56 overflow-y-auto space-y-1 border rounded-md p-2">
+                  {tasks.filter((t) => t.status === "completed").length === 0 ? (
+                    <p className="text-xs text-muted-foreground">暂无已完成任务</p>
+                  ) : (
+                    tasks
+                      .filter((t) => t.status === "completed")
+                      .map((t) => (
+                        <label
+                          key={t.id}
+                          className="flex items-center gap-2 text-xs hover:bg-muted/50 p-1.5 rounded cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={throughputTaskIds.includes(t.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setThroughputTaskIds((ids) => [...ids, t.id]);
+                              } else {
+                                setThroughputTaskIds((ids) =>
+                                  ids.filter((id) => id !== t.id),
+                                );
+                              }
+                            }}
+                          />
+                          <span className="truncate">{t.name}</span>
+                          <Badge variant="outline" className="text-[10px] ml-auto">
+                            并发 {t.concurrency ?? 1}
+                          </Badge>
+                        </label>
+                      ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+            <ThroughputChart taskIds={throughputTaskIds} />
+          </div>
         )}
 
         {/* ── 天梯榜 (Champion per criterion) ── */}
@@ -948,25 +1000,71 @@ export default function ResultsPage() {
 
                   {/* Cost report */}
                   {reportType === "cost" && (
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { label: "平均延迟", value: `${Number(reportData.avg_latency_ms).toFixed(0)} ms` },
-                        { label: "首字延迟", value: `${Number(reportData.avg_first_token_ms).toFixed(0)} ms` },
-                        { label: "吞吐量", value: `${Number(reportData.throughput_tokens_per_sec).toFixed(1)} tokens/s` },
-                        { label: "总 Token 数", value: Number(reportData.total_tokens).toLocaleString() },
-                        { label: "最低延迟", value: `${Number(reportData.min_latency_ms).toFixed(0)} ms` },
-                        { label: "最高延迟", value: `${Number(reportData.max_latency_ms).toFixed(0)} ms` },
-                        { label: "平均生成长度", value: `${Number(reportData.avg_tokens_per_response).toFixed(0)} tokens` },
-                        { label: "运行时长", value: `${Number(reportData.duration_seconds).toFixed(0)} 秒` },
-                        { label: "GPU", value: String(reportData.gpu_ids) },
-                        { label: "评测样本", value: Number(reportData.total_samples).toLocaleString() },
-                      ].map((item) => (
-                        <div key={item.label} className="rounded-lg border p-3">
-                          <p className="text-xs text-muted-foreground">{item.label}</p>
-                          <p className="text-lg font-bold font-mono">{item.value}</p>
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { label: "平均延迟", value: `${Number(reportData.avg_latency_ms).toFixed(0)} ms` },
+                          { label: "首字延迟", value: `${Number(reportData.avg_first_token_ms).toFixed(0)} ms` },
+                          { label: "吞吐量", value: `${Number(reportData.throughput_tokens_per_sec).toFixed(1)} tokens/s` },
+                          { label: "总 Token 数", value: Number(reportData.total_tokens).toLocaleString() },
+                          { label: "最低延迟", value: `${Number(reportData.min_latency_ms).toFixed(0)} ms` },
+                          { label: "最高延迟", value: `${Number(reportData.max_latency_ms).toFixed(0)} ms` },
+                          { label: "平均生成长度", value: `${Number(reportData.avg_tokens_per_response).toFixed(0)} tokens` },
+                          { label: "运行时长", value: `${Number(reportData.duration_seconds).toFixed(0)} 秒` },
+                          { label: "GPU", value: String(reportData.gpu_ids) },
+                          { label: "评测样本", value: Number(reportData.total_samples).toLocaleString() },
+                        ].map((item) => (
+                          <div key={item.label} className="rounded-lg border p-3">
+                            <p className="text-xs text-muted-foreground">{item.label}</p>
+                            <p className="text-lg font-bold font-mono">{item.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3">
+                        <p className="text-sm font-medium mb-2">GPU 硬件指标</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            {
+                              label: "GPU 利用率",
+                              value: reportData.gpu_utilization_pct,
+                              unit: "%",
+                              fmt: (v: number) => v.toFixed(1),
+                            },
+                            {
+                              label: "显存峰值",
+                              value: reportData.gpu_memory_peak_mb,
+                              unit: "MiB",
+                              fmt: (v: number) => v.toFixed(0),
+                            },
+                            {
+                              label: "平均功耗",
+                              value: reportData.gpu_power_watts,
+                              unit: "W",
+                              fmt: (v: number) => v.toFixed(1),
+                            },
+                          ].map((m) => (
+                            <div key={m.label} className="rounded-lg border p-3">
+                              <p className="text-xs text-muted-foreground">{m.label}</p>
+                              <p className="text-lg font-bold font-mono">
+                                {m.value == null ? (
+                                  <span className="text-muted-foreground">N/A</span>
+                                ) : (
+                                  <>
+                                    {m.fmt(Number(m.value))}
+                                    <span className="text-xs text-muted-foreground ml-1">{m.unit}</span>
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                        {reportData.metrics_note ? (
+                          <p className="text-[11px] text-muted-foreground mt-2">
+                            {String(reportData.metrics_note)}
+                          </p>
+                        ) : null}
+                      </div>
+                    </>
                   )}
 
                   {/* Value report */}

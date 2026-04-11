@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import type { ComputeCluster, ClusterNode } from "@/lib/types";
+import type { ComputeCluster, ClusterNode, DcgmStatus } from "@/lib/types";
 
 export function useClusters() {
   return useQuery({
@@ -28,7 +28,15 @@ export function useCluster(id: string) {
 export function useCreateCluster() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { name: string; kubeconfig: string; namespace?: string; description?: string; vllm_image?: string }) => {
+    mutationFn: async (data: {
+      name: string;
+      kubeconfig: string;
+      namespace?: string;
+      description?: string;
+      vllm_image?: string;
+      prometheus_url?: string;
+      dcgm_namespace?: string;
+    }) => {
       const res = await api.post<ComputeCluster>("/clusters", data);
       return res.data;
     },
@@ -39,7 +47,15 @@ export function useCreateCluster() {
 export function useUpdateCluster() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { id: string; name?: string; description?: string; namespace?: string; vllm_image?: string }) => {
+    mutationFn: async (data: {
+      id: string;
+      name?: string;
+      description?: string;
+      namespace?: string;
+      vllm_image?: string;
+      prometheus_url?: string;
+      dcgm_namespace?: string;
+    }) => {
       const { id, ...body } = data;
       const res = await api.put<ComputeCluster>(`/clusters/${id}`, body);
       return res.data;
@@ -91,6 +107,18 @@ export function useInstallGpuSupport() {
       return res.data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["clusters"] }),
+  });
+}
+
+export function useDcgmStatus(id: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ["clusters", id, "dcgm-status"],
+    queryFn: async () => {
+      const res = await api.get<DcgmStatus>(`/clusters/${id}/dcgm-status`);
+      return res.data;
+    },
+    enabled: !!id && enabled,
+    staleTime: 30_000,
   });
 }
 

@@ -20,6 +20,7 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { useUserPermissions } from "@/lib/hooks/use-user-permissions";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { TenantSwitcher } from "@/components/tenant-switcher";
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; perm: string | null };
 
@@ -146,6 +147,7 @@ export function Topbar() {
 
         {user && (
           <div className="flex items-center gap-1 shrink-0">
+            <TenantSwitcher />
             <button
               onClick={handleAccountClick}
               className="hidden sm:flex items-center gap-2 rounded-lg px-3 py-1.5 cursor-pointer hover:bg-accent/50 transition-colors"

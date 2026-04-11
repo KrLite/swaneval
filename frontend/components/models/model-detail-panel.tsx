@@ -26,8 +26,9 @@ import {
   Send,
   X as XIcon,
 } from "lucide-react";
-import { useUpdateModel, useTestModel, usePlayground, useUndeployModel, useCheckDeployHealth } from "@/lib/hooks/use-models";
+import { useUpdateModel, useTestModel, usePlayground, useUndeployModel, useCheckDeployHealth, useModelVersions, useCreateModelVersion } from "@/lib/hooks/use-models";
 import type { LLMModel } from "@/lib/types";
+import { VersionComparisonChart } from "./version-comparison-chart";
 import { cn, utc } from "@/lib/utils";
 import { formatTime } from "@/lib/time";
 import { DEPLOY_STATUS } from "@/lib/constants";
@@ -440,8 +441,114 @@ export function ModelDetailPanel({
               </div>
             )}
           </div>
+
+          <ModelVersionsSection model={model} />
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function ModelVersionsSection({ model }: { model: LLMModel }) {
+  const { data: versions } = useModelVersions(model.id);
+  const createVersion = useCreateModelVersion();
+  const [showNewVersion, setShowNewVersion] = useState(false);
+  const [newVersionTag, setNewVersionTag] = useState("");
+  const [newVersionError, setNewVersionError] = useState("");
+
+  const rootId = model.base_model_id || model.id;
+  const allVersions = versions ?? [];
+
+  const handleCreate = async () => {
+    setNewVersionError("");
+    if (!newVersionTag.trim()) {
+      setNewVersionError("请输入版本号");
+      return;
+    }
+    try {
+      await createVersion.mutateAsync({
+        base_id: model.id,
+        name: newVersionTag.trim(),
+      });
+      setShowNewVersion(false);
+      setNewVersionTag("");
+    } catch (err: unknown) {
+      setNewVersionError(err instanceof Error ? err.message : "创建版本失败");
+    }
+  };
+
+  return (
+    <div className="rounded-md border p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium">模型版本</p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-[11px]"
+          onClick={() => setShowNewVersion(!showNewVersion)}
+        >
+          {showNewVersion ? "取消" : "创建新版本"}
+        </Button>
+      </div>
+
+      {showNewVersion && (
+        <div className="space-y-2">
+          <Input
+            value={newVersionTag}
+            onChange={(e) => setNewVersionTag(e.target.value)}
+            placeholder="例: v2"
+            className="h-8 text-xs font-mono"
+          />
+          {newVersionError && (
+            <p className="text-[11px] text-destructive">{newVersionError}</p>
+          )}
+          <Button
+            size="sm"
+            className="h-7 text-[11px] w-full"
+            onClick={handleCreate}
+            disabled={createVersion.isPending}
+          >
+            {createVersion.isPending && (
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            )}
+            克隆当前配置为新版本
+          </Button>
+        </div>
+      )}
+
+      {allVersions.length <= 1 ? (
+        <p className="text-[11px] text-muted-foreground">
+          该模型暂无其他版本。创建新版本后可在此对比每个迭代的评测分数。
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {allVersions.map((v) => (
+            <div
+              key={v.id}
+              className="flex items-center justify-between text-[11px] rounded-md border px-2 py-1.5"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Badge
+                  variant={v.id === model.id ? "default" : "outline"}
+                  className="text-[10px] font-mono shrink-0"
+                >
+                  {v.version}
+                </Badge>
+                <span className="truncate">
+                  {v.description || v.model_name || "—"}
+                </span>
+              </div>
+              <span className="text-muted-foreground font-mono shrink-0">
+                {formatTime(v.created_at)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {allVersions.length > 1 && (
+        <VersionComparisonChart baseModelId={rootId} />
+      )}
     </div>
   );
 }

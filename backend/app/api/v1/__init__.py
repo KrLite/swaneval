@@ -4,6 +4,7 @@ from app.api.v1 import (
     auth,
     benchmarks,
     clusters,
+    compliance,
     criteria,
     datasets,
     metrics,
@@ -12,6 +13,7 @@ from app.api.v1 import (
     reports,
     results,
     tasks,
+    tenants,
     users,
 )
 
@@ -29,3 +31,5 @@ router.include_router(users.router, prefix="/users", tags=["users"])
 router.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
 router.include_router(permissions.router, prefix="/permissions", tags=["permissions"])
 router.include_router(clusters.router, prefix="/clusters", tags=["clusters"])
+router.include_router(compliance.router, prefix="/compliance", tags=["compliance"])
+router.include_router(tenants.router, prefix="/tenants", tags=["tenants"])
