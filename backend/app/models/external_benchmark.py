@@ -43,6 +43,8 @@ class ExternalBenchmark(SQLModel, table=True):
     notes: str = Field(default="")
     # 备注 / Notes
 
+    tenant_id: uuid.UUID | None = Field(default=None, foreign_key="tenants.id", index=True)
+
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_type=DateTime(timezone=True),

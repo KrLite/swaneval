@@ -18,8 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Loader2, Check, X as XIcon, Globe, Server } from "lucide-react";
-import { useCreateModel, useDeployModel } from "@/lib/hooks/use-models";
+import { Plus, Loader2, Check, X as XIcon, Globe, Server, Search, ExternalLink } from "lucide-react";
+import { useCreateModel, useDeployModel, usePreflightHub, type HubPreflightResult } from "@/lib/hooks/use-models";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useUserTokens } from "@/lib/hooks/use-users";
 import { useClusters } from "@/lib/hooks/use-clusters";
@@ -33,6 +33,8 @@ interface ModelCreateFormProps {
 export function ModelCreateForm({ onSuccess, onClose: _onClose }: ModelCreateFormProps) {
   const create = useCreateModel();
   const deploy = useDeployModel();
+  const preflight = usePreflightHub();
+  const [preflightResult, setPreflightResult] = useState<HubPreflightResult | null>(null);
   const user = useAuthStore((s) => s.user);
   const { data: tokenStatus } = useUserTokens();
   const { data: clusters = [] } = useClusters();
@@ -263,13 +265,134 @@ export function ModelCreateForm({ onSuccess, onClose: _onClose }: ModelCreateFor
               </Select>
             </PanelField>
             <PanelField label="模型 ID" required>
-              <Input
-                value={shForm.model_id}
-                onChange={(e) => setShForm({ ...shForm, model_id: e.target.value })}
-                placeholder="Qwen/Qwen2.5-7B-Instruct"
-                className="font-mono"
-                required
-              />
+              <div className="flex gap-2">
+                <Input
+                  value={shForm.model_id}
+                  onChange={(e) => {
+                    setShForm({ ...shForm, model_id: e.target.value });
+                    setPreflightResult(null);
+                  }}
+                  placeholder="Qwen/Qwen2.5-7B-Instruct 或 https://huggingface.co/..."
+                  className="font-mono flex-1"
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    if (!shForm.model_id) return;
+                    try {
+                      const result = await preflight.mutateAsync({
+                        source: shForm.source,
+                        model_id: shForm.model_id,
+                      });
+                      setPreflightResult(result);
+                      if (result.ok && result.repo) {
+                        setShForm((f) => ({
+                          ...f,
+                          model_id: result.repo!,
+                          name: f.name || result.repo!.split("/").pop() || "",
+                        }));
+                      }
+                    } catch {
+                      setPreflightResult({
+                        ok: false,
+                        error: "预检请求失败",
+                      });
+                    }
+                  }}
+                  disabled={preflight.isPending || !shForm.model_id}
+                >
+                  {preflight.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Search className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </div>
+              {preflightResult && (
+                <div
+                  className={`mt-2 rounded-md border p-2 text-[11px] ${
+                    preflightResult.ok
+                      ? "bg-muted/30"
+                      : "bg-destructive/10 text-destructive"
+                  }`}
+                >
+                  {!preflightResult.ok ? (
+                    <p>{preflightResult.error}</p>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-medium">
+                          {preflightResult.repo}
+                        </span>
+                        {preflightResult.url && (
+                          <a
+                            href={preflightResult.url}
+                            target="_blank"
+                            rel="noopener"
+                            className="text-primary hover:underline inline-flex items-center gap-1"
+                          >
+                            打开 <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-3 text-muted-foreground">
+                        {preflightResult.license && (
+                          <div>
+                            <span>License: </span>
+                            <span className="font-mono text-foreground">
+                              {preflightResult.license}
+                            </span>
+                          </div>
+                        )}
+                        {preflightResult.pipeline_tag && (
+                          <div>
+                            <span>任务: </span>
+                            <span className="font-mono text-foreground">
+                              {preflightResult.pipeline_tag}
+                            </span>
+                          </div>
+                        )}
+                        {preflightResult.downloads !== undefined && (
+                          <div>
+                            <span>下载: </span>
+                            <span className="font-mono text-foreground">
+                              {preflightResult.downloads.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        {preflightResult.estimated_size_bytes !== undefined &&
+                          preflightResult.estimated_size_bytes > 0 && (
+                          <div>
+                            <span>估计大小: </span>
+                            <span className="font-mono text-foreground">
+                              {(
+                                preflightResult.estimated_size_bytes /
+                                1024 ** 3
+                              ).toFixed(2)}{" "}
+                              GB
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {preflightResult.tags && preflightResult.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {preflightResult.tags.map((t) => (
+                            <span
+                              key={t}
+                              className="px-1.5 py-0.5 rounded bg-background border text-[10px]"
+                            >
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </PanelField>
 
             {/* Token status */}

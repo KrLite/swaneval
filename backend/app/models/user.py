@@ -53,6 +53,14 @@ class User(SQLModel, table=True):
     hf_token: str = Field(default="")
     ms_token: str = Field(default="")
 
+    active_tenant_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="tenants.id",
+    )
+    # Currently selected tenant for this user session. The X-Tenant-ID
+    # header (set by the frontend) overrides this; the DB field is the
+    # fallback when the header is missing.
+
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_type=DateTime(timezone=True),

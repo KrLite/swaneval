@@ -45,11 +45,177 @@ async def create_model(
         model_name=body.model_name,
         max_tokens=body.max_tokens,
         source_model_id=body.source_model_id,
+        version=body.version or "v1",
+        supports_vision=body.supports_vision,
     )
     session.add(m)
     await session.commit()
     await session.refresh(m)
     return m
+
+
+@router.post("/preflight-hub")
+async def preflight_hub_model(
+    source: str,
+    model_id: str,
+    current_user: User = require_permission("models.write"),
+):
+    """Look up a model on HuggingFace or ModelScope before deploying.
+
+    The frontend calls this to validate the user-supplied URL/repo and
+    show metadata (license, size, pipeline_tag, etc.) in the import
+    wizard. Returns a structured preview, never throws — errors come
+    back as ``{ ok: False, error }`` so the UI can show them inline.
+    """
+    source = (source or "").strip().lower()
+    model_id = (model_id or "").strip()
+
+    # Accept a full URL or a bare repo. Normalize to "org/repo".
+    if model_id.startswith(("http://", "https://")):
+        parts = model_id.rstrip("/").split("/")
+        if len(parts) >= 2:
+            model_id = f"{parts[-2]}/{parts[-1]}"
+
+    if source not in ("huggingface", "modelscope"):
+        return {"ok": False, "error": "source 必须为 huggingface 或 modelscope"}
+    if not model_id or "/" not in model_id:
+        return {"ok": False, "error": "模型 ID 格式无效，期望 org/repo"}
+
+    url = (
+        f"https://huggingface.co/api/models/{model_id}"
+        if source == "huggingface"
+        else f"https://modelscope.cn/api/v1/models/{model_id}"
+    )
+    headers: dict[str, str] = {}
+    hf_token = getattr(current_user, "hf_token", "") or settings.HF_TOKEN or ""
+    if source == "huggingface" and hf_token:
+        headers["Authorization"] = f"Bearer {hf_token}"
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, headers=headers)
+    except httpx.TimeoutException:
+        return {"ok": False, "error": "请求 Hub API 超时"}
+    except httpx.RequestError as e:
+        return {"ok": False, "error": f"请求 Hub API 失败: {e}"}
+
+    if resp.status_code == 401:
+        return {"ok": False, "error": "需要 Token；请在账号设置中配置"}
+    if resp.status_code == 404:
+        return {"ok": False, "error": "模型未找到"}
+    if resp.status_code != 200:
+        return {"ok": False, "error": f"Hub API 返回 {resp.status_code}"}
+
+    try:
+        data = resp.json()
+    except ValueError:
+        return {"ok": False, "error": "Hub 返回非 JSON 响应"}
+
+    # Normalize fields from HF / MS schemas into one shape.
+    card = data.get("cardData") or {}
+    license_id = (
+        (card.get("license") if isinstance(card, dict) else None)
+        or data.get("license")
+        or ""
+    )
+    pipeline_tag = data.get("pipeline_tag") or ""
+    tags = data.get("tags") or []
+    downloads = data.get("downloads") or 0
+    likes = data.get("likes") or 0
+    siblings = data.get("siblings") or []
+    total_bytes = 0
+    for s in siblings:
+        size = s.get("size") if isinstance(s, dict) else None
+        if isinstance(size, int):
+            total_bytes += size
+
+    return {
+        "ok": True,
+        "source": source,
+        "repo": model_id,
+        "license": license_id,
+        "pipeline_tag": pipeline_tag,
+        "tags": tags[:8],
+        "downloads": downloads,
+        "likes": likes,
+        "estimated_size_bytes": total_bytes,
+        "url": (
+            f"https://huggingface.co/{model_id}"
+            if source == "huggingface"
+            else f"https://modelscope.cn/models/{model_id}"
+        ),
+    }
+
+
+@router.post("/{model_id}/versions", response_model=LLMModelResponse, status_code=201)
+async def create_model_version(
+    model_id: uuid.UUID,
+    body: LLMModelCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = require_permission("models.write"),
+):
+    """Clone an existing model record into a new version.
+
+    Copies every field from the base model unless the request body
+    overrides it. The new record's ``base_model_id`` points to the
+    root of the version family: if the source model has its own
+    ``base_model_id``, we follow that chain; otherwise the source
+    becomes the base. The ``version`` field comes from ``body.name``
+    unless the body provides one explicitly (we reuse ``body.name``
+    as the version tag to avoid introducing a separate parameter).
+    """
+    source = await session.get(LLMModel, model_id)
+    if not source:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "基础模型未找到")
+
+    root_id = source.base_model_id or source.id
+    new = LLMModel(
+        name=source.name,
+        version=body.name or "v2",  # body.name doubles as version tag
+        base_model_id=root_id,
+        provider=body.provider or source.provider,
+        endpoint_url=body.endpoint_url or source.endpoint_url,
+        api_key=body.api_key or source.api_key,
+        model_type=body.model_type or source.model_type,
+        api_format=body.api_format or source.api_format,
+        description=body.description or source.description,
+        model_name=body.model_name or source.model_name,
+        max_tokens=body.max_tokens or source.max_tokens,
+        source_model_id=body.source_model_id or source.source_model_id,
+    )
+    session.add(new)
+    await session.commit()
+    await session.refresh(new)
+    return new
+
+
+@router.get("/{model_id}/versions", response_model=list[LLMModelResponse])
+async def list_model_versions(
+    model_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = require_permission("models.read"),
+):
+    """List every model record in the same version family.
+
+    Resolution: if the target model has a ``base_model_id``, use it;
+    otherwise treat the target as the base. Returns the base plus all
+    descendants, ordered by creation time.
+    """
+    target = await session.get(LLMModel, model_id)
+    if not target:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "模型未找到")
+
+    root_id = target.base_model_id or target.id
+    stmt = (
+        select(LLMModel)
+        .where(
+            (LLMModel.id == root_id)
+            | (LLMModel.base_model_id == root_id)
+        )
+        .order_by(col(LLMModel.created_at).asc())
+    )
+    result = await session.exec(stmt)
+    return result.all()
 
 
 @router.get("", response_model=list[LLMModelResponse])

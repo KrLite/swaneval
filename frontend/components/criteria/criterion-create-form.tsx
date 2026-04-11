@@ -16,6 +16,7 @@ import {
 import { Plus, Loader2 } from "lucide-react";
 import { useCreateCriterion } from "@/lib/hooks/use-criteria";
 import { useModels } from "@/lib/hooks/use-models";
+import { RuleTestPanel } from "./rule-test-panel";
 
 const typeDescriptions: Record<string, string> = {
   preset: "使用内置指标，如精确匹配、包含匹配或数值接近度。",
@@ -39,6 +40,10 @@ const emptyForm = {
   type: "preset",
   metric: "exact_match",
   pattern: "",
+  match_mode: "contains",
+  keywords: "",
+  keywords_mode: "any",
+  test_sample: "",
   sandbox_mode: "pass_at_k",
   sandbox_timeout: "10",
   sandbox_script_path: "",
@@ -86,8 +91,19 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
     e.preventDefault();
     let config: Record<string, unknown> = {};
     if (form.type === "preset") config = { metric: form.metric };
-    else if (form.type === "regex")
-      config = { pattern: form.pattern, match_mode: "contains" };
+    else if (form.type === "regex") {
+      const keywordList = form.keywords
+        .split(/[\n,]/)
+        .map((k) => k.trim())
+        .filter(Boolean);
+      config = {
+        pattern: form.pattern,
+        match_mode: form.match_mode,
+        ...(keywordList.length > 0
+          ? { keywords: keywordList, keywords_mode: form.keywords_mode }
+          : {}),
+      };
+    }
     else if (form.type === "sandbox") {
       config = {
         mode: form.sandbox_mode,
@@ -180,15 +196,65 @@ export function CriterionCreateForm({ onSuccess, onClose: _onClose }: CriterionC
         )}
 
         {form.type === "regex" && (
-          <PanelField label="正则表达式" required>
-            <RegexInput
-              value={form.pattern}
-              onChange={(v) =>
-                setForm({ ...form, pattern: v })
-              }
-              placeholder="\\d+\\.?\\d*"
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <PanelField label="正则表达式" required>
+                <RegexInput
+                  value={form.pattern}
+                  onChange={(v) => setForm({ ...form, pattern: v })}
+                  placeholder="\\d+\\.?\\d*"
+                />
+              </PanelField>
+              <PanelField label="匹配模式">
+                <Select
+                  value={form.match_mode}
+                  onValueChange={(v) => setForm({ ...form, match_mode: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="contains">包含即通过</SelectItem>
+                    <SelectItem value="exact">整体匹配</SelectItem>
+                    <SelectItem value="extract">提取组比对</SelectItem>
+                  </SelectContent>
+                </Select>
+              </PanelField>
+              <PanelField label="关键词模式">
+                <Select
+                  value={form.keywords_mode}
+                  onValueChange={(v) =>
+                    setForm({ ...form, keywords_mode: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">任一命中</SelectItem>
+                    <SelectItem value="all">全部命中</SelectItem>
+                  </SelectContent>
+                </Select>
+              </PanelField>
+            </div>
+            <PanelField label="关键词 (逗号或换行分隔)">
+              <textarea
+                value={form.keywords}
+                onChange={(e) => setForm({ ...form, keywords: e.target.value })}
+                placeholder="正确, 通过, Yes"
+                rows={2}
+                className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+              />
+            </PanelField>
+            <RuleTestPanel
+              pattern={form.pattern}
+              matchMode={form.match_mode}
+              keywords={form.keywords}
+              keywordsMode={form.keywords_mode}
+              sample={form.test_sample}
+              onSampleChange={(v) => setForm({ ...form, test_sample: v })}
             />
-          </PanelField>
+          </div>
         )}
 
         {form.type === "sandbox" && (

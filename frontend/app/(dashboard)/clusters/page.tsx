@@ -61,6 +61,7 @@ import {
   useProbeCluster,
   useClusterNodes,
   useGpuStatus,
+  useDcgmStatus,
 } from "@/lib/hooks/use-clusters";
 import { useActiveDeployments } from "@/lib/hooks/use-models";
 import type { ComputeCluster } from "@/lib/types";
@@ -120,6 +121,7 @@ function ClusterDetail({
     cluster.id,
   );
   const { data: gpuStatus } = useGpuStatus(cluster.id);
+  const { data: dcgmStatus, refetch: refetchDcgm, isFetching: dcgmFetching } = useDcgmStatus(cluster.id, false);
   const { data: allDeployments = [] } = useActiveDeployments();
   const deployments = allDeployments.filter((m) => m.cluster_id === cluster.id);
   const updateCluster = useUpdateCluster();
@@ -220,6 +222,18 @@ function ClusterDetail({
             label="vLLM 镜像" value={cluster.vllm_image || ""}
             onSave={(v) => updateCluster.mutateAsync({ id: cluster.id, vllm_image: v }).then(() => refreshAll())}
             mono placeholder="默认 (vllm/vllm-openai:latest)"
+          />
+          {/* Prometheus URL — editable */}
+          <InlineEditField
+            label="Prometheus URL" value={cluster.prometheus_url || ""}
+            onSave={(v) => updateCluster.mutateAsync({ id: cluster.id, prometheus_url: v }).then(() => refreshAll())}
+            mono placeholder="未配置 (报告不采集 GPU 硬件指标)"
+          />
+          {/* DCGM Namespace — editable */}
+          <InlineEditField
+            label="DCGM 命名空间" value={cluster.dcgm_namespace || "gpu-operator"}
+            onSave={(v) => updateCluster.mutateAsync({ id: cluster.id, dcgm_namespace: v }).then(() => refreshAll())}
+            mono
           />
           {/* API Server — read-only */}
           <div>
@@ -324,6 +338,59 @@ function ClusterDetail({
                 <a href="https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/getting-started.html" target="_blank" rel="noopener" className="text-primary hover:underline">NVIDIA GPU Operator 安装指南 →</a>
               </p>
             </div>
+          )}
+        </div>
+
+        {/* DCGM + Prometheus Metrics Section */}
+        <div className="mb-6 rounded-md border p-3 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium">GPU 指标采集</p>
+            {!cluster.prometheus_url ? (
+              <Badge variant="outline" className="text-[10px]">未配置</Badge>
+            ) : dcgmStatus?.found && dcgmStatus.ready === dcgmStatus.desired && dcgmStatus.ready > 0 ? (
+              <Badge variant="success" className="text-[10px]">DCGM 就绪</Badge>
+            ) : dcgmStatus?.found ? (
+              <Badge variant="warning" className="text-[10px]">DCGM 部分就绪</Badge>
+            ) : dcgmStatus && !dcgmStatus.found ? (
+              <Badge variant="outline" className="text-[10px]">未检测到 DCGM</Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px]">待检测</Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span>Prometheus:</span>
+            <span className="font-mono">{cluster.prometheus_url || "未配置"}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span>DCGM 命名空间:</span>
+            <span className="font-mono">{cluster.dcgm_namespace || "gpu-operator"}</span>
+          </div>
+          {dcgmStatus?.found && (
+            <div className="text-[11px] text-muted-foreground">
+              DaemonSet <span className="font-mono">{dcgmStatus.daemonset_name}</span>：
+              {dcgmStatus.ready}/{dcgmStatus.desired} 就绪
+            </div>
+          )}
+          {dcgmStatus?.error && (
+            <div className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
+              {dcgmStatus.error}
+            </div>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px]"
+            onClick={() => refetchDcgm()}
+            disabled={dcgmFetching}
+          >
+            {dcgmFetching && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+            检测 DCGM Exporter
+          </Button>
+          {!cluster.prometheus_url && (
+            <p className="text-[11px] text-muted-foreground">
+              配置 Prometheus URL 后可在性能/成本报告中查看 GPU 利用率、显存峰值和功耗。
+              API 模型任务不采集硬件指标。
+            </p>
           )}
         </div>
 
@@ -519,6 +586,8 @@ export default function ClustersPage() {
   const [createDescription, setCreateDescription] = useState("");
   const [createVllmImageOption, setCreateVllmImageOption] = useState("__default__");
   const [createVllmImageCustom, setCreateVllmImageCustom] = useState("");
+  const [createPrometheusUrl, setCreatePrometheusUrl] = useState("");
+  const [createDcgmNamespace, setCreateDcgmNamespace] = useState("");
   const [createError, setCreateError] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -542,6 +611,8 @@ export default function ClustersPage() {
           : createVllmImageOption === "__default__"
             ? undefined
             : createVllmImageOption || undefined,
+        prometheus_url: createPrometheusUrl || undefined,
+        dcgm_namespace: createDcgmNamespace || undefined,
       });
       setShowCreate(false);
       setCreateName("");
@@ -550,6 +621,8 @@ export default function ClustersPage() {
       setCreateDescription("");
       setCreateVllmImageOption("__default__");
       setCreateVllmImageCustom("");
+      setCreatePrometheusUrl("");
+      setCreateDcgmNamespace("");
     } catch (err: unknown) {
       setCreateError(extractErrorDetail(err, "创建失败"));
     }
@@ -757,6 +830,30 @@ export default function ClustersPage() {
               )}
               <p className="text-[11px] text-muted-foreground">
                 国内网络建议使用阿里云或华为云镜像加速 vLLM 部署
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Prometheus URL</Label>
+              <Input
+                value={createPrometheusUrl}
+                onChange={(e) => setCreatePrometheusUrl(e.target.value)}
+                placeholder="http://prometheus.monitoring.svc:9090"
+                className="h-9 font-mono text-xs"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                可选。配置后性能/成本报告将从 DCGM Exporter 采集 GPU 利用率、显存峰值和功耗
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">DCGM 命名空间</Label>
+              <Input
+                value={createDcgmNamespace}
+                onChange={(e) => setCreateDcgmNamespace(e.target.value)}
+                placeholder="gpu-operator"
+                className="h-9 font-mono text-xs"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                DCGM Exporter DaemonSet 所在的命名空间，默认为 gpu-operator
               </p>
             </div>
             {createError && (

@@ -13,6 +13,7 @@ class TaskCreate(BaseModel):
     criteria_ids: list[uuid.UUID]
     params_json: str = '{"temperature": 0.7, "max_tokens": 1024}'
     repeat_count: int = 1
+    concurrency: int = 1
     seed_strategy: SeedStrategy = SeedStrategy.fixed
     gpu_ids: str = ""
     env_vars: str = ""
@@ -33,6 +34,7 @@ class TaskResponse(BaseModel):
     criteria_ids: str
     params_json: str
     repeat_count: int
+    concurrency: int = 1
     seed_strategy: SeedStrategy
     gpu_ids: str = ""
     env_vars: str = ""

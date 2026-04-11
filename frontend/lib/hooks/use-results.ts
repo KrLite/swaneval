@@ -1,6 +1,14 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import api from "@/lib/api";
-import type { EvalResult, LeaderboardEntry, TaskSummaryEntry, PaginatedResponse } from "@/lib/types";
+import type {
+  EvalResult,
+  LeaderboardEntry,
+  TaskSummaryEntry,
+  PaginatedResponse,
+  ThroughputPoint,
+  VersionComparisonRow,
+  EloRankingRow,
+} from "@/lib/types";
 
 export function useResults(taskId?: string, page = 1, pageSize = 50, enabled = true) {
   return useQuery({
@@ -61,6 +69,54 @@ export function useErrorResults(taskId: string, page = 1, pageSize = 50, refetch
     enabled: !!taskId,
     refetchInterval,
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useThroughput(taskIds: string[]) {
+  return useQuery({
+    queryKey: ["results", "throughput", taskIds.slice().sort().join(",")],
+    queryFn: async () => {
+      if (!taskIds.length) return [];
+      const params = new URLSearchParams();
+      for (const id of taskIds) params.append("task_ids", id);
+      const res = await api.get<ThroughputPoint[]>("/results/throughput", {
+        params,
+      });
+      return res.data;
+    },
+    enabled: taskIds.length > 0,
+    staleTime: 30_000,
+  });
+}
+
+export function useVersionComparison(baseModelId: string, criterionId?: string) {
+  return useQuery({
+    queryKey: ["results", "version-comparison", baseModelId, criterionId],
+    queryFn: async () => {
+      const params: Record<string, string> = { base_model_id: baseModelId };
+      if (criterionId) params.criterion_id = criterionId;
+      const res = await api.get<VersionComparisonRow[]>(
+        "/results/version-comparison",
+        { params },
+      );
+      return res.data;
+    },
+    enabled: !!baseModelId,
+    staleTime: 30_000,
+  });
+}
+
+export function useEloRanking(taskId: string, criterionId: string) {
+  return useQuery({
+    queryKey: ["results", "elo-ranking", taskId, criterionId],
+    queryFn: async () => {
+      const res = await api.get<EloRankingRow[]>("/results/elo-ranking", {
+        params: { task_id: taskId, criterion_id: criterionId },
+      });
+      return res.data;
+    },
+    enabled: !!taskId && !!criterionId,
+    staleTime: 30_000,
   });
 }
 
