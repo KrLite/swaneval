@@ -25,6 +25,7 @@ import type { EvalTask, Dataset, Criterion } from "@/lib/types";
 import { utc } from "@/lib/utils";
 import { formatTime } from "@/lib/time";
 import { statusLabel, statusBadgeVariant, formatDuration } from "./task-constants";
+import { StabilityChart } from "./stability-chart";
 
 function parseParams(json: string) {
   try {
@@ -156,6 +157,10 @@ export function TaskDetailPanel({
             <DetailRow
               label="重复次数"
               value={<span className="font-mono">{task.repeat_count}</span>}
+            />
+            <DetailRow
+              label="并发度"
+              value={<span className="font-mono">{task.concurrency}</span>}
             />
             <DetailRow
               label="种子策略"
@@ -303,6 +308,10 @@ export function TaskDetailPanel({
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
+
+          {task.repeat_count > 1 && task.status === "completed" && (
+            <StabilityChart taskId={task.id} />
+          )}
         </CardContent>
       </Card>
     </div>

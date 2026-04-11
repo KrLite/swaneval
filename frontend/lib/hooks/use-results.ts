@@ -1,6 +1,12 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import api from "@/lib/api";
-import type { EvalResult, LeaderboardEntry, TaskSummaryEntry, PaginatedResponse } from "@/lib/types";
+import type {
+  EvalResult,
+  LeaderboardEntry,
+  TaskSummaryEntry,
+  PaginatedResponse,
+  ThroughputPoint,
+} from "@/lib/types";
 
 export function useResults(taskId?: string, page = 1, pageSize = 50, enabled = true) {
   return useQuery({
@@ -61,6 +67,23 @@ export function useErrorResults(taskId: string, page = 1, pageSize = 50, refetch
     enabled: !!taskId,
     refetchInterval,
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useThroughput(taskIds: string[]) {
+  return useQuery({
+    queryKey: ["results", "throughput", taskIds.slice().sort().join(",")],
+    queryFn: async () => {
+      if (!taskIds.length) return [];
+      const params = new URLSearchParams();
+      for (const id of taskIds) params.append("task_ids", id);
+      const res = await api.get<ThroughputPoint[]>("/results/throughput", {
+        params,
+      });
+      return res.data;
+    },
+    enabled: taskIds.length > 0,
+    staleTime: 30_000,
   });
 }
 

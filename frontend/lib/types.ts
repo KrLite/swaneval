@@ -95,6 +95,7 @@ export interface EvalTask {
   criteria_ids: string;
   params_json: string;
   repeat_count: number;
+  concurrency: number;
   seed_strategy: "fixed" | "random";
   gpu_ids: string;
   env_vars: string;
@@ -128,6 +129,19 @@ export interface StabilityStats {
   min_score: number;
   max_score: number;
   per_run_scores: number[];
+}
+
+export interface ThroughputPoint {
+  task_id: string;
+  task_name: string;
+  model_id: string;
+  model_name: string;
+  concurrency: number;
+  execution_backend: string;
+  avg_tokens_per_sec: number;
+  avg_first_token_ms: number;
+  avg_latency_ms: number;
+  sample_count: number;
 }
 
 export interface EvalSubtask {

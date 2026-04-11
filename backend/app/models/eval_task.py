@@ -66,6 +66,11 @@ class EvalTask(SQLModel, table=True):
     repeat_count: int = Field(default=1)
     # 重复次数 / Repeat count (for stability testing)
 
+    concurrency: int = Field(default=1)
+    # 并发请求数 / Concurrency level (parallel in-flight requests),
+    # meaningful only for K8s/vLLM execution backend. Used by the
+    # throughput-vs-concurrency chart in results dashboard.
+
     seed_strategy: SeedStrategy = Field(
         sa_column=Column(SAEnum(SeedStrategy), nullable=False, default=SeedStrategy.fixed)
     )

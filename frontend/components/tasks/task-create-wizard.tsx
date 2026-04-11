@@ -46,6 +46,7 @@ const emptyForm = {
   max_tokens: "2048",
   limit: "",
   repeat_count: "1",
+  concurrency: "1",
   seed_strategy: "fixed",
   gpu_ids: "",
   env_vars: "",
@@ -143,6 +144,7 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
       criteria_ids: form.criteria_ids,
       params_json: JSON.stringify(paramsObj),
       repeat_count: parseInt(form.repeat_count),
+      concurrency: parseInt(form.concurrency || "1"),
       seed_strategy: form.seed_strategy,
       gpu_ids: form.gpu_ids || undefined,
       env_vars: form.env_vars || undefined,
@@ -185,6 +187,7 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
             max_tokens: String(data.max_tokens ?? params.max_tokens ?? f.max_tokens),
             limit: String(data.limit ?? params.limit ?? f.limit),
             repeat_count: String(data.repeat_count ?? f.repeat_count),
+            concurrency: String(data.concurrency ?? f.concurrency),
             seed_strategy: data.seed_strategy ?? f.seed_strategy,
             gpu_ids: data.gpu_ids ?? f.gpu_ids,
             env_vars: typeof data.env_vars === "object" ? JSON.stringify(data.env_vars, null, 2) : data.env_vars ?? f.env_vars,
@@ -404,7 +407,7 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
                 placeholder="不限制"
               />
             </PanelField>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <PanelField label="重复次数">
                 <Input
                   type="number"
@@ -416,6 +419,20 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
                       repeat_count: e.target.value,
                     })
                   }
+                />
+              </PanelField>
+              <PanelField label="并发度">
+                <Input
+                  type="number"
+                  min="1"
+                  value={form.concurrency}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      concurrency: e.target.value,
+                    })
+                  }
+                  placeholder="1"
                 />
               </PanelField>
               <PanelField label="种子策略">
@@ -435,6 +452,9 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
                 </Select>
               </PanelField>
             </div>
+            <p className="text-[11px] text-muted-foreground -mt-2">
+              并发度仅对 K8s/vLLM 执行后端生效，用于吞吐量对比图；外部 API 任务固定串行执行。
+            </p>
           </>
         )}
 
@@ -603,6 +623,10 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
                 value={form.repeat_count}
               />
               <DetailRow
+                label="并发度"
+                value={form.concurrency}
+              />
+              <DetailRow
                 label="种子策略"
                 value={
                   form.seed_strategy === "fixed" ? "固定" : "随机"
@@ -662,6 +686,7 @@ export function TaskCreateWizard({ onSuccess }: TaskCreateWizardProps) {
                         : {}),
                     },
                     repeat_count: parseInt(form.repeat_count),
+                    concurrency: parseInt(form.concurrency || "1"),
                     seed_strategy: form.seed_strategy,
                     ...(form.gpu_ids ? { gpu_ids: form.gpu_ids } : {}),
                     ...(form.env_vars ? { env_vars: form.env_vars } : {}),
