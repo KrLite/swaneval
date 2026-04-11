@@ -15,6 +15,7 @@ class CriterionType(str, enum.Enum):
     regex = "regex"  # 正则表达式匹配 / Regular expression matching
     sandbox = "sandbox"  # 沙箱执行 / Sandboxed code execution
     llm_judge = "llm_judge"  # LLM作为评判者 / LLM-as-a-judge evaluation
+    elo = "elo"  # ELO rating via pairwise LLM judge comparison
 
 
 class Criterion(SQLModel, table=True):

@@ -58,6 +58,8 @@ export interface LLMModel {
   description: string;
   model_name: string;
   max_tokens: number | null;
+  version: string;
+  base_model_id: string | null;
   created_at: string;
   deploy_status: string;
   cluster_id: string | null;
@@ -65,6 +67,26 @@ export interface LLMModel {
   vllm_deployment_name: string;
   last_test_at: string | null;
   last_test_ok: boolean | null;
+}
+
+export interface VersionComparisonRow {
+  model_id: string;
+  model_name: string;
+  version: string;
+  criterion_id: string;
+  criterion_name: string;
+  avg_score: number;
+  sample_count: number;
+  latest_task_at: string | null;
+  created_at: string;
+}
+
+export interface EloRankingRow {
+  model_id: string;
+  model_name?: string;
+  version?: string;
+  rating: number;
+  comparisons: number;
 }
 
 export interface PlaygroundResponse {

@@ -6,6 +6,8 @@ import type {
   TaskSummaryEntry,
   PaginatedResponse,
   ThroughputPoint,
+  VersionComparisonRow,
+  EloRankingRow,
 } from "@/lib/types";
 
 export function useResults(taskId?: string, page = 1, pageSize = 50, enabled = true) {
@@ -83,6 +85,37 @@ export function useThroughput(taskIds: string[]) {
       return res.data;
     },
     enabled: taskIds.length > 0,
+    staleTime: 30_000,
+  });
+}
+
+export function useVersionComparison(baseModelId: string, criterionId?: string) {
+  return useQuery({
+    queryKey: ["results", "version-comparison", baseModelId, criterionId],
+    queryFn: async () => {
+      const params: Record<string, string> = { base_model_id: baseModelId };
+      if (criterionId) params.criterion_id = criterionId;
+      const res = await api.get<VersionComparisonRow[]>(
+        "/results/version-comparison",
+        { params },
+      );
+      return res.data;
+    },
+    enabled: !!baseModelId,
+    staleTime: 30_000,
+  });
+}
+
+export function useEloRanking(taskId: string, criterionId: string) {
+  return useQuery({
+    queryKey: ["results", "elo-ranking", taskId, criterionId],
+    queryFn: async () => {
+      const res = await api.get<EloRankingRow[]>("/results/elo-ranking", {
+        params: { task_id: taskId, criterion_id: criterionId },
+      });
+      return res.data;
+    },
+    enabled: !!taskId && !!criterionId,
     staleTime: 30_000,
   });
 }

@@ -45,6 +45,7 @@ async def create_model(
         model_name=body.model_name,
         max_tokens=body.max_tokens,
         source_model_id=body.source_model_id,
+        version=body.version or "v1",
     )
     session.add(m)
     await session.commit()
@@ -143,6 +144,77 @@ async def preflight_hub_model(
             else f"https://modelscope.cn/models/{model_id}"
         ),
     }
+
+
+@router.post("/{model_id}/versions", response_model=LLMModelResponse, status_code=201)
+async def create_model_version(
+    model_id: uuid.UUID,
+    body: LLMModelCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = require_permission("models.write"),
+):
+    """Clone an existing model record into a new version.
+
+    Copies every field from the base model unless the request body
+    overrides it. The new record's ``base_model_id`` points to the
+    root of the version family: if the source model has its own
+    ``base_model_id``, we follow that chain; otherwise the source
+    becomes the base. The ``version`` field comes from ``body.name``
+    unless the body provides one explicitly (we reuse ``body.name``
+    as the version tag to avoid introducing a separate parameter).
+    """
+    source = await session.get(LLMModel, model_id)
+    if not source:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "基础模型未找到")
+
+    root_id = source.base_model_id or source.id
+    new = LLMModel(
+        name=source.name,
+        version=body.name or "v2",  # body.name doubles as version tag
+        base_model_id=root_id,
+        provider=body.provider or source.provider,
+        endpoint_url=body.endpoint_url or source.endpoint_url,
+        api_key=body.api_key or source.api_key,
+        model_type=body.model_type or source.model_type,
+        api_format=body.api_format or source.api_format,
+        description=body.description or source.description,
+        model_name=body.model_name or source.model_name,
+        max_tokens=body.max_tokens or source.max_tokens,
+        source_model_id=body.source_model_id or source.source_model_id,
+    )
+    session.add(new)
+    await session.commit()
+    await session.refresh(new)
+    return new
+
+
+@router.get("/{model_id}/versions", response_model=list[LLMModelResponse])
+async def list_model_versions(
+    model_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = require_permission("models.read"),
+):
+    """List every model record in the same version family.
+
+    Resolution: if the target model has a ``base_model_id``, use it;
+    otherwise treat the target as the base. Returns the base plus all
+    descendants, ordered by creation time.
+    """
+    target = await session.get(LLMModel, model_id)
+    if not target:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "模型未找到")
+
+    root_id = target.base_model_id or target.id
+    stmt = (
+        select(LLMModel)
+        .where(
+            (LLMModel.id == root_id)
+            | (LLMModel.base_model_id == root_id)
+        )
+        .order_by(col(LLMModel.created_at).asc())
+    )
+    result = await session.exec(stmt)
+    return result.all()
 
 
 @router.get("", response_model=list[LLMModelResponse])
