@@ -89,6 +89,29 @@ export interface EloRankingRow {
   comparisons: number;
 }
 
+export interface ComplianceCveFinding {
+  id: string;
+  severity: string;
+  description: string;
+}
+
+export interface ComplianceRecord {
+  id: string;
+  resource_type: "model" | "dataset";
+  resource_id: string;
+  resource_name: string;
+  license_spdx: string;
+  license_status: "compliant" | "restricted" | "unknown";
+  cve_findings: ComplianceCveFinding[];
+  notes: string;
+  last_scanned_at: string | null;
+}
+
+export interface CompliancePolicy {
+  compliant: string[];
+  restricted: string[];
+}
+
 export interface PlaygroundResponse {
   output: string;
   latency_ms: number;

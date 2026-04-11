@@ -1,3 +1,8 @@
+from app.models.compliance import (
+    ComplianceRecord,
+    ComplianceResourceType,
+    ComplianceStatus,
+)
 from app.models.compute_cluster import ClusterInfraJob, ComputeCluster
 from app.models.criterion import Criterion
 from app.models.dataset import Dataset, DatasetVersion, SyncLog
@@ -30,4 +35,7 @@ __all__ = [
     "ReportExportLog",
     "PairwiseComparison",
     "PairwiseWinner",
+    "ComplianceRecord",
+    "ComplianceResourceType",
+    "ComplianceStatus",
 ]
