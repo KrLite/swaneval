@@ -29,8 +29,8 @@ from app.schemas.dataset import (
 )
 from app.services.dataset_deletion import cleanup_uploaded_file, delete_dataset_versions
 from app.services.storage import StorageBackend, get_storage
-from app.services.storage.file_io import read_bytes as _read_bytes_raw
-from app.services.storage.file_io import read_text as _read_text_raw
+from app.services.storage.file_io import read_bytes as _read_bytes
+from app.services.storage.file_io import read_text as _read_text
 from app.services.storage.utils import uri_to_key
 
 # In-memory preflight cache: token -> {source_uri, format, row_count, ...}
@@ -63,15 +63,17 @@ def _resolve_path(uri: str) -> str:
 
 
 async def _count_rows(storage: StorageBackend, source_uri: str) -> int:
-    """Count rows in a data file via the storage backend."""
+    """Count rows in a data file via the storage backend.
+
+    Raises FileNotFoundError if the underlying file is missing — callers
+    must not mask this into a zero row count.
+    """
     path = _resolve_path(source_uri)
     lower = path.lower()
 
     # Parquet — read row count from metadata (no data parsing)
     if lower.endswith(".parquet"):
         content = await _read_bytes(storage, source_uri)
-        if content is None:
-            return 0
         import io
 
         import pyarrow.parquet as pq
@@ -81,8 +83,6 @@ async def _count_rows(storage: StorageBackend, source_uri: str) -> int:
     # Excel — use openpyxl read-only mode for row count
     if lower.endswith((".xlsx", ".xls")):
         content = await _read_bytes(storage, source_uri)
-        if content is None:
-            return 0
         import io
 
         from openpyxl import load_workbook
@@ -95,39 +95,17 @@ async def _count_rows(storage: StorageBackend, source_uri: str) -> int:
     # CSV
     if lower.endswith(".csv"):
         text = await _read_text(storage, source_uri)
-        if text is None:
-            return 0
         return max(0, text.count("\n") - 1)  # minus header
 
     # JSON
     if lower.endswith(".json"):
         text = await _read_text(storage, source_uri)
-        if text is None:
-            return 0
         data = json.loads(text)
         return len(data) if isinstance(data, list) else 1
 
     # JSONL (default)
     text = await _read_text(storage, source_uri)
-    if text is None:
-        return 0
     return sum(1 for line in text.splitlines() if line.strip())
-
-
-async def _read_text(storage: StorageBackend, source_uri: str) -> str | None:
-    """Read file content as text, from storage or local filesystem."""
-    try:
-        return await _read_text_raw(storage, source_uri)
-    except FileNotFoundError:
-        return None
-
-
-async def _read_bytes(storage: StorageBackend, source_uri: str) -> bytes | None:
-    """Read file content as bytes, from storage or local filesystem."""
-    try:
-        return await _read_bytes_raw(storage, source_uri)
-    except FileNotFoundError:
-        return None
 
 
 @router.post("/upload", response_model=DatasetResponse, status_code=201)
@@ -512,9 +490,13 @@ async def preview_dataset(
 
     # Binary formats — Parquet, Excel (read only needed rows)
     if lower.endswith((".parquet", ".xlsx", ".xls")):
-        content = await _read_bytes(storage, ds.source_uri)
-        if content is None:
-            return {"rows": [], "total": 0}
+        try:
+            content = await _read_bytes(storage, ds.source_uri)
+        except FileNotFoundError as e:
+            raise HTTPException(
+                status.HTTP_410_GONE,
+                f"数据集文件缺失: {ds.source_uri}",
+            ) from e
         import io
 
         if lower.endswith(".parquet"):
@@ -531,9 +513,13 @@ async def preview_dataset(
         return {"rows": rows, "total": ds.row_count}
 
     # Text formats — JSON, JSONL, CSV
-    text = await _read_text(storage, ds.source_uri)
-    if text is None:
-        return {"rows": [], "total": 0}
+    try:
+        text = await _read_text(storage, ds.source_uri)
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status.HTTP_410_GONE,
+            f"数据集文件缺失: {ds.source_uri}",
+        ) from e
 
     if lower.endswith(".csv"):
         import io

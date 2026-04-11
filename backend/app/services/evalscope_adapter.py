@@ -320,13 +320,16 @@ async def extract_primary_score(storage: StorageBackend, work_dir_key: str) -> f
         score = _find_numeric_score(data)
         if score is not None:
             return float(score)
-    if read_errors and len(read_errors) == len(files):
-        from app.errors import ResultIngestionError
+    from app.errors import ResultIngestionError
 
+    if read_errors and len(read_errors) == len(files):
         raise ResultIngestionError(
             f"All {len(files)} report file(s) failed to read/parse: " + "; ".join(read_errors)
         )
-    return 0.0  # Files exist but no numeric score found
+    raise ResultIngestionError(
+        f"No numeric score extractable from {len(files)} report file(s) "
+        f"in {reports_prefix}; evaluation output is malformed"
+    )
 
 
 def _find_numeric_score(node: Any) -> float | None:
