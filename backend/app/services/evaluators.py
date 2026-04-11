@@ -35,11 +35,47 @@ def evaluate_contains(expected: str, actual: str) -> float:
     return 1.0 if expected.strip() in actual.strip() else 0.0
 
 
-def evaluate_regex(pattern: str, actual: str, extract_group: int = 0) -> float:
+def evaluate_regex(
+    pattern: str,
+    actual: str,
+    extract_group: int = 0,
+    match_mode: str = "contains",
+    expected: str = "",
+) -> float:
+    """Regex-based evaluator with three modes.
+
+    - ``contains``: pass if the regex matches anywhere in ``actual``.
+    - ``exact``: pass only if the regex matches the entire ``actual``.
+    - ``extract``: pull the capture group out of ``actual`` and compare it
+      to ``expected`` (string equality, stripped).
+    """
+    if not pattern:
+        return 0.0
     match = re.search(pattern, actual)
     if not match:
         return 0.0
+
+    if match_mode == "exact":
+        return 1.0 if match.group(0) == actual.strip() else 0.0
+    if match_mode == "extract":
+        try:
+            captured = match.group(extract_group or 1)
+        except (IndexError, re.error):
+            captured = match.group(0)
+        return 1.0 if captured.strip() == expected.strip() else 0.0
+    # contains (default)
     return 1.0
+
+
+def _evaluate_keyword_rules(
+    keywords: list[str], actual: str, mode: str = "any"
+) -> float:
+    if not keywords:
+        return 1.0  # vacuously true; caller already gated on non-empty list
+    hits = sum(1 for kw in keywords if kw in actual)
+    if mode == "all":
+        return 1.0 if hits == len(keywords) else 0.0
+    return 1.0 if hits > 0 else 0.0
 
 
 def evaluate_numeric_closeness(expected: str, actual: str, tolerance: float = 0.01) -> float:
@@ -410,9 +446,32 @@ def run_criterion(criterion_type: str, config_json: str, expected: str, actual: 
 
     elif criterion_type == "regex":
         pattern = config.get("pattern", "")
-        if not pattern:
-            raise ValueError("Regex criterion has empty pattern — check config_json")
-        return evaluate_regex(pattern, actual, config.get("extract_group", 0))
+        keywords = config.get("keywords") or []
+        if not pattern and not keywords:
+            raise ValueError(
+                "Regex criterion must have either pattern or keywords"
+            )
+        match_mode = config.get("match_mode", "contains")
+        regex_score = (
+            evaluate_regex(
+                pattern,
+                actual,
+                config.get("extract_group", 0),
+                match_mode=match_mode,
+                expected=expected,
+            )
+            if pattern
+            else 1.0
+        )
+        keyword_score = (
+            _evaluate_keyword_rules(
+                keywords, actual, config.get("keywords_mode", "any")
+            )
+            if keywords
+            else 1.0
+        )
+        # Both rules must pass: pattern + keywords are AND-composed.
+        return 1.0 if regex_score == 1.0 and keyword_score == 1.0 else 0.0
 
     elif criterion_type in ("sandbox", "script"):
         return evaluate_sandbox(config, expected, actual)

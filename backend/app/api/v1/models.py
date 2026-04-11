@@ -52,6 +52,99 @@ async def create_model(
     return m
 
 
+@router.post("/preflight-hub")
+async def preflight_hub_model(
+    source: str,
+    model_id: str,
+    current_user: User = require_permission("models.write"),
+):
+    """Look up a model on HuggingFace or ModelScope before deploying.
+
+    The frontend calls this to validate the user-supplied URL/repo and
+    show metadata (license, size, pipeline_tag, etc.) in the import
+    wizard. Returns a structured preview, never throws — errors come
+    back as ``{ ok: False, error }`` so the UI can show them inline.
+    """
+    source = (source or "").strip().lower()
+    model_id = (model_id or "").strip()
+
+    # Accept a full URL or a bare repo. Normalize to "org/repo".
+    if model_id.startswith(("http://", "https://")):
+        parts = model_id.rstrip("/").split("/")
+        if len(parts) >= 2:
+            model_id = f"{parts[-2]}/{parts[-1]}"
+
+    if source not in ("huggingface", "modelscope"):
+        return {"ok": False, "error": "source 必须为 huggingface 或 modelscope"}
+    if not model_id or "/" not in model_id:
+        return {"ok": False, "error": "模型 ID 格式无效，期望 org/repo"}
+
+    url = (
+        f"https://huggingface.co/api/models/{model_id}"
+        if source == "huggingface"
+        else f"https://modelscope.cn/api/v1/models/{model_id}"
+    )
+    headers: dict[str, str] = {}
+    hf_token = getattr(current_user, "hf_token", "") or settings.HF_TOKEN or ""
+    if source == "huggingface" and hf_token:
+        headers["Authorization"] = f"Bearer {hf_token}"
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, headers=headers)
+    except httpx.TimeoutException:
+        return {"ok": False, "error": "请求 Hub API 超时"}
+    except httpx.RequestError as e:
+        return {"ok": False, "error": f"请求 Hub API 失败: {e}"}
+
+    if resp.status_code == 401:
+        return {"ok": False, "error": "需要 Token；请在账号设置中配置"}
+    if resp.status_code == 404:
+        return {"ok": False, "error": "模型未找到"}
+    if resp.status_code != 200:
+        return {"ok": False, "error": f"Hub API 返回 {resp.status_code}"}
+
+    try:
+        data = resp.json()
+    except ValueError:
+        return {"ok": False, "error": "Hub 返回非 JSON 响应"}
+
+    # Normalize fields from HF / MS schemas into one shape.
+    card = data.get("cardData") or {}
+    license_id = (
+        (card.get("license") if isinstance(card, dict) else None)
+        or data.get("license")
+        or ""
+    )
+    pipeline_tag = data.get("pipeline_tag") or ""
+    tags = data.get("tags") or []
+    downloads = data.get("downloads") or 0
+    likes = data.get("likes") or 0
+    siblings = data.get("siblings") or []
+    total_bytes = 0
+    for s in siblings:
+        size = s.get("size") if isinstance(s, dict) else None
+        if isinstance(size, int):
+            total_bytes += size
+
+    return {
+        "ok": True,
+        "source": source,
+        "repo": model_id,
+        "license": license_id,
+        "pipeline_tag": pipeline_tag,
+        "tags": tags[:8],
+        "downloads": downloads,
+        "likes": likes,
+        "estimated_size_bytes": total_bytes,
+        "url": (
+            f"https://huggingface.co/{model_id}"
+            if source == "huggingface"
+            else f"https://modelscope.cn/models/{model_id}"
+        ),
+    }
+
+
 @router.get("", response_model=list[LLMModelResponse])
 async def list_models(
     session: AsyncSession = Depends(get_db),

@@ -18,6 +18,33 @@ export function useModels() {
   });
 }
 
+export interface HubPreflightResult {
+  ok: boolean;
+  error?: string;
+  source?: string;
+  repo?: string;
+  license?: string;
+  pipeline_tag?: string;
+  tags?: string[];
+  downloads?: number;
+  likes?: number;
+  estimated_size_bytes?: number;
+  url?: string;
+}
+
+export function usePreflightHub() {
+  return useMutation({
+    mutationFn: async (data: { source: string; model_id: string }) => {
+      const res = await api.post<HubPreflightResult>(
+        "/models/preflight-hub",
+        null,
+        { params: data },
+      );
+      return res.data;
+    },
+  });
+}
+
 export function useCreateModel() {
   const qc = useQueryClient();
   return useMutation({
