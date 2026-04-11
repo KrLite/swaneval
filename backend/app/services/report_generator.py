@@ -1,5 +1,6 @@
 """Report generator service for SwanEVAL."""
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -7,10 +8,88 @@ from sqlalchemy import func as sa_func
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.models.compute_cluster import ComputeCluster
 from app.models.criterion import Criterion
 from app.models.eval_result import EvalResult
 from app.models.eval_task import EvalTask
 from app.models.llm_model import LLMModel
+from app.services.dcgm_queries import (
+    DCGM_GPU_MEM_PEAK,
+    DCGM_GPU_POWER_AVG,
+    DCGM_GPU_UTIL_AVG,
+    format_query,
+)
+from app.services.prometheus_client import PrometheusClient
+
+logger = logging.getLogger(__name__)
+
+
+async def _collect_gpu_metrics(
+    task: EvalTask, session: AsyncSession
+) -> dict:
+    """Query DCGM metrics from the task's cluster Prometheus endpoint.
+
+    Returns a dict with the three GPU fields and a ``metrics_note`` describing
+    the data source or the reason values are absent. All three fields may be
+    None when the cluster lacks a Prometheus URL, the query fails, or the
+    task has no timing information — by design, so report generation never
+    blocks on missing observability.
+    """
+    base = {
+        "gpu_utilization_pct": None,
+        "gpu_memory_peak_mb": None,
+        "gpu_power_watts": None,
+    }
+
+    cluster_id = getattr(task, "cluster_id", None)
+    if cluster_id is None:
+        return {**base, "metrics_note": "任务未关联计算集群，无 GPU 指标"}
+
+    cluster = await session.get(ComputeCluster, cluster_id)
+    if cluster is None:
+        return {**base, "metrics_note": "计算集群记录缺失，无 GPU 指标"}
+
+    if not cluster.prometheus_url:
+        return {
+            **base,
+            "metrics_note": "集群未配置 Prometheus URL，跳过 GPU 指标采集",
+        }
+
+    if not task.started_at or not task.finished_at:
+        return {
+            **base,
+            "metrics_note": "任务缺少 started_at/finished_at 时间窗，无法查询 DCGM",
+        }
+
+    client = PrometheusClient(cluster.prometheus_url)
+    util_query = format_query(DCGM_GPU_UTIL_AVG, task.gpu_ids)
+    mem_query = format_query(DCGM_GPU_MEM_PEAK, task.gpu_ids)
+    power_query = format_query(DCGM_GPU_POWER_AVG, task.gpu_ids)
+
+    util = await client.aggregate_over_window(
+        util_query, task.started_at, task.finished_at, "avg"
+    )
+    mem = await client.aggregate_over_window(
+        mem_query, task.started_at, task.finished_at, "max"
+    )
+    power = await client.aggregate_over_window(
+        power_query, task.started_at, task.finished_at, "avg"
+    )
+
+    all_missing = util is None and mem is None and power is None
+    if all_missing:
+        note = (
+            "Prometheus 查询未返回数据；请确认 DCGM Exporter 已部署且时间窗内有采样"
+        )
+    else:
+        note = "采集自 DCGM Exporter via Prometheus"
+
+    return {
+        "gpu_utilization_pct": round(util, 2) if util is not None else None,
+        "gpu_memory_peak_mb": round(mem, 1) if mem is not None else None,
+        "gpu_power_watts": round(power, 2) if power is not None else None,
+        "metrics_note": note,
+    }
 
 
 async def generate_performance_report(task_id: uuid.UUID, session: AsyncSession) -> dict:
@@ -192,21 +271,19 @@ async def generate_cost_report(task_id: uuid.UUID, session: AsyncSession) -> dic
     }
 
     if execution_backend == "k8s_vllm":
-        # K8s/vLLM: add GPU-specific fields (populated from DCGM exporter)
-        base_report.update(
-            {
-                "gpu_ids": task.gpu_ids or "",
-                "gpu_utilization_pct": None,
-                "gpu_memory_peak_mb": None,
-                "gpu_power_watts": None,
-                "metrics_note": "GPU 指标需通过 Prometheus + DCGM Exporter 采集",
-            }
-        )
+        # K8s/vLLM: query DCGM Exporter via Prometheus for real GPU metrics.
+        gpu_metrics = await _collect_gpu_metrics(task, session)
+        base_report["gpu_ids"] = task.gpu_ids or ""
+        base_report.update(gpu_metrics)
     else:
-        # API model: no GPU metrics
+        # API model: no hardware metrics are collectable.
         base_report.update(
             {
                 "gpu_ids": task.gpu_ids if task.gpu_ids else "N/A (API 模型)",
+                "gpu_utilization_pct": None,
+                "gpu_memory_peak_mb": None,
+                "gpu_power_watts": None,
+                "metrics_note": "API 模型不采集硬件指标",
                 "estimated_cost_usd": None,
             }
         )

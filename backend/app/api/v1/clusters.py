@@ -24,6 +24,7 @@ from app.services.k8s_manager import (
     get_cluster_nodes,
     probe_cluster_resources,
     validate_kubeconfig,
+    verify_dcgm_exporter,
 )
 
 logger = logging.getLogger(__name__)
@@ -101,6 +102,8 @@ async def create_cluster(
         api_server_url=info["api_server_url"],
         namespace=body.namespace,
         vllm_image=body.vllm_image,
+        prometheus_url=body.prometheus_url,
+        dcgm_namespace=body.dcgm_namespace,
         status=ClusterStatus.connecting,
         created_by=current_user.id,
     )
@@ -170,6 +173,10 @@ async def update_cluster(
         cluster.namespace = body.namespace
     if body.vllm_image is not None:
         cluster.vllm_image = body.vllm_image
+    if body.prometheus_url is not None:
+        cluster.prometheus_url = body.prometheus_url
+    if body.dcgm_namespace is not None:
+        cluster.dcgm_namespace = body.dcgm_namespace
 
     cluster.updated_at = datetime.now(timezone.utc)
     session.add(cluster)
@@ -420,3 +427,30 @@ async def get_gpu_status(
         raise HTTPException(400, "集群缺少 Kubeconfig")
 
     return await check_gpu_operator_status(cluster.kubeconfig_encrypted)
+
+
+@router.get("/{cluster_id}/dcgm-status")
+async def get_dcgm_status(
+    cluster_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = require_permission("clusters.read"),
+):
+    """Check whether DCGM Exporter is running in the cluster's DCGM namespace.
+
+    Does not fail the request on K8s errors — DCGM is optional infrastructure
+    and verification is purely informational so the UI can surface a warning
+    before a user expects GPU metrics in reports.
+    """
+    cluster = await session.get(ComputeCluster, cluster_id)
+    if not cluster:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "集群未找到")
+    if not cluster.kubeconfig_encrypted:
+        raise HTTPException(400, "集群缺少 Kubeconfig")
+
+    status_info = await asyncio.to_thread(
+        verify_dcgm_exporter,
+        cluster.kubeconfig_encrypted,
+        cluster.dcgm_namespace or "gpu-operator",
+    )
+    status_info["prometheus_url"] = cluster.prometheus_url or ""
+    return status_info

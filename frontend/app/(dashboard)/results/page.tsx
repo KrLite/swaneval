@@ -948,25 +948,71 @@ export default function ResultsPage() {
 
                   {/* Cost report */}
                   {reportType === "cost" && (
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { label: "平均延迟", value: `${Number(reportData.avg_latency_ms).toFixed(0)} ms` },
-                        { label: "首字延迟", value: `${Number(reportData.avg_first_token_ms).toFixed(0)} ms` },
-                        { label: "吞吐量", value: `${Number(reportData.throughput_tokens_per_sec).toFixed(1)} tokens/s` },
-                        { label: "总 Token 数", value: Number(reportData.total_tokens).toLocaleString() },
-                        { label: "最低延迟", value: `${Number(reportData.min_latency_ms).toFixed(0)} ms` },
-                        { label: "最高延迟", value: `${Number(reportData.max_latency_ms).toFixed(0)} ms` },
-                        { label: "平均生成长度", value: `${Number(reportData.avg_tokens_per_response).toFixed(0)} tokens` },
-                        { label: "运行时长", value: `${Number(reportData.duration_seconds).toFixed(0)} 秒` },
-                        { label: "GPU", value: String(reportData.gpu_ids) },
-                        { label: "评测样本", value: Number(reportData.total_samples).toLocaleString() },
-                      ].map((item) => (
-                        <div key={item.label} className="rounded-lg border p-3">
-                          <p className="text-xs text-muted-foreground">{item.label}</p>
-                          <p className="text-lg font-bold font-mono">{item.value}</p>
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { label: "平均延迟", value: `${Number(reportData.avg_latency_ms).toFixed(0)} ms` },
+                          { label: "首字延迟", value: `${Number(reportData.avg_first_token_ms).toFixed(0)} ms` },
+                          { label: "吞吐量", value: `${Number(reportData.throughput_tokens_per_sec).toFixed(1)} tokens/s` },
+                          { label: "总 Token 数", value: Number(reportData.total_tokens).toLocaleString() },
+                          { label: "最低延迟", value: `${Number(reportData.min_latency_ms).toFixed(0)} ms` },
+                          { label: "最高延迟", value: `${Number(reportData.max_latency_ms).toFixed(0)} ms` },
+                          { label: "平均生成长度", value: `${Number(reportData.avg_tokens_per_response).toFixed(0)} tokens` },
+                          { label: "运行时长", value: `${Number(reportData.duration_seconds).toFixed(0)} 秒` },
+                          { label: "GPU", value: String(reportData.gpu_ids) },
+                          { label: "评测样本", value: Number(reportData.total_samples).toLocaleString() },
+                        ].map((item) => (
+                          <div key={item.label} className="rounded-lg border p-3">
+                            <p className="text-xs text-muted-foreground">{item.label}</p>
+                            <p className="text-lg font-bold font-mono">{item.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3">
+                        <p className="text-sm font-medium mb-2">GPU 硬件指标</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            {
+                              label: "GPU 利用率",
+                              value: reportData.gpu_utilization_pct,
+                              unit: "%",
+                              fmt: (v: number) => v.toFixed(1),
+                            },
+                            {
+                              label: "显存峰值",
+                              value: reportData.gpu_memory_peak_mb,
+                              unit: "MiB",
+                              fmt: (v: number) => v.toFixed(0),
+                            },
+                            {
+                              label: "平均功耗",
+                              value: reportData.gpu_power_watts,
+                              unit: "W",
+                              fmt: (v: number) => v.toFixed(1),
+                            },
+                          ].map((m) => (
+                            <div key={m.label} className="rounded-lg border p-3">
+                              <p className="text-xs text-muted-foreground">{m.label}</p>
+                              <p className="text-lg font-bold font-mono">
+                                {m.value == null ? (
+                                  <span className="text-muted-foreground">N/A</span>
+                                ) : (
+                                  <>
+                                    {m.fmt(Number(m.value))}
+                                    <span className="text-xs text-muted-foreground ml-1">{m.unit}</span>
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                        {reportData.metrics_note ? (
+                          <p className="text-[11px] text-muted-foreground mt-2">
+                            {String(reportData.metrics_note)}
+                          </p>
+                        ) : null}
+                      </div>
+                    </>
                   )}
 
                   {/* Value report */}

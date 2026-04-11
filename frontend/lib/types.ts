@@ -252,9 +252,21 @@ export interface ComputeCluster {
   node_count: number;
   vllm_image: string;
   gpu_operator_installed: boolean;
+  prometheus_url: string;
+  dcgm_namespace: string;
   vllm_cache_ready: boolean;
   last_probed_at: string | null;
   created_at: string;
+}
+
+export interface DcgmStatus {
+  found: boolean;
+  daemonset_name: string | null;
+  desired: number;
+  ready: number;
+  namespace: string;
+  prometheus_url: string;
+  error?: string;
 }
 
 export interface ClusterNode {
