@@ -411,6 +411,17 @@ async def _run_task_via_evalscope_service(
     total_results = 0
     for row in ingested_results:
         prompt_text = row["prompt_text"]
+        if not prompt_text:
+            # Empty prompt cannot be attributed to any dataset row by query
+            # match. This is an upstream data-quality issue (the dataset row
+            # itself had no `query`), not an attribution ambiguity — skip it
+            # with a warning instead of aborting the whole task.
+            logger.warning(
+                "Task %s: skipping ingested result with empty prompt_text "
+                "(no upstream query to attribute to)",
+                task_id,
+            )
+            continue
         dataset_id = prompt_to_dataset.get(prompt_text)
         if dataset_id is None:
             # Use a stable digest rather than the raw prompt — the message

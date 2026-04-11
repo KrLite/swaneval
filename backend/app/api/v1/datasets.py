@@ -517,8 +517,8 @@ async def preview_dataset(
         text = await _read_text(storage, ds.source_uri)
     except FileNotFoundError as e:
         raise HTTPException(
-            status.HTTP_410_GONE,
-            f"数据集文件缺失: {ds.source_uri}",
+            status.HTTP_404_NOT_FOUND,
+            "数据集文件不存在或已被删除",
         ) from e
 
     if lower.endswith(".csv"):
