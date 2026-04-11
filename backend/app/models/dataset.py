@@ -46,6 +46,12 @@ class Dataset(SQLModel, table=True):
     format: str = Field(default="jsonl", max_length=32)
     # 数据格式 / Data format (jsonl, csv, parquet, etc)
 
+    modality: str = Field(default="text", max_length=32)
+    # 数据集模态 / Modality of inputs: "text" or "vision_text".
+    # vision_text datasets have an image or images field alongside
+    # the text prompt, consumed by vision-capable models via the
+    # OpenAI chat completions `content` array format.
+
     tags: str = Field(default="")  # comma-separated
     # 标签 / Tags (comma-separated, e.g., "math,reasoning")
 

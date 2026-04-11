@@ -46,6 +46,7 @@ async def create_model(
         max_tokens=body.max_tokens,
         source_model_id=body.source_model_id,
         version=body.version or "v1",
+        supports_vision=body.supports_vision,
     )
     session.add(m)
     await session.commit()

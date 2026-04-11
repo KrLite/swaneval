@@ -28,6 +28,7 @@ export interface Dataset {
   source_type: "upload" | "huggingface" | "modelscope" | "server_path" | "preset";
   source_uri: string;
   format: string;
+  modality: string;
   tags: string;
   version: number;
   size_bytes: number;
@@ -43,7 +44,7 @@ export interface Dataset {
 export interface Criterion {
   id: string;
   name: string;
-  type: "preset" | "regex" | "sandbox" | "llm_judge";
+  type: "preset" | "regex" | "sandbox" | "llm_judge" | "elo";
   config_json: string;
   created_at: string;
 }
@@ -60,6 +61,7 @@ export interface LLMModel {
   max_tokens: number | null;
   version: string;
   base_model_id: string | null;
+  supports_vision: boolean;
   created_at: string;
   deploy_status: string;
   cluster_id: string | null;

@@ -24,6 +24,10 @@ class EvalResult(SQLModel, table=True):
     prompt_text: str = Field(default="")
     expected_output: str = Field(default="")
     model_output: str = Field(default="")
+    input_images_json: str = Field(default="[]")
+    # JSON array of image URIs for vision_text prompts. Empty for
+    # text-only datasets. URIs can be data: URLs, http(s), or storage
+    # keys the frontend resolves through the storage layer.
     score: float = Field(default=0.0)
     latency_ms: float = Field(default=0.0)
     tokens_generated: int = Field(default=0)

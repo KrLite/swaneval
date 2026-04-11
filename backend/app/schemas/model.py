@@ -18,6 +18,7 @@ class LLMModelCreate(BaseModel):
     max_tokens: int | None = None
     source_model_id: str = ""
     version: str = "v1"
+    supports_vision: bool = False
 
 
 class LLMModelUpdate(BaseModel):
@@ -49,6 +50,7 @@ class LLMModelResponse(BaseModel):
     source_model_id: str = ""
     version: str = "v1"
     base_model_id: uuid.UUID | None = None
+    supports_vision: bool = False
     last_test_at: datetime | None = None
     last_test_ok: bool | None = None
 

@@ -105,3 +105,8 @@ class LLMModel(SQLModel, table=True):
 
     last_test_ok: bool | None = Field(default=None)
     # 上次测试结果
+
+    supports_vision: bool = Field(default=False)
+    # 是否支持视觉输入 / Vision capability marker. When true, the
+    # task runner is allowed to bind the model against vision_text
+    # datasets; when false, such tasks are rejected at creation time.
