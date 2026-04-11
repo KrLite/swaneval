@@ -40,6 +40,8 @@ class Criterion(SQLModel, table=True):
     config_json: str = Field(default="{}")
     # 配置JSON / Configuration JSON (type-specific settings)
 
+    tenant_id: uuid.UUID | None = Field(default=None, foreign_key="tenants.id", index=True)
+
     created_by: uuid.UUID | None = Field(default=None, foreign_key="users.id")
     # 创建者ID / Creator user ID (foreign key to users)
 

@@ -42,6 +42,8 @@ class Report(SQLModel, table=True):
     allowed_users: str = Field(default="")
     # 白名单用户ID（逗号分隔）/ Whitelist user IDs (comma-separated)
 
+    tenant_id: uuid.UUID | None = Field(default=None, foreign_key="tenants.id", index=True)
+
     created_by: uuid.UUID | None = Field(default=None, foreign_key="users.id")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

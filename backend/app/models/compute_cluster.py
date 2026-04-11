@@ -67,6 +67,8 @@ class ComputeCluster(SQLModel, table=True):
     dcgm_namespace: str = Field(default="gpu-operator")
     # DCGM Exporter 所在的 K8s 命名空间
 
+    tenant_id: uuid.UUID | None = Field(default=None, foreign_key="tenants.id", index=True)
+
     vllm_cache_ready: bool = Field(default=False)
     last_probed_at: datetime | None = Field(
         default=None,

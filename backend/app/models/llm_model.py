@@ -66,6 +66,8 @@ class LLMModel(SQLModel, table=True):
     max_tokens: int | None = Field(default=None)
     # 模型 token 上限 / Optional model token limit
 
+    tenant_id: uuid.UUID | None = Field(default=None, foreign_key="tenants.id", index=True)
+
     version: str = Field(default="v1", max_length=64)
     # 版本号 / Model version tag. Multiple versions of the same logical
     # model can coexist; (name, version) pairs identify each one.

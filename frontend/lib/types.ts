@@ -114,6 +114,14 @@ export interface CompliancePolicy {
   restricted: string[];
 }
 
+export interface Tenant {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  created_at: string;
+}
+
 export interface PlaygroundResponse {
   output: string;
   latency_ms: number;

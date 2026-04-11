@@ -13,6 +13,7 @@ from app.models.llm_model import LLMModel
 from app.models.pairwise_comparison import PairwiseComparison, PairwiseWinner
 from app.models.permission import PermissionGroup, ResourceAcl, UserGroupMembership
 from app.models.report import Report, ReportExportLog
+from app.models.tenant import Tenant, TenantMembership, TenantRole
 from app.models.user import User
 
 __all__ = [
@@ -38,4 +39,7 @@ __all__ = [
     "ComplianceRecord",
     "ComplianceResourceType",
     "ComplianceStatus",
+    "Tenant",
+    "TenantMembership",
+    "TenantRole",
 ]

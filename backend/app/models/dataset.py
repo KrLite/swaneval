@@ -64,6 +64,10 @@ class Dataset(SQLModel, table=True):
     row_count: int = Field(default=0)
     # 数据行数 / Number of data rows
 
+    tenant_id: uuid.UUID | None = Field(default=None, foreign_key="tenants.id", index=True)
+    # 多租户隔离 / Tenant ownership. Nullable in SQLModel so existing code
+    # compiles; DB constraint is NOT NULL via migration 0022.
+
     created_by: uuid.UUID | None = Field(default=None, foreign_key="users.id")
     # 创建者ID / Creator user ID (foreign key to users)
 
