@@ -271,6 +271,22 @@ class TestEvalscopeAdapter(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ResultIngestionError):
                 await extract_primary_score(storage, "work")
 
+    async def test_extract_primary_score_no_numeric_field(self):
+        """Report files exist and parse as JSON but contain no extractable
+        numeric score — must fail-fast instead of silently returning 0.0."""
+        from app.errors import ResultIngestionError
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage = LocalFileStorage(root=tmpdir)
+            payload = {"summary": {"metrics": [{"name": "foo", "note": "n/a"}]}}
+            await storage.write_file(
+                "work/reports/modelA/general_qa.json",
+                json.dumps(payload).encode(),
+            )
+            with self.assertRaises(ResultIngestionError) as ctx:
+                await extract_primary_score(storage, "work")
+            self.assertIn("No numeric score", str(ctx.exception))
+
     def test_find_numeric_score_variants(self):
         self.assertEqual(_find_numeric_score({"score": 0.1}), 0.1)
         self.assertEqual(_find_numeric_score({"Score": 0.2}), 0.2)

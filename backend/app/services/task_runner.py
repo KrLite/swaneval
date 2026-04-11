@@ -1,6 +1,7 @@
 """In-process task runner for MVP. Runs eval tasks as asyncio background tasks."""
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -31,6 +32,7 @@ from app.errors import (
     ModelCallError,
     ModelRateLimitError,
     ModelTimeoutError,
+    ResultIngestionError,
 )
 from app.metrics import (
     evaluation_score,
@@ -335,24 +337,42 @@ async def _run_task_via_evalscope_service(
         task_id,
     )
 
-    # 6. Build prompt → dataset_id mapping for correct attribution
-    #    Use first-seen semantics: if the same query appears in multiple
-    #    datasets, the first dataset wins (no silent overwrite).
+    # 6. Build prompt → dataset_id mapping for correct attribution.
+    #    Fail-fast on read/parse errors AND on cross-dataset duplicate
+    #    queries — the same query appearing in two datasets makes
+    #    attribution ambiguous, so refuse to guess.
     prompt_to_dataset: dict[str, uuid.UUID] = {}
     for ds in datasets:
         stem = dataset_stems[ds.id]
         ds_input_key = f"{work_dir_key}/input/general_qa/{stem}.jsonl"
         try:
             text = await storage.read_text(ds_input_key)
-            for line in text.splitlines():
-                line = line.strip()
-                if line:
-                    row_data = json.loads(line)
-                    q = row_data.get("query", "")
-                    if q and q not in prompt_to_dataset:
-                        prompt_to_dataset[q] = ds.id
-        except Exception:
-            pass  # Mapping failure is non-fatal; will use default
+        except Exception as e:
+            raise ResultIngestionError(
+                f"Failed to read dataset input {ds_input_key} for "
+                f"prompt→dataset attribution: {e}"
+            ) from e
+        for line_no, raw in enumerate(text.splitlines(), start=1):
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                row_data = json.loads(line)
+            except json.JSONDecodeError as e:
+                raise ResultIngestionError(
+                    f"Malformed JSONL in {ds_input_key} at line {line_no}: {e}"
+                ) from e
+            q = row_data.get("query", "")
+            if not q:
+                continue
+            existing = prompt_to_dataset.get(q)
+            if existing is not None and existing != ds.id:
+                raise ResultIngestionError(
+                    f"Ambiguous prompt→dataset attribution: duplicate query "
+                    f"found in datasets {existing} and {ds.id} "
+                    f"(at {ds_input_key} line {line_no})"
+                )
+            prompt_to_dataset[q] = ds.id
 
     # 7. Ingest results from EvalScope output artifacts
     score = await extract_primary_score(storage, work_dir_key)
@@ -384,15 +404,35 @@ async def _run_task_via_evalscope_service(
             len(criteria),
         )
 
-    # 8. Create EvalResult entries with correct dataset/criterion attribution
-    default_dataset_id = datasets[0].id
+    # 8. Create EvalResult entries with correct dataset/criterion attribution.
+    #    Fail-fast: a prompt without a mapping means the ingested result
+    #    cannot be attributed to any dataset — do not silently bucket it
+    #    into datasets[0].
     total_results = 0
-    fallback_count = 0
     for row in ingested_results:
-        dataset_id = prompt_to_dataset.get(row["prompt_text"])
+        prompt_text = row["prompt_text"]
+        if not prompt_text:
+            # Empty prompt cannot be attributed to any dataset row by query
+            # match. This is an upstream data-quality issue (the dataset row
+            # itself had no `query`), not an attribution ambiguity — skip it
+            # with a warning instead of aborting the whole task.
+            logger.warning(
+                "Task %s: skipping ingested result with empty prompt_text "
+                "(no upstream query to attribute to)",
+                task_id,
+            )
+            continue
+        dataset_id = prompt_to_dataset.get(prompt_text)
         if dataset_id is None:
-            dataset_id = default_dataset_id
-            fallback_count += 1
+            # Use a stable digest rather than the raw prompt — the message
+            # ends up persisted in EvalSubtask.error_log, so avoid leaking
+            # any PII/secret content that may live inside dataset rows.
+            digest = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()[:16]
+            raise ResultIngestionError(
+                f"Task {task_id}: ingested result prompt not found in any "
+                f"dataset input; cannot attribute to a dataset "
+                f"(prompt sha256: {digest})"
+            )
         for criterion in criteria:
             result = EvalResult(
                 task_id=task_id,
@@ -409,14 +449,6 @@ async def _run_task_via_evalscope_service(
             )
             session.add(result)
             total_results += 1
-
-    if fallback_count:
-        logger.debug(
-            "Task %s: %d/%d results used default dataset attribution",
-            task_id,
-            fallback_count,
-            len(ingested_results),
-        )
 
     subtask.last_completed_index = len(ingested_results) if ingested_results else total_converted
     subtask.progress_pct = 100.0
@@ -619,8 +651,6 @@ def _validate_result(result: EvalResult) -> None:
 
     Raises ResultIngestionError if the result is in an invalid state.
     """
-    from app.errors import ResultIngestionError
-
     if result.model_output.startswith("[ERROR]"):
         raise ResultIngestionError(
             f"Refusing dirty result: model_output contains error string: {result.model_output[:80]}"

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from app.config import settings
+from app.errors import ResultIngestionError
 from app.services.storage.base import StorageBackend
 from app.services.storage.utils import uri_to_key
 
@@ -303,8 +304,6 @@ async def extract_primary_score(storage: StorageBackend, work_dir_key: str) -> f
     reports_prefix = f"{work_dir_key}/reports"
     files = await storage.list_files(reports_prefix, patterns=["*.json"])
     if not files:
-        from app.errors import ResultIngestionError
-
         raise ResultIngestionError(
             f"No report files found in {reports_prefix} after task completion"
         )
@@ -321,12 +320,16 @@ async def extract_primary_score(storage: StorageBackend, work_dir_key: str) -> f
         if score is not None:
             return float(score)
     if read_errors and len(read_errors) == len(files):
-        from app.errors import ResultIngestionError
-
         raise ResultIngestionError(
             f"All {len(files)} report file(s) failed to read/parse: " + "; ".join(read_errors)
         )
-    return 0.0  # Files exist but no numeric score found
+    msg = (
+        f"No numeric score extractable from {len(files)} report file(s) "
+        f"in {reports_prefix}; evaluation output is malformed"
+    )
+    if read_errors:
+        msg += f" (partial read/parse failures: {'; '.join(read_errors)})"
+    raise ResultIngestionError(msg)
 
 
 def _find_numeric_score(node: Any) -> float | None:
